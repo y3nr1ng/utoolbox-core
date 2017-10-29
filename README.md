@@ -1,5 +1,5 @@
 # Lattice
-[![Build Status](https://travis-ci.com/liuyenting/lattice.svg?token=RnNdzNQoCUCRNxtUiy7m&branch=master)](https://travis-ci.com/liuyenting/lattice.svg?token=RnNdzNQoCUCRNxtUiy7m&branch=master)  
+[![Build Status](https://travis-ci.com/liuyenting/lattice.svg?token=RnNdzNQoCUCRNxtUiy7m&branch=master)](https://travis-ci.com/liuyenting/lattice)  
 A Python image processing package for LLSM.
 
 ## Getting Started
