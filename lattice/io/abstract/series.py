@@ -32,7 +32,7 @@ class TimePoint():
     Load a file as an object representation.
     """
     def __init__(self, dtype, file_path=None):
-        pass
+        print(file_path)
 
     def __del__(self):
         pass
