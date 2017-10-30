@@ -32,7 +32,10 @@ class TimePoint():
     Load a file as an object representation.
     """
     def __init__(self, dtype, file_path=None):
-        print(file_path)
+        self.dtype = dtype
+
+        #TODO call the constructor of the primitive type
+        dtype(file_path)
 
     def __del__(self):
         pass
