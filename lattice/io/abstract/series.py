@@ -13,6 +13,17 @@ class TimeSeries():
         else:
             self._timepoints = []
 
+    def __len__(self):
+        return len(self._timepoints)
+
+    def __getitem__(self, key):
+        if isinstance(key, slice):
+            return [self._timepoints[i] for i in xrange(*key.indices(len(self)))]
+        elif isinstance(key, int):
+            return self._timepoints[key]
+        else:
+            raise TypeError('Invalid argument type')
+
     def __del__(self):
         del self._timepoints[:]
 
