@@ -1,7 +1,7 @@
 import os.path
 import glob
 
-class TimeSeries():
+class TimeSeries(object):
     """
     Load series of time points.
     """
@@ -24,10 +24,16 @@ class TimeSeries():
         else:
             raise TypeError('Invalid argument type')
 
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        pass
+
     def __del__(self):
         del self._timepoints[:]
 
-class TimePoint():
+class TimePoint(object):
     """
     Load a file as an object representation.
     """
