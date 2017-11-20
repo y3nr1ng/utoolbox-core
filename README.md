@@ -1,9 +1,14 @@
-# uToolbox 
+# uToolbox
 [![Build Status](https://travis-ci.com/liuyenting/uToolbox.svg?token=RnNdzNQoCUCRNxtUiy7m&branch=master)](https://travis-ci.com/liuyenting/uToolbox)  
 A Python image processing package for LLSM.
 
 ## Getting Started
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See deployment for notes on how to deploy the project on a live system.
+
+Quick note
+```
+python -m utoolbox.demo.load_tiff
+```
 
 ### Prerequisites
 What things you need to install the software and how to install them
