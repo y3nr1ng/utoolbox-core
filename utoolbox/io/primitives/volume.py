@@ -1,4 +1,6 @@
-class SimpleVolume(object):
+import numpy as np
+
+class SimpleVolume(np.ndarray):
     def __init__(self, file_path):
         print(file_path)
 
