@@ -4,16 +4,12 @@ from mmap import mmap, ACCESS_READ, ACCESS_WRITE
 import os
 from struct import unpack, iter_unpack
 
-import matplotlib.pyplot as plt
-
 class Tiff(FileIO):
     def __init__(self, path, mode):
-        print('in Tiff.__init__')
-
         self._mode = mode
         self._path = path
 
-        self._ifds = []
+        self._subfiles = []
         self._current_page = 0
 
     def __enter__(self):
@@ -86,18 +82,18 @@ class Tiff(FileIO):
             # create IFD object
             ifd = IFD(self._path, self._mm.tell())
             ifd.parse_tags(self._mm, self._byte_order)
-            self._ifds.append(ifd)
+            self._subfiles.append(ifd)
 
             # update the offset
             (next_ifd_offset, ) = unpack(self._byte_order+'I', self._mm.read(4))
 
-        print('{} IFDs found'.format(len(self)))
+        print('{} subfiles'.format(len(self)))
 
     def __len__(self):
         """
-        Return number of IFDs.
+        Return number of subfiles.
         """
-        return len(self._ifds)
+        return len(self._subfiles)
 
     def __iter__(self):
         return self
@@ -111,12 +107,19 @@ class Tiff(FileIO):
             return self[self._current_page-1]
 
     def __getitem__(self, index):
-        return self._ifds[index]
+        return self._subfiles[index]
+
+    def __setitem__(self, index, data):
+        raise NotImplementedError
 
 class IFD(object):
     def __init__(self, path, offset):
         self._path = path
         self._offset = offset
+
+        # lazy load the raster data
+        #TODO use lazy property
+        self._raster = None
 
     def parse_tags(self, mm, byte_order):
         """
@@ -132,7 +135,62 @@ class IFD(object):
         }
 
     @property
-    def data(self):
+    def rasters(self):
+        if self._raster is None:
+            self._determine_image_type()
+
         address = format(self._offset, '02x')
         n_tags = len(self.tags)
-        print('address @ 0x{}, {} tags'.format(address, n_tags))
+        return 'address @ 0x{}, {} tags'.format(address, n_tags)
+
+    def _determine_image_type(self):
+        """
+        Using hard-coded logic to determine type of the raster from tags
+        contained in the IFD.
+        """
+        tags = set(self.tags.keys())
+        if tags < BilevelImage.REQUIRED_TAGS:
+            raise TypeError('Insufficient tag information')
+        elif tags < GrayscaleImage.REQUIRED_TAGS:
+            print('-> bilevel')
+        else:
+            if tags > PaletteImage.REQUIRED_TAGS:
+                print('-> palette')
+            elif tags > RGBImage.REQUIRED_TAGS:
+                print('-> rgb')
+            else:
+                print('-> grayscale')
+
+class Tags(object):
+    def __init__(self, tag_id, dtype, count, offset):
+        pass
+
+    def __str__(self):
+        pass
+
+class BilevelImage(IFD):
+    REQUIRED_TAGS = {
+        256, 257, 259, 262, 273, 278, 279, 282, 283, 296
+    }
+    pass
+
+class GrayscaleImage(BilevelImage):
+    REQUIRED_TAGS = {
+        256, 257, 258, 259, 262, 273, 278, 279, 282, 283,
+        296
+    }
+    pass
+
+class PaletteImage(GrayscaleImage):
+    REQUIRED_TAGS = {
+        256, 257, 258, 259, 262, 273, 278, 279, 282, 283,
+        296, 320
+    }
+    pass
+
+class RGBImage(GrayscaleImage):
+    REQUIRED_TAGS = {
+        256, 257, 258, 259, 262, 273, 277, 278, 279, 282,
+        283, 296
+    }
+    pass
