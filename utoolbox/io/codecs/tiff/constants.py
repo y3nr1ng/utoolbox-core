@@ -54,6 +54,39 @@ class TagType(Enum):
         """
         return TagType.Undefined
 
+class NewSubfileOption(Enum):
+    """
+    A general indication of the kind of data contained in this subfile,  mainly
+    useful when there are multiple subfiles in a single TIFF file.
+    """
+    __slots__ = ()
+
+    Unspecified = ('Unspecified',    0)
+    Reduced     = ('Reduced-resolution', 1)
+    Page        = ('Multi-page',         2)
+    Mask        = ('Transparency Mask',  4)
+
+    def __new__(cls, name, value):
+        """
+        Parse pre-defined internal table.
+
+        Parameters
+        ----------
+        cls: TagType
+            Type of current object used in the initialization.
+        name: str
+            String representation for print out.
+        value: int
+            Binary index in the TIFF specification.
+        """
+        obj = object.__new__(cls)
+        obj._name = name
+        obj._value_ = value
+        return obj
+
+    def __str__(self):
+        return self._name
+
 class CompressionType(object):
     """
     Compression scheme used on the image data.
@@ -119,6 +152,101 @@ class PhotometricOptions(Enum):
     def __str__(self):
         return self._name
 
+class OrientationOptions(Enum):
+    """
+    The orientation of the image with respect to the rows and columns.
+    """
+    __slots__ = ()
+
+    TopLeft     = 1
+    TopRight    = 2
+    BottomRight = 3
+    BottomLeft  = 4
+    LeftTop     = 5
+    RightTop    = 6
+    RightBottom = 7
+    LeftBottom  = 8
+
+    def __str__(self):
+        return self._name_
+
+class PlanarConfigOptions(Enum):
+    """
+    How the components of each pixel are stored.
+    """
+    __slots__ = ()
+
+    Chunky = 1
+    Planar = 2
+
+    def __str__(self):
+        return self._name_
+
+class ResolutionUnitOptions(Enum):
+    """
+    The unit of measurement for XResolution and YResolution.
+    """
+    __slots__ = ()
+
+    NoUnit     = ('None',       1)
+    Inch       = ('Inch',       2)
+    Centimeter = ('Centimeter', 3)
+
+    def __new__(cls, name, value):
+        """
+        Parse pre-defined internal table.
+
+        Parameters
+        ----------
+        cls: TagType
+            Type of current object used in the initialization.
+        name: str
+            String representation for print out.
+        value: int
+            Binary index in the TIFF specification.
+        """
+        obj = object.__new__(cls)
+        obj._name = name
+        obj._value_ = value
+        return obj
+
+    def __str__(self):
+        return self._name_
+
+class SampleFormatOptions(Enum):
+    """
+    Specifies how to interpret each data sample in a pixel.
+    """
+    __slots__ = ()
+
+    UInt      = ('Unsigned Integer',    1)
+    Int       = ('Signed Integer',      2)
+    IEEEFP    = ('IEEE Floating Point', 3)
+    Undefined = ('Undefined',           4)
+    CplxInt   = ('Complex Integer',     5)
+    CplxFP    = ('Complex IEEE FP',     6)
+
+    def __new__(cls, name, value):
+        """
+        Parse pre-defined internal table.
+
+        Parameters
+        ----------
+        cls: TagType
+            Type of current object used in the initialization.
+        name: str
+            String representation for print out.
+        value: int
+            Binary index in the TIFF specification.
+        """
+        obj = object.__new__(cls)
+        obj._name = name
+        obj._value_ = value
+        return obj
+
+    def __str__(self):
+        return self._name_
+
 class Tags(object):
     """
     Reference extracted from the TIFF specification, containing baseline tags
@@ -133,38 +261,30 @@ class Tags(object):
     """
     __slots__ = ()
 
-    NewSubfileType   = ('NewSubfileType',   254,     TagType.Long, 1, None)
-    SubfileType      = ('SubfileType',      255,    TagType.Short, 1, None)
-    ImageWidth       = ('ImageWidth',       256,    TagType.Short, 1, None)
-    ImageLength      = ('ImageLength',      257,    TagType.Short, 1, None)
-    BitsPerSample    = ('BitsPerSample',    258,    TagType.Short, '<SamplesPerPixel>', 1)
+    NewSubfileType   = ('NewSubfileType',   254,     TagType.Long, NewSubfileOption.Unspecified)
+    ImageWidth       = ('ImageWidth',       256,    TagType.Short, None)
+    ImageLength      = ('ImageLength',      257,    TagType.Short, None)
+    BitsPerSample    = ('BitsPerSample',    258,    TagType.Short, 1)
     Compression      = ('Compression',      259,    TagType.Short, CompressionOptions.Uncompressed)
     Photometric      = ('PhotometricInterpretation', 262, TagType.Short, PhotometricOptions.WhiteIsZero)
     ImageDescription = ('ImageDescription', 270,    TagType.ASCII, None)
-    Make             = ('Make',             271,    TagType.ASCII, None)
-    Model            = ('Model',            272,    TagType.ASCII, None)
-    StripOffsets     = ('StripOffsets',     273,    TagType.Short, '<StripsPerImage>')
-    Orientation      = ('Orientation',      274,    TagType.Short, 1)
+    StripOffsets     = ('StripOffsets',     273,    TagType.Short, None)
+    Orientation      = ('Orientation',      274,    TagType.Short, OrientationOptions.TopLeft)
     SamplesPerPixel  = ('SamplesPerPixel',  277,    TagType.Short, 1)
-    RowsPerStrip     = ('RowsPerStrip',     278,    TagType.Short, 1)
-    StripByteCounts  = ('StripByteCounts',  279,     TagType.Long,  1)
-    XResolution      = ('XResolution',      282, TagType.Rational, )
-    YResolution      = ('YResolution',      283, TagType.Rational, )
-    PlanarConfig     = ('PlanarConfiguration', 284, TagType.Short, '<Contig>')
-    PageName         = ('PageName',         285,    TagType.ASCII, )
-    XPosition        = ('XPosition',        286, TagType.Rational, )
-    YPosition        = ('YPosition',        287, TagType.Rational, )
-    ResolutionUnit   = ('ResolutionUnit',   296,    TagType.Short, '<None>')
-    PageNumber       = ('PageNumber',       297,    TagType.Short, )
+    RowsPerStrip     = ('RowsPerStrip',     278,    TagType.Short, 2**16-1)
+    StripByteCounts  = ('StripByteCounts',  279,     TagType.Long, None)
+    XResolution      = ('XResolution',      282, TagType.Rational, None)
+    YResolution      = ('YResolution',      283, TagType.Rational, None)
+    PlanarConfig     = ('PlanarConfiguration', 284, TagType.Short, PlanarConfigOptions.Chunky)
+    PageName         = ('PageName',         285,    TagType.ASCII, None)
+    ResolutionUnit   = ('ResolutionUnit',   296,    TagType.Short, ResolutionUnitOptions.Inch)
+    PageNumber       = ('PageNumber',       297,    TagType.Short, None)
     Software         = ('Software',         305,    TagType.ASCII, None)
-    DateTime         = ('DateTime',         306,    TagType.ASCII, None)
-    Artist           = ('Artist',           315,    TagType.ASCII, None)
-    HostComputer     = ('HostComputer',     316,    TagType.ASCII, None)
     ColorMap         = ('ColorMap',         320,    TagType.Short, None)
     ExtraSamples     = ('ExtraSamples',     338,    TagType.Short, None)
-    SampleFormat     = ('SampleFormat',     339,    TagType.Short, '<unsigned integer>')
+    SampleFormat     = ('SampleFormat',     339,    TagType.Short, SampleFormatOptions.UInt)
 
-    def __new__(cls, name, value, dtype, count, default):
+    def __new__(cls, name, value, dtype, default):
         """
         Parse pre-defined internal table.
 
@@ -178,8 +298,6 @@ class Tags(object):
             Binary index in the TIFF specification.
         dtype: TagType
             Type of the field.
-        count: int
-            Default number of field to interpret.
         default: (arbitrary)
             Default value, `None` if not specified.
         """
@@ -187,7 +305,6 @@ class Tags(object):
         obj._name = name
         obj._value_ = value
         obj._type = dtype
-        obj._count = count
         obj._default = default
         return obj
 
@@ -197,10 +314,6 @@ class Tags(object):
     @property
     def type(self):
         return self._type
-
-    @property
-    def count(self):
-        return self._count
 
     @property
     def default(self):
