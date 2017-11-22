@@ -54,7 +54,7 @@ class TagType(Enum):
         """
         return TagType.Undefined
 
-class NewSubfileOption(Enum):
+class NewSubfileOptions(Enum):
     """
     A general indication of the kind of data contained in this subfile,  mainly
     useful when there are multiple subfiles in a single TIFF file.
@@ -87,7 +87,7 @@ class NewSubfileOption(Enum):
     def __str__(self):
         return self._name
 
-class CompressionType(object):
+class CompressionOptions(Enum):
     """
     Compression scheme used on the image data.
     """
@@ -247,7 +247,7 @@ class SampleFormatOptions(Enum):
     def __str__(self):
         return self._name_
 
-class Tags(object):
+class Tags(Enum):
     """
     Reference extracted from the TIFF specification, containing baseline tags
     and extension tags.
@@ -261,28 +261,29 @@ class Tags(object):
     """
     __slots__ = ()
 
-    NewSubfileType   = ('NewSubfileType',   254,     TagType.Long, NewSubfileOption.Unspecified)
-    ImageWidth       = ('ImageWidth',       256,    TagType.Short, None)
-    ImageLength      = ('ImageLength',      257,    TagType.Short, None)
-    BitsPerSample    = ('BitsPerSample',    258,    TagType.Short, 1)
-    Compression      = ('Compression',      259,    TagType.Short, CompressionOptions.Uncompressed)
+    NewSubfileType   = ('NewSubfileType',   254,      TagType.Long, NewSubfileOptions.Unspecified)
+    ImageWidth       = ('ImageWidth',       256,     TagType.Short, None)
+    ImageLength      = ('ImageLength',      257,     TagType.Short, None)
+    BitsPerSample    = ('BitsPerSample',    258,     TagType.Short, 1)
+    Compression      = ('Compression',      259,     TagType.Short, CompressionOptions.Uncompressed)
     Photometric      = ('PhotometricInterpretation', 262, TagType.Short, PhotometricOptions.WhiteIsZero)
-    ImageDescription = ('ImageDescription', 270,    TagType.ASCII, None)
-    StripOffsets     = ('StripOffsets',     273,    TagType.Short, None)
-    Orientation      = ('Orientation',      274,    TagType.Short, OrientationOptions.TopLeft)
-    SamplesPerPixel  = ('SamplesPerPixel',  277,    TagType.Short, 1)
-    RowsPerStrip     = ('RowsPerStrip',     278,    TagType.Short, 2**16-1)
-    StripByteCounts  = ('StripByteCounts',  279,     TagType.Long, None)
-    XResolution      = ('XResolution',      282, TagType.Rational, None)
-    YResolution      = ('YResolution',      283, TagType.Rational, None)
-    PlanarConfig     = ('PlanarConfiguration', 284, TagType.Short, PlanarConfigOptions.Chunky)
-    PageName         = ('PageName',         285,    TagType.ASCII, None)
-    ResolutionUnit   = ('ResolutionUnit',   296,    TagType.Short, ResolutionUnitOptions.Inch)
-    PageNumber       = ('PageNumber',       297,    TagType.Short, None)
-    Software         = ('Software',         305,    TagType.ASCII, None)
-    ColorMap         = ('ColorMap',         320,    TagType.Short, None)
-    ExtraSamples     = ('ExtraSamples',     338,    TagType.Short, None)
-    SampleFormat     = ('SampleFormat',     339,    TagType.Short, SampleFormatOptions.UInt)
+    ImageDescription = ('ImageDescription', 270,     TagType.ASCII, None)
+    StripOffsets     = ('StripOffsets',     273,     TagType.Short, None)
+    Orientation      = ('Orientation',      274,     TagType.Short, OrientationOptions.TopLeft)
+    SamplesPerPixel  = ('SamplesPerPixel',  277,     TagType.Short, 1)
+    RowsPerStrip     = ('RowsPerStrip',     278,     TagType.Short, 2**16-1)
+    StripByteCounts  = ('StripByteCounts',  279,      TagType.Long, None)
+    XResolution      = ('XResolution',      282,  TagType.Rational, None)
+    YResolution      = ('YResolution',      283,  TagType.Rational, None)
+    PlanarConfig     = ('PlanarConfiguration', 284,  TagType.Short, PlanarConfigOptions.Chunky)
+    PageName         = ('PageName',         285,     TagType.ASCII, None)
+    ResolutionUnit   = ('ResolutionUnit',   296,     TagType.Short, ResolutionUnitOptions.Inch)
+    PageNumber       = ('PageNumber',       297,     TagType.Short, None)
+    Software         = ('Software',         305,     TagType.ASCII, None)
+    ColorMap         = ('ColorMap',         320,     TagType.Short, None)
+    ExtraSamples     = ('ExtraSamples',     338,     TagType.Short, None)
+    SampleFormat     = ('SampleFormat',     339,     TagType.Short, SampleFormatOptions.UInt)
+    Unknown          = ('<Unknown>',          0, TagType.Undefined, None)
 
     def __new__(cls, name, value, dtype, default):
         """
@@ -318,3 +319,9 @@ class Tags(object):
     @property
     def default(self):
         return self._default
+
+    def _missing_(value):
+        """
+        Return the default value.
+        """
+        return Tags.Unknown
