@@ -1,5 +1,37 @@
 from enum import Enum
 
+class TagType(Enum):
+    Byte = 1        # uint8
+    ASCII = 2       # str
+    Short = 3       # uint16
+    Long = 4        # uint32
+    Rational = 5    # uint32/uint32 -> fraction
+    SByte = 6       # int8
+    Undefined = 7
+    SShort = 8      # int16
+    SLong = 9       # int32
+    SRational = 10  # int32/int32 -> fraction
+    Float = 11      # float
+    Double = 12     # double
+
+    _FORMAT_LUT = {
+        1: 'B',
+        2: 's',
+        3: 'H',
+        4: 'I',
+        5: 'II',
+        6: 'b',
+        7: 'P',
+        8: 'h',
+        9: 'i',
+        10: 'ii',
+        11: 'f',
+        12: 'd'
+    }
+
+    def __str__(self):
+        return self._FORMAT_LUT[self.value]
+
 class TagName(Enum):
     NewSubfileType = 254
     SubfileType = 255
@@ -96,5 +128,9 @@ class PhotometricOptions(Enum):
     CIELab = 8
 
 class Tags(object):
-    def __init__(self):
+    @staticmethod
+    def __init__(self, tag_id, dtype, count, offset):
+        pass
+
+    def __str__(self):
         pass

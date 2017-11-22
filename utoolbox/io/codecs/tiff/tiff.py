@@ -129,11 +129,17 @@ class IFD(object):
 
         tag_fmt = byte_order + 'HHII'
         raw_tags = mm.read(n_tags*12)
-        #TODO replace Tag list instead of dict
         self.tags = {
             tag_id: (dtype, count, offset)
             for (tag_id, dtype, count, offset) in iter_unpack(tag_fmt, raw_tags)
         }
+
+    def _interpret_tags(self):
+        """
+        Extract the actual information of the tag.
+        """
+        for tag_id, (dtype, count, offset) in self.tags.items():
+            pass
 
     @property
     def rasters(self):
@@ -159,13 +165,6 @@ class IFD(object):
                 print('<rgb>')
             else:
                 print('<grayscale>')
-
-class Tags(object):
-    def __init__(self, tag_id, dtype, count, offset):
-        pass
-
-    def __str__(self):
-        pass
 
 class BilevelImage(IFD):
     REQUIRED_TAGS = {
