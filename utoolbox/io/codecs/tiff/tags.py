@@ -125,11 +125,11 @@ class PhotometricOptions(Enum):
     """
     __slots__ = ()
 
-    WhiteIsZero = ('WhiteIsZero',     0)
-    BlackIsZero = ('BlackIsZero',     1)
+    WhiteIsZero = ('White is Zero',     0)
+    BlackIsZero = ('Black is Zero',     1)
     RGB         = ('RGB',             2)
-    Palette     = ('Palette',         3)
-    Mask        = ('TransparenyMask', 4)
+    Palette     = ('Palette RGB',         3)
+    Mask        = ('Transpareny Mask', 4)
 
     def __new__(cls, name, value):
         """
@@ -151,6 +151,18 @@ class PhotometricOptions(Enum):
 
     def __str__(self):
         return self._name
+
+class FillOrderOptions(Enum):
+    """
+    How the components of each pixel are stored.
+    """
+    __slots__ = ()
+
+    MSB2LSB = 1
+    LSB2MSB = 2
+
+    def __str__(self):
+        return self._name_
 
 class OrientationOptions(Enum):
     """
@@ -261,29 +273,30 @@ class Tags(Enum):
     """
     __slots__ = ()
 
-    NewSubfileType   = ('NewSubfileType',   254,      TagType.Long, NewSubfileOptions.Unspecified)
-    ImageWidth       = ('ImageWidth',       256,     TagType.Short, None)
-    ImageLength      = ('ImageLength',      257,     TagType.Short, None)
-    BitsPerSample    = ('BitsPerSample',    258,     TagType.Short, 1)
-    Compression      = ('Compression',      259,     TagType.Short, CompressionOptions.Uncompressed)
-    Photometric      = ('PhotometricInterpretation', 262, TagType.Short, PhotometricOptions.WhiteIsZero)
-    ImageDescription = ('ImageDescription', 270,     TagType.ASCII, None)
-    StripOffsets     = ('StripOffsets',     273,     TagType.Short, None)
-    Orientation      = ('Orientation',      274,     TagType.Short, OrientationOptions.TopLeft)
-    SamplesPerPixel  = ('SamplesPerPixel',  277,     TagType.Short, 1)
-    RowsPerStrip     = ('RowsPerStrip',     278,     TagType.Short, 2**16-1)
-    StripByteCounts  = ('StripByteCounts',  279,      TagType.Long, None)
-    XResolution      = ('XResolution',      282,  TagType.Rational, None)
-    YResolution      = ('YResolution',      283,  TagType.Rational, None)
-    PlanarConfig     = ('PlanarConfiguration', 284,  TagType.Short, PlanarConfigOptions.Chunky)
-    PageName         = ('PageName',         285,     TagType.ASCII, None)
-    ResolutionUnit   = ('ResolutionUnit',   296,     TagType.Short, ResolutionUnitOptions.Inch)
-    PageNumber       = ('PageNumber',       297,     TagType.Short, None)
-    Software         = ('Software',         305,     TagType.ASCII, None)
-    ColorMap         = ('ColorMap',         320,     TagType.Short, None)
-    ExtraSamples     = ('ExtraSamples',     338,     TagType.Short, None)
-    SampleFormat     = ('SampleFormat',     339,     TagType.Short, SampleFormatOptions.UInt)
-    Unknown          = ('<Unknown>',          0, TagType.Undefined, None)
+    NewSubfileType   = ('New Subfile Type',   254,      TagType.Long, NewSubfileOptions.Unspecified)
+    ImageWidth       = ('Image Width',        256,     TagType.Short, None)
+    ImageLength      = ('Image Length',       257,     TagType.Short, None)
+    BitsPerSample    = ('Bits per Sample',    258,     TagType.Short, 1)
+    Compression      = ('Compression',        259,     TagType.Short, CompressionOptions.Uncompressed)
+    Photometric      = ('Photometric Interpretation', 262, TagType.Short, PhotometricOptions.WhiteIsZero)
+    FillOrder        = ('Fill Order',         266,     TagType.Short, FillOrderOptions.MSB2LSB)
+    ImageDescription = ('Image Description',  270,     TagType.ASCII, None)
+    StripOffsets     = ('Strip Offsets',      273,     TagType.Short, None)
+    Orientation      = ('Orientation',        274,     TagType.Short, OrientationOptions.TopLeft)
+    SamplesPerPixel  = ('Samples per Pixel',  277,     TagType.Short, 1)
+    RowsPerStrip     = ('Rows per Strip',     278,     TagType.Short, 2**16-1)
+    StripByteCounts  = ('Strip Byte Counts',  279,      TagType.Long, None)
+    XResolution      = ('X Resolution',       282,  TagType.Rational, None)
+    YResolution      = ('Y Resolution',       283,  TagType.Rational, None)
+    PlanarConfig     = ('Planar Configuration', 284,   TagType.Short, PlanarConfigOptions.Chunky)
+    PageName         = ('Page Name',          285,     TagType.ASCII, None)
+    ResolutionUnit   = ('Resolution Unit',    296,     TagType.Short, ResolutionUnitOptions.Inch)
+    PageNumber       = ('Page Number',        297,     TagType.Short, None)
+    Software         = ('Software',           305,     TagType.ASCII, None)
+    ColorMap         = ('Color Map',          320,     TagType.Short, None)
+    ExtraSamples     = ('Extra Samples',      338,     TagType.Short, None)
+    SampleFormat     = ('Sample Format',      339,     TagType.Short, SampleFormatOptions.UInt)
+    Unknown          = ('<Unknown>',            0, TagType.Undefined, None)
 
     def __new__(cls, name, value, dtype, default):
         """
