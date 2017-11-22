@@ -1,81 +1,80 @@
 from enum import Enum
 
-TAG_NAME = {
-    254: 'NewSubfileType',
-    255: 'SubfileType',
-    256: 'ImageWidth',
-    257: 'ImageLength',
-    258: 'BitsPerSample',
-    259: 'Compression',
-    262: 'PhotometricInterpretation',
-    263: 'Thresholding',
-    264: 'CellWidth',
-    265: 'CellLength',
-    266: 'FillOrder',
-    269: 'DocumentName',
-    270: 'ImageDescription',
-    271: 'Make',
-    272: 'Model',
-    273: 'StripOffsets',
-    274: 'Orientation',
-    277: 'SamplesPerPixel',
-    278: 'RowsPerStrip',
-    279: 'StripByteCounts',
-    280: 'MinSampleValue',
-    281: 'MaxSampleValue',
-    282: 'XResolution',
-    283: 'YResolution',
-    284: 'PlanarConfiguration',
-    285: 'PageName',
-    286: 'XPosition',
-    287: 'YPosition',
-    288: 'FreeOffsets',
-    289: 'FreeByteCounts',
-    290: 'GrayResponseUnit',
-    291: 'GrayResponseCurve',
-    292: 'T4Options',
-    293: 'T6Options',
-    296: 'ResolutionUnit',
-    297: 'PageNumber',
-    301: 'TransferFunction',
-    305: 'Software',
-    306: 'DateTime',
-    315: 'Artist',
-    316: 'HostComputer',
-    317: 'Predictor',
-    318: 'WhitePoint',
-    319: 'PrimaryChromaticities',
-    320: 'ColorMap',
-    321: 'HalftoneHints',
-    322: 'TileWidth',
-    323: 'TileLength',
-    324: 'TileOffsets',
-    325: 'TileByteCounts',
-    332: 'InkSet',
-    333: 'InkNames',
-    334: 'NumberOfInks',
-    336: 'DotRange',
-    337: 'TargetPrinter',
-    338: 'ExtraSamples',
-    339: 'SampleFormat',
-    340: 'SMinSampleValue',
-    341: 'SMaxSampleValue',
-    342: 'TransferRange',
-    512: 'JPEGProc',
-    513: 'JPEGInterchangeFormat',
-    514: 'JPEGInterchangeFormatLngth',
-    515: 'JPEGRestartInterval',
-    517: 'JPEGLosslessPredictors',
-    518: 'JPEGPointTransforms',
-    519: 'JPEGQTables',
-    520: 'JPEGDCTables',
-    521: 'JPEGACTables',
-    529: 'YCbCrCoefficients',
-    530: 'YCbCrSubSampling',
-    531: 'YCbCrPositioning',
-    532: 'ReferenceBlackWhite',
-    33432: 'Copyright'
-}
+class TagName(Enum):
+    NewSubfileType = 254
+    SubfileType = 255
+    ImageWidth = 256
+    ImageLength = 257
+    BitsPerSample = 258
+    Compression = 259
+    PhotometricInterpretation = 262
+    Thresholding = 263
+    CellWidth = 264
+    CellLength = 265
+    FillOrder = 266
+    DocumentName = 269
+    ImageDescription = 270
+    Make = 271
+    Model = 272
+    StripOffsets = 273
+    Orientation = 274
+    SamplesPerPixel = 277
+    RowsPerStrip = 278
+    StripByteCounts = 279
+    MinSampleValue = 280
+    MaxSampleValue = 281
+    XResolution = 282
+    YResolution = 283
+    PlanarConfiguration = 284
+    PageName = 285
+    XPosition = 286
+    YPosition =  287
+    FreeOffsets = 288
+    FreeByteCounts = 289
+    GrayResponseUnit = 290
+    GrayResponseCurve = 291
+    T4Options = 292
+    T6Options = 293
+    ResolutionUnit = 296
+    PageNumber = 297
+    TransferFunction = 301
+    Software = 305
+    DateTime = 306
+    Artist = 315
+    HostComputer = 316
+    Predictor = 317
+    WhitePoint = 318
+    PrimaryChromaticities = 319
+    lorMap = 320
+    HalftoneHints = 321
+    TileWidth = 322
+    TileLength = 323
+    TileOffsets = 324
+    TileByteCounts = 325
+    InkSet = 332
+    InkNames = 333
+    NumberOfInks = 334
+    DotRange = 336
+    TargetPrinter = 337
+    ExtraSamples = 338
+    SampleFormat = 339
+    SMinSampleValue = 340
+    SMaxSampleValue = 341
+    TransferRange = 342
+    JPEGProc = 512
+    JPEGInterchangeFormat = 513
+    JPEGInterchangeFormatLngth = 514
+    JPEGRestartInterval = 515
+    JPEGLosslessPredictors = 517
+    JPEGPointTransforms = 518
+    JPEGQTables = 519
+    JPEGDCTables = 520
+    JPEGACTables = 521
+    YCbCrCoefficients = 529
+    YCbCrSubSampling = 530
+    YCbCrPositioning = 531
+    ReferenceBlackWhite = 532
+    Copyright = 33432
 
 class CompressionOptions(Enum):
     Uncompressed = 1
