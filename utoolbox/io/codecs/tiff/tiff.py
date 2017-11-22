@@ -80,8 +80,7 @@ class Tiff(FileIO):
             self._mm.seek(next_ifd_offset, os.SEEK_SET)
 
             # create IFD object
-            ifd = IFD(self._path, self._mm.tell())
-            ifd.parse_tags(self._mm, self._byte_order)
+            ifd = IFD(self._path, self._mm, self._byte_order, self._mm.tell())
             self._subfiles.append(ifd)
 
             # update the offset
@@ -107,39 +106,80 @@ class Tiff(FileIO):
             return self[self._current_page-1]
 
     def __getitem__(self, index):
+        #NOTE delayed tag interpretation?
+        self._subfiles[index].interpret_tag()
         return self._subfiles[index]
 
     def __setitem__(self, index, data):
         raise NotImplementedError
 
 class IFD(object):
-    def __init__(self, path, offset):
+    def __init__(self, path, mm, byte_order, offset):
         self._path = path
+        self._mm = mm
+        self._byte_order = byte_order
         self._offset = offset
+
+        self._parse_tags()
 
         # lazy load the raster data
         #TODO use lazy property
         self._raster = None
 
-    def parse_tags(self, mm, byte_order):
+    def _parse_tags(self):
         """
         Parse the containing tags in specified IFD.
         """
-        (n_tags, ) = unpack(byte_order+'H', mm.read(2))
+        (n_tags, ) = unpack(self._byte_order+'H', self._mm.read(2))
 
-        tag_fmt = byte_order + 'HHII'
-        raw_tags = mm.read(n_tags*12)
+        tag_fmt = self._byte_order + 'HHII'
+        raw_tags = self._mm.read(n_tags*12)
+
         self.tags = {
-            tag_id: (dtype, count, offset)
+            tag_id: (TagType(dtype), count, offset)
             for (tag_id, dtype, count, offset) in iter_unpack(tag_fmt, raw_tags)
         }
 
-    def _interpret_tags(self):
+    def interpret_tag(self):
+        #TODO remove the wrapper?
+        for tag_id, (dtype, count, offset) in self.tags.items():
+            self.tags[tag_id] = self._interpret_tag(dtype, count, offset)
+
+    def _interpret_tag(self, dtype, count, offset):
         """
         Extract the actual information of the tag.
         """
-        for tag_id, (dtype, count, offset) in self.tags.items():
-            pass
+        return {
+            TagType.Byte:      self._interpret_numeric_tag,
+            TagType.ASCII:     self._interpret_ascii_tag,
+            TagType.Short:     self._interpret_numeric_tag,
+            TagType.Long:      self._interpret_numeric_tag,
+            TagType.Rational:  self._interpret_rational_tag,
+            TagType.SByte:     self._interpret_numeric_tag,
+            TagType.Undefined: self._interpret_undefined_tag,
+            TagType.SShort:    self._interpret_numeric_tag,
+            TagType.SLong:     self._interpret_numeric_tag,
+            TagType.SRational: self._interpret_rational_tag,
+            TagType.Float:     self._interpret_numeric_tag,
+            TagType.Double:    self._interpret_numeric_tag
+        }[dtype](dtype, count, offset)
+
+    def _interpret_numeric_tag(self, dtype, count, offset):
+        return (dtype, count, offset)
+
+    def _interpret_rational_tag(self, dtype, count, offset):
+        return (dtype, count, offset)
+
+    def _interpret_ascii_tag(self, dtype, count, offset):
+        self._mm.seek(offset, os.SEEK_SET)
+        fmt = self._byte_order + str(count) + dtype.format
+        buf = self._mm.read(count)
+        (val, ) = unpack(fmt, buf)
+        return val
+
+    def _interpret_undefined_tag(self, *args):
+        #return hex(offset)
+        return (dtype, count, offset)
 
     @property
     def rasters(self):
