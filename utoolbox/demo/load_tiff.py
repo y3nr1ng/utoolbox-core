@@ -1,12 +1,20 @@
 from utoolbox.io import imopen
-from utoolbox.io.codecs.tiff.tags import TagName, TagType
+from utoolbox.io.codecs.tiff.tags import TagName
 from timeit import default_timer as timer
 
 from pprint import pprint
 
-print(TagType['Rational'])
-print(TagType.Rational)
-print(TagType((1, 'B')))
+from utoolbox.io.codecs.tiff.constants import TagType
+from random import randint
+
+start = timer()
+n = 10000
+for _ in range(n):
+    x = TagType(randint(1, 13))
+end = timer()
+dt = end-start
+print('elapsed {:.3f}s, {:.3f}us per iteration'.format(dt, dt/n*1e6))
+print()
 
 raise RuntimeError('PAUSE')
 
@@ -25,4 +33,4 @@ with imopen(file_path, 'r') as imfile:
 end = timer()
 print('image scanned in {:.3f}s'.format(end - start))
 
-input("Press Enter to continue...")
+input('Press Enter to continue...')

@@ -1,3 +1,4 @@
+from .constants import *
 from enum import Enum
 
 class TagType(Enum):
