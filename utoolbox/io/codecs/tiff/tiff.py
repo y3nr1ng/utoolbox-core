@@ -140,9 +140,7 @@ class IFD(object):
         if self._raster is None:
             self._determine_image_type()
 
-        address = format(self._offset, '02x')
-        n_tags = len(self.tags)
-        return 'address @ 0x{}, {} tags'.format(address, n_tags)
+        return 'address @ 0x{}'.format(hex(self._offset))
 
     def _determine_image_type(self):
         """
@@ -153,14 +151,14 @@ class IFD(object):
         if tags < BilevelImage.REQUIRED_TAGS:
             raise TypeError('Insufficient tag information')
         elif tags < GrayscaleImage.REQUIRED_TAGS:
-            print('-> bilevel')
+            print('<bilevel>')
         else:
             if tags > PaletteImage.REQUIRED_TAGS:
-                print('-> palette')
+                print('<palette>')
             elif tags > RGBImage.REQUIRED_TAGS:
-                print('-> rgb')
+                print('<rgb>')
             else:
-                print('-> grayscale')
+                print('<grayscale>')
 
 class Tags(object):
     def __init__(self, tag_id, dtype, count, offset):

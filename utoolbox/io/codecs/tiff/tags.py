@@ -1,3 +1,4 @@
+from enum import Enum
 
 TAG_NAME = {
     254: 'NewSubfileType',
@@ -75,6 +76,25 @@ TAG_NAME = {
     532: 'ReferenceBlackWhite',
     33432: 'Copyright'
 }
+
+class CompressionOptions(Enum):
+    Uncompressed = 1
+    CCITT = 2
+    Group3 = 3
+    Group4 = 4
+    LZW = 5
+    JPEG = 6
+    PackBits = 32773
+
+class PhotometricOptions(Enum):
+    WhiteIsZero = 0
+    BlackIsZero = 1
+    RGB = 2
+    Palette = 3
+    TransparencyMask = 4
+    CMYK = 5
+    YCbCr = 6
+    CIELab = 8
 
 class Tags(object):
     def __init__(self):
