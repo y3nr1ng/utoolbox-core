@@ -1,5 +1,5 @@
 from ..template import FileIO
-from .tags import Tags
+from .tags import TagType
 from mmap import mmap, ACCESS_READ, ACCESS_WRITE
 import os
 from struct import unpack, iter_unpack
