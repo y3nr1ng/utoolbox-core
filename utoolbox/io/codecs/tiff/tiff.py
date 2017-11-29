@@ -1,5 +1,5 @@
 from ..template import FileIO
-from .tags import TagType
+from .tags import Tags, TagType
 from mmap import mmap, ACCESS_READ, ACCESS_WRITE
 import os
 from struct import unpack, iter_unpack
@@ -143,6 +143,9 @@ class IFD(object):
     def interpret_tags(self):
         #TODO remove the wrapper?
         for tag, (ttype, count, offset) in self.tags.items():
+            # skip uknown tags per specification
+            if tag == Tags.Unknown:
+                continue
             self.tags[tag] = self._interpret_tag(ttype, count, offset)
 
     def _interpret_tag(self, ttype, count, offset):
@@ -165,16 +168,34 @@ class IFD(object):
         }[ttype](ttype, count, offset)
 
     def _interpret_numeric_tag(self, ttype, count, offset):
-        return (ttype, count, offset)
+        if count == 1:
+            return offset
+        self._mm.seek(offset, os.SEEK_SET)
+        fmt = self._byte_order + str(count) + ttype.format
+        buf = self._mm.read(ttype.size * count)
+        val = unpack(fmt, buf)
+        return val
 
     def _interpret_rational_tag(self, ttype, count, offset):
-        return (ttype, count, offset)
+        self._mm.seek(offset, os.SEEK_SET)
+        fmt = self._byte_order + ttype.format
+        if count == 1:
+            buf = self._mm.read(ttype.size)
+            (nom, den) = unpack(fmt, buf)
+            val = nom/den
+        else:
+            raw_rationals = self._mm.read(ttype.size * count)
+            val = {
+                nom/den for (nom, den) in iter_unpack(fmt, raw_rationals)
+            }
+        return val
 
     def _interpret_ascii_tag(self, ttype, count, offset):
         self._mm.seek(offset, os.SEEK_SET)
-        fmt = self._byte_order + str(count) + dtype.format
+        fmt = self._byte_order + str(count) + ttype.format
         buf = self._mm.read(count)
         (val, ) = unpack(fmt, buf)
+        #TODO split strings by \0
         return val
 
     def _interpret_undefined_tag(self, ttype, count, offset):
@@ -192,6 +213,7 @@ class IFD(object):
         Using hard-coded logic to determine type of the raster from tags
         contained in the IFD.
         """
+        #TODO use photometic field to determine the type
         tags = set(self.tags.keys())
         if tags < BilevelImage.REQUIRED_TAGS:
             raise TypeError('Insufficient tag information')
