@@ -10,8 +10,8 @@ start = timer()
 
 with imopen(file_path, 'r') as imfile:
     for page in imfile:
-        for tag_id, tag_info in page.tags.items():
-            print('{} ({}): {}'.format(Tags(tag_id).name, tag_id, tag_info))
+        for tag, tag_info in page.tags.items():
+            print('{} ({}): {}'.format(tag, tag.value, tag_info))
         print(page.rasters)
         print()
 
