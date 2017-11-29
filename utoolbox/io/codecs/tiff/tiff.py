@@ -107,7 +107,7 @@ class Tiff(FileIO):
 
     def __getitem__(self, index):
         #NOTE delayed tag interpretation?
-        self._subfiles[index].interpret_tag()
+        self._subfiles[index].interpret_tags()
         return self._subfiles[index]
 
     def __setitem__(self, index, data):
@@ -140,14 +140,14 @@ class IFD(object):
             for (tag_id, dtype, count, offset) in iter_unpack(tag_fmt, raw_tags)
         }
 
-    def interpret_tag(self):
+    def interpret_tags(self):
         #TODO remove the wrapper?
         for tag_id, (dtype, count, offset) in self.tags.items():
             self.tags[tag_id] = self._interpret_tag(dtype, count, offset)
 
     def _interpret_tag(self, dtype, count, offset):
         """
-        Extract the actual information of the tag.
+        Extract the actual information of specified field.
         """
         return {
             TagType.Byte:      self._interpret_numeric_tag,
@@ -179,6 +179,7 @@ class IFD(object):
 
     def _interpret_undefined_tag(self, *args):
         #return hex(offset)
+        #TODO count as bytes, load the byte array
         return (dtype, count, offset)
 
     @property

@@ -1,5 +1,5 @@
 from utoolbox.io import imopen
-from utoolbox.io.codecs.tiff.tags import Tags, OrientationOptions
+from utoolbox.io.codecs.tiff.tags import Tags
 from timeit import default_timer as timer
 
 from pprint import pprint

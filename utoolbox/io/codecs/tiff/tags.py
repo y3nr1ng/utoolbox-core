@@ -61,7 +61,7 @@ class NewSubfileOptions(Enum):
     """
     __slots__ = ()
 
-    Unspecified = ('Unspecified',    0)
+    Unspecified = ('Unspecified',        0)
     Reduced     = ('Reduced-resolution', 1)
     Page        = ('Multi-page',         2)
     Mask        = ('Transparency Mask',  4)
@@ -125,10 +125,10 @@ class PhotometricOptions(Enum):
     """
     __slots__ = ()
 
-    WhiteIsZero = ('White is Zero',     0)
-    BlackIsZero = ('Black is Zero',     1)
-    RGB         = ('RGB',             2)
-    Palette     = ('Palette RGB',         3)
+    WhiteIsZero = ('White is Zero',    0)
+    BlackIsZero = ('Black is Zero',    1)
+    RGB         = ('RGB',              2)
+    Palette     = ('Palette RGB',      3)
     Mask        = ('Transpareny Mask', 4)
 
     def __new__(cls, name, value):
