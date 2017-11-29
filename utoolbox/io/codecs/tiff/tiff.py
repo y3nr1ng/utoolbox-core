@@ -141,7 +141,6 @@ class IFD(object):
         }
 
     def interpret_tags(self):
-        #TODO remove the wrapper?
         for tag, (ttype, count, offset) in self.tags.items():
             # skip uknown tags per specification
             if tag == Tags.Unknown:
