@@ -136,16 +136,16 @@ class IFD(object):
         raw_tags = self._mm.read(n_tags*12)
 
         self.tags = {
-            tag_id: (TagType(dtype), count, offset)
+            Tags(tag_id): (TagType(dtype), count, offset)
             for (tag_id, dtype, count, offset) in iter_unpack(tag_fmt, raw_tags)
         }
 
     def interpret_tags(self):
         #TODO remove the wrapper?
-        for tag_id, (dtype, count, offset) in self.tags.items():
-            self.tags[tag_id] = self._interpret_tag(dtype, count, offset)
+        for tag, (ttype, count, offset) in self.tags.items():
+            self.tags[tag] = self._interpret_tag(ttype, count, offset)
 
-    def _interpret_tag(self, dtype, count, offset):
+    def _interpret_tag(self, ttype, count, offset):
         """
         Extract the actual information of specified field.
         """
@@ -162,25 +162,23 @@ class IFD(object):
             TagType.SRational: self._interpret_rational_tag,
             TagType.Float:     self._interpret_numeric_tag,
             TagType.Double:    self._interpret_numeric_tag
-        }[dtype](dtype, count, offset)
+        }[ttype](ttype, count, offset)
 
-    def _interpret_numeric_tag(self, dtype, count, offset):
-        return (dtype, count, offset)
+    def _interpret_numeric_tag(self, ttype, count, offset):
+        return (ttype, count, offset)
 
-    def _interpret_rational_tag(self, dtype, count, offset):
-        return (dtype, count, offset)
+    def _interpret_rational_tag(self, ttype, count, offset):
+        return (ttype, count, offset)
 
-    def _interpret_ascii_tag(self, dtype, count, offset):
+    def _interpret_ascii_tag(self, ttype, count, offset):
         self._mm.seek(offset, os.SEEK_SET)
         fmt = self._byte_order + str(count) + dtype.format
         buf = self._mm.read(count)
         (val, ) = unpack(fmt, buf)
         return val
 
-    def _interpret_undefined_tag(self, *args):
-        #return hex(offset)
-        #TODO count as bytes, load the byte array
-        return (dtype, count, offset)
+    def _interpret_undefined_tag(self, ttype, count, offset):
+        return hex(offset)
 
     @property
     def rasters(self):
