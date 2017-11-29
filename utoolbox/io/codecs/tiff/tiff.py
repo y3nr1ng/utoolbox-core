@@ -194,7 +194,8 @@ class IFD(object):
         fmt = self._byte_order + str(count) + ttype.format
         buf = self._mm.read(count)
         (val, ) = unpack(fmt, buf)
-        #TODO split strings by \0
+        # NOTE only planned to support utf-8
+        val = val.decode('utf-8', 'backslashreplace')
         return val
 
     def _interpret_undefined_tag(self, ttype, count, offset):
