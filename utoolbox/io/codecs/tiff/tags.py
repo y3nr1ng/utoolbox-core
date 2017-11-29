@@ -4,20 +4,20 @@ from collections import namedtuple as ntuple
 class TagType(Enum):
     __slots__ = ()
 
-    Byte      = ('Byte',             1,  'B')
-    ASCII     = ('ASCII',            2,  's')
-    Short     = ('Short',            3,  'H')
-    Long      = ('Long',             4,  'I')
-    Rational  = ('Rational',         5, 'II')
-    SByte     = ('Signed Byte',      6,  'b')
-    Undefined = ('Undefined',        7,  'p')
-    SShort    = ('Signed Short',     8,  'h')
-    SLong     = ('Signed Long',      9,  'i')
-    SRational = ('Signed Rational', 10, 'ii')
-    Float     = ('Float',           11,  'f')
-    Double    = ('Double',          12,  'd')
+    Byte      = ('Byte',             1,  'B',    1)
+    ASCII     = ('ASCII',            2,  's', None)
+    Short     = ('Short',            3,  'H',    2)
+    Long      = ('Long',             4,  'I',    4)
+    Rational  = ('Rational',         5, 'II',    8)
+    SByte     = ('Signed Byte',      6,  'b',    1)
+    Undefined = ('Undefined',        7,  'p', None)
+    SShort    = ('Signed Short',     8,  'h',    2)
+    SLong     = ('Signed Long',      9,  'i',    4)
+    SRational = ('Signed Rational', 10, 'ii',    8)
+    Float     = ('Float',           11,  'f',    4)
+    Double    = ('Double',          12,  'd',    8)
 
-    def __new__(cls, name, value, fmt):
+    def __new__(cls, name, value, fmt, size):
         """
         Parse pre-defined internal table.
 
@@ -31,15 +31,25 @@ class TagType(Enum):
             Binary index in the TIFF specification.
         fmt: str
             Format string used in pack/unpack method.
+        size: int
+            Size to read in bytes.
         """
         obj = object.__new__(cls)
         obj._name = name
         obj._value_ = value
         obj._format = fmt
+        obj._size = size
         return obj
 
     def __str__(self):
         return self._name
+
+    @property
+    def size(self):
+        """
+        Size of bytes to read.
+        """
+        return self._size
 
     @property
     def format(self):
