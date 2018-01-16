@@ -4,11 +4,10 @@ from struct import unpack, iter_unpack
 from operator import add
 
 import numpy as np
-import boltons.debugutils
-#boltons.debugutils.pdb_on_exception()
 
 from ..template import FileIO
 from .tags import Tags, TagType, SampleFormatOptions
+from utoolbox.utils.decorators import run_once
 
 class Tiff(FileIO):
     def __init__(self, path, mode):
@@ -113,6 +112,21 @@ class Tiff(FileIO):
     def __setitem__(self, index, data):
         raise NotImplementedError
 
+    @property
+    def shape(self):
+        shapes = [
+            (page.tags[Tags.ImageWidth], page.tags[Tags.ImageLength])
+            for page in self
+        ]
+        width, length = shapes[0]
+        depth = len(self)
+        return (width, length, depth) if shapes[1:] == shapes[:-1] else shapes
+
+    @property
+    def dtype(self):
+        dtypes = [page.dtype for page in self._subfiles]
+        return dtypes[0] if dtypes[1:] == dtypes[:-1] else dtypes
+
 class IFD(object):
     def __init__(self, path, mm, byte_order, offset):
         self._path = path
@@ -137,6 +151,7 @@ class IFD(object):
             for (tag_id, dtype, count, offset) in iter_unpack(tag_fmt, raw_tags)
         }
 
+    @run_once
     def interpret_tags(self):
         for tag, (ttype, count, offset) in self.tags.items():
             # skip uknown tags per specification
@@ -251,6 +266,7 @@ class IFD(object):
 
     @property
     def dtype(self):
+        print('probing for dtype')
         return {
             # unsigned integer
             (SampleFormatOptions.UInt, 16):     np.uint16,
@@ -293,8 +309,7 @@ class GrayscaleImage(BilevelImage):
                              shape=shape,
                              offset=self.tags[Tags.StripOffsets][0])
         else:
-            #TODO sequential read
-            pass
+            raise NotImplementedError('<grayscale> sequential')
         return data
 
     def __repr__(self):
