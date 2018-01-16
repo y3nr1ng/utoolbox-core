@@ -1,9 +1,6 @@
 import boltons.debugutils
 boltons.debugutils.pdb_on_exception()
 
-from vispy import scene
-from vispy import app
-
 from utoolbox.io import TimeSeries
 import utoolbox.io.primitives as dtype
 from utoolbox.utils.decorators import timeit

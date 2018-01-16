@@ -3,6 +3,7 @@ dependencies:
   - python=3
   - numpy
   - pyqt
+  - pyopengl
   - conda-forge::vispy
   - pip:
     - boltons
