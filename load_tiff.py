@@ -4,7 +4,7 @@ from timeit import default_timer as timer
 
 from pprint import pprint
 
-file_path = 'data/RAWtan1_3_3DSIMb_ch1_stack0004_561nm_0077599msec_0000273428msecAbs.tif'
+file_path = 'data/cell4_ch0_stack0000_488nm_0000000msec_0007934731msecAbs_decon.tif'
 
 start = timer()
 
@@ -12,7 +12,7 @@ with imopen(file_path, 'r') as imfile:
     for page in imfile:
         for tag, tag_info in page.tags.items():
             print('{} ({}): {}'.format(tag, tag.value, tag_info))
-        print(page.rasters)
+        print(page.raster)
         print()
 
         # only test the first page
