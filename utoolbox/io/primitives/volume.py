@@ -33,11 +33,8 @@ class SimpleVolume(np.ndarray):
                     obj = super(SimpleVolume, subtype).__new__(subtype,
                                                                shape=shape,
                                                                dtype=dtype)
-                    print('before loading')
-                    for index, page in imfile:
-                        print(index)
+                    for index, page in enumerate(imfile):
                         obj[..., index] = page.raster
-                    print('loaded')
             elif shape:
                 raise NotImplementedError("Create new file is not implemented.")
                 obj = super(SimpleVolume, subtype).__new__(subtype,
@@ -47,7 +44,7 @@ class SimpleVolume(np.ndarray):
         else:
             raise ValueError("'file_path' must be provided.")
 
-        obj._path = path
+        obj._path = file_path
         return obj
 
     def __array_finalize__(self, obj):
