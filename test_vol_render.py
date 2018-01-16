@@ -4,8 +4,7 @@ Controls:
 * 1  - toggle camera between first person (fly), regular 3D (turntable) and
        arcball
 * 2  - toggle between volume rendering methods
-* 3  - toggle between stent-CT / brain-MRI image
-* 4  - toggle between colormaps
+* 3  - toggle between colormaps
 * 0  - reset cameras
 * [] - decrease/increase isosurface threshold
 
