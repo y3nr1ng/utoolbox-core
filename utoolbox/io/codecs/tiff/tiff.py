@@ -1,8 +1,14 @@
-from ..template import FileIO
-from .tags import Tags, TagType
-from mmap import mmap, ACCESS_READ, ACCESS_WRITE
 import os
+from mmap import mmap, ACCESS_READ, ACCESS_WRITE
 from struct import unpack, iter_unpack
+from operator import add
+
+import numpy as np
+import boltons.debugutils
+#boltons.debugutils.pdb_on_exception()
+
+from ..template import FileIO
+from .tags import Tags, TagType, SampleFormatOptions
 
 class Tiff(FileIO):
     def __init__(self, path, mode):
@@ -117,7 +123,6 @@ class IFD(object):
         self._parse_tags()
 
         # lazy load the raster data
-        #TODO use lazy property
         self._raster = None
 
     def _parse_tags(self):
@@ -206,8 +211,7 @@ class IFD(object):
         if self._raster is None:
             self._determine_image_type()
             self._raster = self._parse_raster()
-
-        return "address @ 0x{}".format(hex(self._offset))
+        return self._raster
 
     def _determine_image_type(self):
         """
@@ -231,13 +235,49 @@ class IFD(object):
     def _parse_raster(self):
         raise NotImplementedError("Raster parser is not specified.")
 
+    def _stripes_summary(self):
+        """Summarize stripe records for raster extraction."""
+        return zip(self.tags[Tags.StripOffsets],
+                   self.tags[Tags.StripByteCounts])
+
+    @property
+    def continuous(self):
+        """
+        Determine whether stripes are placed in continuous block of memory.
+        """
+        offset = self.tags[Tags.StripOffsets]
+        offset_shift = list(map(add, offset, self.tags[Tags.StripByteCounts]))
+        return all(i == j for i, j in zip(offset[1:], offset_shift[:-1]))
+
+    @property
+    def dtype(self):
+        return {
+            # unsigned integer
+            (SampleFormatOptions.UInt, 16):     np.uint16,
+            (SampleFormatOptions.UInt, 32):     np.uint32,
+            (SampleFormatOptions.UInt, 64):     np.uint64,
+
+            # integer
+            (SampleFormatOptions.Int, 16):      np.int16,
+            (SampleFormatOptions.Int, 32):      np.int32,
+            (SampleFormatOptions.Int, 64):      np.int64,
+
+            # floating point
+            (SampleFormatOptions.IEEEFP, 16):   np.float16,
+            (SampleFormatOptions.IEEEFP, 32):   np.float32,
+            (SampleFormatOptions.IEEEFP, 64):   np.float64
+        }[(SampleFormatOptions(self.tags[Tags.SampleFormat]), self.tags[Tags.BitsPerSample])]
+
 class BilevelImage(IFD):
     REQUIRED_TAGS = {
         256, 257, 259, 262, 273, 278, 279, 282, 283, 296
     }
 
     def _parse_raster(self):
-        print('<bilevel>')
+        raise NotImplementedError('<bilevel>')
+
+    def __repr__(self):
+        return 'Bilevel Image'
 
 class GrayscaleImage(BilevelImage):
     REQUIRED_TAGS = {
@@ -246,7 +286,19 @@ class GrayscaleImage(BilevelImage):
     }
 
     def _parse_raster(self):
-        print('<grayscale>')
+        shape = (self.tags[Tags.ImageWidth], self.tags[Tags.ImageLength])
+        if self.continuous:
+            data = np.memmap(self._path,
+                             dtype=self.dtype,
+                             shape=shape,
+                             offset=self.tags[Tags.StripOffsets][0])
+        else:
+            #TODO sequential read
+            pass
+        return data
+
+    def __repr__(self):
+        return 'Grayscale Image'
 
 class PaletteImage(GrayscaleImage):
     REQUIRED_TAGS = {
@@ -255,7 +307,10 @@ class PaletteImage(GrayscaleImage):
     }
 
     def _parse_raster(self):
-        print('<palette>')
+        raise NotImplementedError('<palette>')
+
+    def __repr__(self):
+        return 'Palette Image'
 
 class RGBImage(GrayscaleImage):
     REQUIRED_TAGS = {
@@ -264,4 +319,7 @@ class RGBImage(GrayscaleImage):
     }
 
     def _parse_raster(self):
-        print('<rgb>')
+        raise NotImplementedError('<rgb>')
+
+    def __repr__(self):
+        return 'RGB Image'

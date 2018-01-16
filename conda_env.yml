@@ -2,3 +2,5 @@ name: utoolbox
 dependencies:
   - python=3
   - numpy
+  - pip: 
+    - boltons
