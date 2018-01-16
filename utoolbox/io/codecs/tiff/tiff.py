@@ -47,15 +47,13 @@ class Tiff(FileIO):
             m_mode = ACCESS_WRITE if mode == 'w' else ACCESS_READ
             return (o_mode, m_mode)
         else:
-            raise ValueError('Invalid mode')
+            raise ValueError("Invalid mode.")
 
     def _parse_header(self):
-        """
-        Analyze TIFF header.
-        """
+        """Analyze TIFF header."""
         (identifier, magic) = unpack('HH', self._mm.read(4))
         if magic != 42:
-            raise TypeError('Not a TIFF file')
+            raise TypeError("Not a TIFF file.")
         self._set_byte_order(identifier)
 
         # extract offset of the 1st IFD
@@ -63,15 +61,13 @@ class Tiff(FileIO):
         return first_ifd_offset
 
     def _set_byte_order(self, order):
-        """
-        Determine byte order by identifier string.
-        """
+        """Determine byte order by identifier string."""
         if order == 0x4949:
             self._byte_order = '<'
         elif order == 0x4D4D:
             self._byte_order = '>'
         else:
-            raise ValueError('Invalid byte order identifier')
+            raise ValueError("Invalid byte order identifier.")
 
     def _enumerate_ifds(self, first_ifd_offset):
         next_ifd_offset = first_ifd_offset
@@ -89,9 +85,7 @@ class Tiff(FileIO):
         print('{} subfiles'.format(len(self)))
 
     def __len__(self):
-        """
-        Return number of subfiles.
-        """
+        """Return number of subfiles."""
         return len(self._subfiles)
 
     def __iter__(self):
@@ -127,9 +121,7 @@ class IFD(object):
         self._raster = None
 
     def _parse_tags(self):
-        """
-        Parse the containing tags in specified IFD.
-        """
+        """Parse the containing tags in specified IFD."""
         (n_tags, ) = unpack(self._byte_order+'H', self._mm.read(2))
 
         tag_fmt = self._byte_order + 'HHII'
@@ -150,6 +142,14 @@ class IFD(object):
     def _interpret_tag(self, ttype, count, offset):
         """
         Extract the actual information of specified field.
+
+        Args:
+            ttype:
+                TBA
+            count: integer
+                TBA
+            offset: integer
+                TBA
         """
         return {
             TagType.Byte:      self._interpret_numeric_tag,
@@ -202,11 +202,12 @@ class IFD(object):
         return hex(offset)
 
     @property
-    def rasters(self):
+    def raster(self):
         if self._raster is None:
             self._determine_image_type()
+            self._raster = self._parse_raster()
 
-        return 'address @ 0x{}'.format(hex(self._offset))
+        return "address @ 0x{}".format(hex(self._offset))
 
     def _determine_image_type(self):
         """
@@ -216,40 +217,51 @@ class IFD(object):
         #TODO use photometic field to determine the type
         tags = set(self.tags.keys())
         if tags < BilevelImage.REQUIRED_TAGS:
-            raise TypeError('Insufficient tag information')
+            raise TypeError("Insufficient tag information.")
         elif tags < GrayscaleImage.REQUIRED_TAGS:
-            print('<bilevel>')
+            self.__class__ = BilevelImage
         else:
             if tags > PaletteImage.REQUIRED_TAGS:
-                print('<palette>')
+                self.__class__ = PaletteImage
             elif tags > RGBImage.REQUIRED_TAGS:
-                print('<rgb>')
+                self.__class__ = RGBImage
             else:
-                print('<grayscale>')
+                self.__class__ = GrayscaleImage
+
+    def _parse_raster(self):
+        raise NotImplementedError("Raster parser is not specified.")
 
 class BilevelImage(IFD):
     REQUIRED_TAGS = {
         256, 257, 259, 262, 273, 278, 279, 282, 283, 296
     }
-    pass
+
+    def _parse_raster(self):
+        print('<bilevel>')
 
 class GrayscaleImage(BilevelImage):
     REQUIRED_TAGS = {
         256, 257, 258, 259, 262, 273, 278, 279, 282, 283,
         296
     }
-    pass
+
+    def _parse_raster(self):
+        print('<grayscale>')
 
 class PaletteImage(GrayscaleImage):
     REQUIRED_TAGS = {
         256, 257, 258, 259, 262, 273, 278, 279, 282, 283,
         296, 320
     }
-    pass
+
+    def _parse_raster(self):
+        print('<palette>')
 
 class RGBImage(GrayscaleImage):
     REQUIRED_TAGS = {
         256, 257, 258, 259, 262, 273, 277, 278, 279, 282,
         283, 296
     }
-    pass
+
+    def _parse_raster(self):
+        print('<rgb>')
