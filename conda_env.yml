@@ -2,5 +2,6 @@ name: utoolbox
 dependencies:
   - python=3
   - numpy
-  - pip: 
+  - conda-forge::vispy
+  - pip:
     - boltons
