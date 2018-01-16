@@ -105,7 +105,6 @@ class Tiff(FileIO):
             return self[self._current_page-1]
 
     def __getitem__(self, index):
-        #NOTE delayed tag interpretation?
         self._subfiles[index].interpret_tags()
         return self._subfiles[index]
 
@@ -153,6 +152,9 @@ class IFD(object):
 
     @run_once
     def interpret_tags(self):
+        """
+        Interpret the raw tag definitions and degrade into no-op.
+        """
         for tag, (ttype, count, offset) in self.tags.items():
             # skip uknown tags per specification
             if tag == Tags.Unknown:
@@ -266,7 +268,6 @@ class IFD(object):
 
     @property
     def dtype(self):
-        print('probing for dtype')
         return {
             # unsigned integer
             (SampleFormatOptions.UInt, 16):     np.uint16,
