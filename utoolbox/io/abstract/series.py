@@ -40,7 +40,6 @@ class TimePoint(object):
     def __init__(self, dtype, file_path=None):
         self.dtype = dtype
 
-        #TODO determine codec by file_path
         #TODO call the constructor of the primitive type
         dtype(file_path)
 
