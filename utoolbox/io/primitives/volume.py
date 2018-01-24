@@ -5,7 +5,7 @@ import os.path
 
 import numpy as np
 
-from ..operations import imopen
+from utoolbox.io.operations import imopen
 
 class SimpleVolume(np.ndarray):
     def __new__(subtype, file_path=None, shape=None):
