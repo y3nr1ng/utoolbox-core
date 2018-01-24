@@ -28,7 +28,6 @@ from utoolbox.utils.decorators import timeit
 
 file_path = 'data/cell4_ch0_stack0000_488nm_0000000msec_0007934731msecAbs_decon.tif'
 
-
 # Read volume
 data = dtype.SimpleVolume(file_path)
 
@@ -39,21 +38,16 @@ canvas.measure_fps()
 # Set up a viewbox to display the image with interactive pan/zoom
 view = canvas.central_widget.add_view()
 
-# Set whether we are emulating a 3D texture
-emulate_texture = False
-
 # Create the volume visuals, only one is visible
 volume = scene.visuals.Volume(data, parent=view.scene, threshold=0.225,
-                              emulate_texture=emulate_texture)
-volume.transform = scene.STTransform(translate=(64, 64, 0))
+                              emulate_texture=False)
+#volume.transform = scene.STTransform(translate=(0, 0, 0))
 
 # Create three cameras (Fly, Turntable and Arcball)
-fov = 60.
-cam1 = scene.cameras.FlyCamera(parent=view.scene, fov=fov, name='Fly')
-cam2 = scene.cameras.TurntableCamera(parent=view.scene, fov=fov,
+fov = 0.
+camera = scene.cameras.TurntableCamera(parent=view.scene, fov=fov,
                                      name='Turntable')
-cam3 = scene.cameras.ArcballCamera(parent=view.scene, fov=fov, name='Arcball')
-view.camera = cam2  # Select turntable at first
+view.camera = camera
 
 # Create an XYZAxis visual
 axis = scene.visuals.XYZAxis(parent=view)
@@ -103,15 +97,7 @@ def on_mouse_move(event):
 @canvas.events.key_press.connect
 def on_key_press(event):
     global opaque_cmap, translucent_cmap
-    if event.text == '1':
-        cam_toggle = {cam1: cam2, cam2: cam3, cam3: cam1}
-        view.camera = cam_toggle.get(view.camera, cam2)
-        print(view.camera.name + ' camera')
-        if view.camera is cam2:
-            axis.visible = True
-        else:
-            axis.visible = False
-    elif event.text == '2':
+    if event.text == '2':
         methods = ['mip', 'translucent', 'iso', 'additive']
         method = methods[(methods.index(volume.method) + 1) % 4]
         print("Volume render method: %s" % method)
@@ -124,9 +110,6 @@ def on_key_press(event):
         else:
             cmap = translucent_cmap = next(translucent_cmaps)
         volume.cmap = cmap
-    elif event.text == '0':
-        cam1.set_range()
-        cam3.set_range()
     elif event.text != '' and event.text in '[]':
         s = -0.025 if event.text == '[' else 0.025
         volume.threshold += s

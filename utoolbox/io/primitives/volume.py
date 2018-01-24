@@ -56,6 +56,8 @@ class SimpleVolume(np.ndarray):
         # from explicit constructor
         #   in the middle of SimpleVolume.__new__ constructor
         if obj is None:
+            #TODO load data here
+            print('obj is None')
             return
 
         # from view casting
