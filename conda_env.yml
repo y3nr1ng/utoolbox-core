@@ -1,9 +1,13 @@
 name: utoolbox
+channels:
+  - defaults
+  - conda-forge
 dependencies:
   - python=3
   - numpy
   - pyqt
   - pyopengl
   - conda-forge::vispy
+  - conda-forge::yt
   - pip:
     - boltons
