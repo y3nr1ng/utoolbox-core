@@ -10,8 +10,8 @@ class SimpleVolume(np.ndarray):
     def __new__(cls, path=None, array=None, shape=None, dtype=None):
         """SimpleVolume(path=None, array=None, shape=None, dtype=None)
 
-        A subclass of np.ndarray that acts as the common ground for volumetric
-        dataset.
+        A subclass of np.ndarray that acts as the common ground for standard
+        volumetric dataset.
 
         Parameters
         ----------
@@ -34,4 +34,13 @@ class SimpleVolume(np.ndarray):
         pass
 
 class SIVolume(object):
+    """SIVolume()
+
+    A subclass of np.ndarray that acts as the common ground for structured
+    illuminated volumetric dataset, where a single SI volume is composed of
+    multiple simple volumes.
+
+    Parameters
+    ----------
+    """
     pass
