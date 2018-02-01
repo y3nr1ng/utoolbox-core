@@ -9,11 +9,10 @@ import numpy as np
 from .multi_volume_shaders import get_shaders
 from .callback_list import CallbackList
 
-class VolumeRender(object):
-    """Simple volume renderer.
-
-    This is a modified version of MultiVolumeVisual class [1], which is derived
-    from the original VolumeVisual class in vispy.visuals.volume
+class VolumeRenderVisual(Visual):
+    """
+    This is a refactored version of MultiVolumeVisual class [1], which is
+    derived from the original VolumeVisual class in vispy.visuals.volume
 
     Parameters
     ----------
@@ -24,25 +23,22 @@ class VolumeRender(object):
     [1] https://github.com/astrofrog/vispy-multivol
     """
     def __init__(self, volumes, clim=None, threshold=None,
-                 relative_step_size=0.8, cmap1='grays', cmap2='grays',
-                 emulate_texture=False, n_volume_max=10):
-        # Choose texture class
-        tex_cls = TextureEmulated3D if emulate_texture else Texture3D
-
+                 relative_step_size=0.8, cmap='grays',
+                 emulate_texture=False, n_volume_max=3):
         # We store the data and colormaps in a CallbackList which can warn us
         # when it is modified.
         self.volumes = CallbackList()
         self.volumes.on_size_change = self._update_all_volumes
         self.volumes.on_item_change = self._update_volume
 
-        self._vol_shape = None
+        self._shape = None
         self._need_vertex_update = True
 
-        # Create OpenGL program
+        # create OpenGL program
         vert_shader, frag_shader = get_shaders(n_volume_max)
-        super(MultiVolumeVisual, self).__init__(vcode=vert_shader, fcode=frag_shader)
+        super(VolumeRenderVisual, self).__init__(vcode=vert_shader, fcode=frag_shader)
 
-        # Create gloo objects
+        # create gloo objects
         self._vertices = VertexBuffer()
         self._texcoord = VertexBuffer(
             np.array([
@@ -58,11 +54,12 @@ class VolumeRender(object):
 
         # Set up textures
         self.textures = []
+        tex_cls = TextureEmulated3D if emulate_texture else Texture3D
         for i in range(n_volume_max):
             self.textures.append(tex_cls((10, 10, 10), interpolation='linear',
-                                          wrapping='clamp_to_edge'))
+                                         wrapping='clamp_to_edge'))
             self.shared_program['u_volumetex{0}'.format(i)] = self.textures[i]
-            self.shared_program.frag['cmap{0:d}'.format(i)] = Function(get_colormap('grays').glsl_map)
+            self.shared_program.frag['cmap{0:d}'.format(i)] = Function(get_colormap(cmap).glsl_map)
 
         self.shared_program['a_position'] = self._vertices
         self.shared_program['a_texcoord'] = self._texcoord
@@ -84,8 +81,7 @@ class VolumeRender(object):
         self.volumes.extend(volumes)
 
     def _update_all_volumes(self, volumes):
-        """
-        Update the number of simultaneous textures.
+        """Update the number of simultaneous textures.
         Parameters
         ----------
         n_textures : int
@@ -97,7 +93,6 @@ class VolumeRender(object):
             self._update_volume(volumes, index)
 
     def _update_volume(self, volumes, index):
-
         data, clim, cmap = volumes[index]
 
         cmap = get_colormap(cmap)
@@ -118,22 +113,22 @@ class VolumeRender(object):
 
         print(self.shared_program.frag)
 
-        if self._vol_shape is None:
+        if self._shape is None:
             self.shared_program['u_shape'] = data.shape[::-1]
-            self._vol_shape = data.shape
-        elif data.shape != self._vol_shape:
-            raise ValueError("Shape of arrays should be {0} instead of {1}".format(self._vol_shape, data.shape))
+            self._shape = data.shape
+        elif data.shape != self._shape:
+            raise ValueError("Shape of arrays should be {0} instead of {1}".format(self._shape, data.shape))
 
         self.shared_program['u_n_tex'] = len(self.volumes)
 
 
     @property
     def relative_step_size(self):
-        """ The relative step size used during raycasting.
-        Larger values yield higher performance at reduced quality. If
-        set > 2.0 the ray skips entire voxels. Recommended values are
-        between 0.5 and 1.5. The amount of quality degredation depends
-        on the render method.
+        """Step size during ray casting.
+
+        Larger values yield higher performance at reduced quality. If set > 2.0
+        the ray skips entire voxels. Recommended values are between 0.5 and 1.5.
+        The amount of quality degredation depends on the render method.
         """
         return self._relative_step_size
 
@@ -141,19 +136,20 @@ class VolumeRender(object):
     def relative_step_size(self, value):
         value = float(value)
         if value < 0.1:
-            raise ValueError('relative_step_size cannot be smaller than 0.1')
+            raise ValueError('Step size cannot be smaller than 0.1')
         self._relative_step_size = value
         self.shared_program['u_relative_step_size'] = value
 
     def _create_vertex_data(self):
-        """ Create and set positions and texture coords from the given shape
-        We have six faces with 1 quad (2 triangles) each, resulting in
-        6*2*3 = 36 vertices in total.
-        """
-        shape = self._vol_shape
+        """Create and set positions and texture coords from the given shape.
 
-        # Get corner coordinates. The -0.5 offset is to center
-        # pixels/voxels. This works correctly for anisotropic data.
+        Having 6 faces with 2 triangles each, this results in 6*2*3=36 verticies
+        in total.
+        """
+        shape = self._shape
+
+        # get corner coordinates
+        #NOTE The -0.5 offset is to center pixels/voxels.
         x0, x1 = -0.5, shape[2] - 0.5
         y0, y1 = -0.5, shape[1] - 0.5
         z0, z1 = -0.5, shape[0] - 0.5
@@ -178,18 +174,16 @@ class VolumeRender(object):
         |/      |/
         0-------1
         """
-
         # Order is chosen such that normals face outward; front faces will be
         # culled.
         indices = np.array([2, 6, 0, 4, 5, 6, 7, 2, 3, 0, 1, 5, 3, 7],
                            dtype=np.uint32)
 
-        # Apply
         self._vertices.set_data(pos)
         self._index_buffer.set_data(indices)
 
     def _compute_bounds(self, axis, view):
-        return 0, self._vol_shape[axis]
+        return 0, self._shape[axis]
 
     def _prepare_transforms(self, view):
         trs = view.transforms
@@ -205,4 +199,4 @@ class VolumeRender(object):
             self._create_vertex_data()
             self._need_vertex_update = False
 
-MultiVolume = create_visual_node(MultiVolumeVisual)
+VolumeRender = create_visual_node(VolumeRenderVisual)
