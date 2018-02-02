@@ -3,11 +3,24 @@ channels:
   - defaults
   - conda-forge
 dependencies:
+  # core
   - python=3
+
+  # numerics
   - numpy
+  - pandas
+
+  # parallel
+  - dask
+
+  # file I/O
   - conda-forge::imageio
+
+  # visualize
   - pyqt
   - pyopengl
   - conda-forge::vispy
+
+  # utils
   - pip:
     - boltons
