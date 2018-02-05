@@ -9,6 +9,8 @@ Note
 ----
     https://github.com/astrofrog/vispy-multivol
 """
+from itertools import izip, count
+
 from visy.gloo import Texture3D, TextureEmulated3D, VertexBuffer, IndexBuffer
 from vispy.visuals import Visual
 from vispy.visuals.shaders import Function
@@ -51,7 +53,8 @@ void main() {
 # Fragment shader
 FRAG_SHADER = """
 // uniforms
-uniform $sampler_type u_volumetex;
+uniform int u_n_tex;
+{texture_declaration}
 uniform vec3 u_shape;
 uniform float u_threshold;
 uniform float u_relative_step_size;
@@ -345,12 +348,13 @@ class MultiVolumeVisual(Visual):
 
     Parameters
     ----------
-    vol : ndarray
-        The volume to display. Must be ndim==3.
-    clim : tuple of two floats | None
-        The contrast limits. The values in the volume are mapped to
-        black and white corresponding to these values. Default maps
-        between min and max.
+    vols : ndarray
+        Volumes to display. Must be ndim==4, where number of volumes is placed
+        at the first dimension.
+    clims : list of tuple of two floats | None
+        The contrast limits. The values in the volume are mapped to black and
+        white corresponding to these values. Default maps between min and max of
+        each volume.
     method : {'mip', 'translucent', 'additive', 'iso'}
         The render method to use. See corresponding docs for details.
         Default 'mip'.
@@ -361,26 +365,24 @@ class MultiVolumeVisual(Visual):
         The relative step size to step through the volume. Default 0.8.
         Increase to e.g. 1.5 to increase performance, at the cost of
         quality.
-    cmap : str
-        Colormap to use.
+    cmaps : list of str
+        Colormap to use for each volume.
     emulate_texture : bool
         Use 2D textures to emulate a 3D texture. OpenGL ES 2.0 compatible,
         but has lower performance on desktop platforms.
     """
 
-    def __init__(self, vol, clim=None, method='mip', threshold=None,
-                 relative_step_size=0.8, cmap='grays',
-                 emulate_texture=False):
-
+    def __init__(self, vols, clims=None, method='mip', threshold=None, max_vol=10,
+                 relative_step_size=0.8, cmaps=None, emulate_texture=False):
         tex_cls = TextureEmulated3D if emulate_texture else Texture3D
 
         # Storage of information of volume
         self._vol_shape = ()
-        self._clim = None
+        self._clims = [None for _ in range(len(vols))]
         self._need_vertex_update = True
 
         # Set the colormap
-        self._cmap = get_colormap(cmap)
+        self._cmaps = [get_colormap(cmap) for cmap in cmaps]
 
         # Create gloo objects
         self._vertices = VertexBuffer()
@@ -395,12 +397,20 @@ class MultiVolumeVisual(Visual):
                 [0, 1, 1],
                 [1, 1, 1],
             ], dtype=np.float32))
-        self._tex = tex_cls((10, 10, 10), interpolation='linear',
-                            wrapping='clamp_to_edge')
+        self._texes = [tex_cls((10, 10, 10), interpolation='linear',
+                             wrapping='clamp_to_edge')
+                       for _ in range(max_vol)]
+
+        # Generate fragment shader program
+        tex_declare = ""
+        for index, (_, value) in enumerate(frag_dict.items()):
+            tex_declare += "uniform $sampler_type u_volumetex{};\n".format(index)
+            #TODO additive colormap across volumes
 
         # Create program
         Visual.__init__(self, vcode=VERT_SHADER, fcode="")
-        self.shared_program['u_volumetex'] = self._tex
+        for i in range(len(vols)):
+            self.shared_program['u_volumetex{}'.format(i)] = self._texes[i]
         self.shared_program['a_position'] = self._vertices
         self.shared_program['a_texcoord'] = self._texcoord
         self._draw_mode = 'triangle_strip'
@@ -412,7 +422,7 @@ class MultiVolumeVisual(Visual):
         self.set_gl_state('translucent', cull_face=False)
 
         # Set data
-        self.set_data(vol, clim)
+        self.set_data(vols, clims)
 
         # Set params
         self.method = method
@@ -420,69 +430,88 @@ class MultiVolumeVisual(Visual):
         self.threshold = threshold if (threshold is not None) else vol.mean()
         self.freeze()
 
-    def set_data(self, vol, clim=None):
-        """ Set the volume data.
+    def set_data(self, vols, clims=None, resize=False):
+        """ Set all the volume data.
 
         Parameters
         ----------
+        vols : ndarray
+            3D volumes.
+        clims : lists of tuples | None
+            Colormap limits to use. None will use the min and max values of each
+            volume.
+        """
+        if len(vols) > len(self._texes):
+            raise ValueError("Number of volumes ({n_vol}) exceeds number of textures ({n_tex})." \
+                             .format(n_vol=len(vols), n_tex=len(self._texes)))
+        if clims is None:
+            clims = [None for _ in range(len(vols))]
+        elif (len(vols) != len(clims)):
+            raise ValueError("Number of clims does not match number of volumes.")
+
+        for index, vol, clim in izip(count(), vols, clims):
+            self.set_idata(index, vol, clim, resize)
+        self.shared_program['u_n_tex'] = len(vols)
+
+    def set_idata(self, index, vol, clim=None, resize=False):
+        """ Set the volume data.
+        Parameters
+        ----------
+        index : int
+            The volume to update.
         vol : ndarray
             The 3D volume.
         clim : tuple | None
             Colormap limits to use. None will use the min and max values.
+        resize : bool
+            Resize underlying texture size.
         """
-        # Check volume
         if not isinstance(vol, np.ndarray):
-            raise ValueError('Volume visual needs a numpy array.')
-        if not ((vol.ndim == 3) or (vol.ndim == 4 and vol.shape[-1] <= 4)):
-            raise ValueError('Volume visual needs a 3D image.')
+            raise ValueError("Multi-volume visual needs a numpy array.")
+        if not (vol.ndim == 3):
+            raise ValueError("Multi-volume visual needs a 3D image for each volume.")
 
-        # Handle clim
         if clim is not None:
             clim = np.array(clim, float)
             if not (clim.ndim == 1 and clim.size == 2):
                 raise ValueError('clim must be a 2-element array-like')
-            self._clim = tuple(clim)
-        if self._clim is None:
-            self._clim = vol.min(), vol.max()
+            self._clims[index] = tuple(clim)
+        if self._clims[index] is None:
+            self._clims[index] = vol.min(), vol.max()
 
-        # Apply clim
+        # apply clim to data
         vol = np.array(vol, dtype='float32', copy=False)
-        if self._clim[1] == self._clim[0]:
-            if self._clim[0] != 0.:
+        if self._clims[index][1] == self._clims[index][0]:
+            if self._clims[index][0] != 0.:
                 vol *= 1.0 / self._clim[0]
         else:
-            vol -= self._clim[0]
-            vol /= self._clim[1] - self._clim[0]
+            vol -= self._clims[index][0]
+            vol /= self._clims[index][1] - self._clims[index][0]
 
-        # Apply to texture
-        self._tex.set_data(vol)  # will be efficient if vol is same shape
-        self.shared_program['u_shape'] = (vol.shape[2], vol.shape[1],
-                                          vol.shape[0])
-
-        shape = vol.shape[:3]
-        if self._vol_shape != shape:
-            self._vol_shape = shape
+        #NOTE _tex.set_data() is efficient if vol is of same shape
+        self._texes[index].set_data(vol)
+        if self._vol_shape is None or self._vol_shape != vol.shape:
+            self.shared_program['u_shape'] = tuple(vol.shape)
+            self._vol_shape = vol.shape
             self._need_vertex_update = True
-        self._vol_shape = shape
-
-        # Get some stats
-        self._kb_for_texture = np.prod(self._vol_shape) / 1024
 
     @property
-    def clim(self):
-        """ The contrast limits that were applied to the volume data.
+    def clims(self):
+        """ The contrast limits that were applied to the volumes.
         Settable via set_data().
         """
-        return self._clim
+        return self._clims
 
     @property
-    def cmap(self):
-        return self._cmap
+    def cmaps(self):
+        return self._cmaps
 
-    @cmap.setter
-    def cmap(self, cmap):
-        self._cmap = get_colormap(cmap)
-        self.shared_program.frag['cmap'] = Function(self._cmap.glsl_map)
+    @cmaps.setter
+    def cmaps(self, cmap):
+        if isinstance(cmap, tuple):
+            index, cmap = cmap
+            self._cmaps[index] = get_colormap(cmap)
+            self.shared_program.frag['cmap{}'.format(index)] = Function(self._cmaps[index].glsl_map)
         self.update()
 
     @property
@@ -491,15 +520,15 @@ class MultiVolumeVisual(Visual):
 
         Current options are:
 
-            * translucent: voxel colors are blended along the view ray until
-              the result is opaque.
+            * translucent: voxel colors are blended along the view ray until the
+              result is opaque.
             * mip: maxiumum intensity projection. Cast a ray and display the
               maximum value that was encountered.
-            * additive: voxel colors are added along the view ray until
-              the result is saturated.
+            * additive: voxel colors are added along the view ray until the
+              result is saturated.
             * iso: isosurface. Cast a ray until a certain threshold is
-              encountered. At that location, lighning calculations are
-              performed to give the visual appearance of a surface.
+              encountered. At that location, lighning calculations are performed
+              to give the visual appearance of a surface.
         """
         return self._method
 
@@ -516,9 +545,8 @@ class MultiVolumeVisual(Visual):
             self.shared_program['u_threshold'] = None
 
         self.shared_program.frag = frag_dict[method]
-        self.shared_program.frag['sampler_type'] = self._tex.glsl_sampler_type
-        self.shared_program.frag['sample'] = self._tex.glsl_sample
-        self.shared_program.frag['cmap'] = Function(self._cmap.glsl_map)
+        self.shared_program.frag['sampler_type'] = self._texes[0].glsl_sampler_type
+        self.shared_program.frag['sample'] = self._texes[0].glsl_sample
         self.update()
 
     @property
