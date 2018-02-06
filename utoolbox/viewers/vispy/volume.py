@@ -88,8 +88,6 @@ float colorToVal(vec4 color)
     return color.g;
 }}
 
-$uniform $sampler_type
-
 $sampler_type getTex(int index)
 {{
     {gettex}
@@ -100,21 +98,7 @@ $cmap getCmap(int index)
     {getcmap}
 }}
 
-vec4 sampleColor(vec3 loc)
-{{
-    {color_aggregation}
-    color *= 1. / u_n_tex;
-    return color;
-}}
-
-vec4 sampleCmap(vec3 loc)
-{{
-    {cmap_aggregation}
-    color *= 1. / u_n_tex;
-    return color;
-}}
-
-vec4 calculateColor(vec4 betterColor, vec3 loc, vec3 step)
+vec4 calculateColor(int index, vec4 betterColor, vec3 loc, vec3 step)
 {{
     // Calculate color by incorporating lighting
     vec4 color1;
@@ -125,16 +109,16 @@ vec4 calculateColor(vec4 betterColor, vec3 loc, vec3 step)
 
     // calculate normal vector from gradient
     vec3 N; // normal
-    color1 = $sample( u_volumetex, loc+vec3(-step[0],0.0,0.0) );
-    color2 = $sample( u_volumetex, loc+vec3(step[0],0.0,0.0) );
+    color1 = $sample( getTex(index), loc+vec3(-step[0],0.0,0.0) );
+    color2 = $sample( getTex(index), loc+vec3(step[0],0.0,0.0) );
     N[0] = colorToVal(color1) - colorToVal(color2);
     betterColor = max(max(color1, color2),betterColor);
-    color1 = $sample( u_volumetex, loc+vec3(0.0,-step[1],0.0) );
-    color2 = $sample( u_volumetex, loc+vec3(0.0,step[1],0.0) );
+    color1 = $sample( getTex(index), loc+vec3(0.0,-step[1],0.0) );
+    color2 = $sample( getTex(index), loc+vec3(0.0,step[1],0.0) );
     N[1] = colorToVal(color1) - colorToVal(color2);
     betterColor = max(max(color1, color2),betterColor);
-    color1 = $sample( u_volumetex, loc+vec3(0.0,0.0,-step[2]) );
-    color2 = $sample( u_volumetex, loc+vec3(0.0,0.0,step[2]) );
+    color1 = $sample( getTex(index), loc+vec3(0.0,0.0,-step[2]) );
+    color2 = $sample( getTex(index), loc+vec3(0.0,0.0,step[2]) );
     N[2] = colorToVal(color1) - colorToVal(color2);
     betterColor = max(max(color1, color2),betterColor);
     float gm = length(N); // gradient magnitude
@@ -223,27 +207,32 @@ void main() {{
     //gl_FragColor = vec4(0.0, nsteps / 3.0 / u_shape.x, 1.0, 1.0);
     //return;
 
-    {before_loop}
+    for (int i_tex = 0; i_tex < u_n_tex; i_tex++)
+    {{
+        {before_loop}
 
-    // This outer loop seems necessary on some systems for large
-    // datasets. Ugly, but it works ...
-    vec3 loc = start_loc;
-    int iter = 0;
-    while (iter < nsteps) {{
-        for (iter=iter; iter<nsteps; iter++)
-        {{
-            // Get sample color
-            vec4 color = sampleColor(loc);
-            float val = colorToVal(color);
+        // This outer loop seems necessary on some systems for large
+        // datasets. Ugly, but it works ...
+        vec3 loc = start_loc;
+        int iter = 0;
+        while (iter < nsteps) {{
+            for (iter=iter; iter<nsteps; iter++)
+            {{
+                // Get sample color
+                vec4 color = $sample(getTex(i_tex), loc);
+                float val = color.g
 
-            {in_loop}
+                {in_loop}
 
-            // Advance location deeper into the volume
-            loc += step;
+                // Advance location deeper into the volume
+                loc += step;
+            }}
         }}
+
+        {after_loop}
     }}
 
-    {after_loop}
+    {after_sampling}
 
     /* Set depth value - from visvis TODO
     int iter_depth = int(maxi);
@@ -276,10 +265,13 @@ MIP_SNIPPETS = dict(
         // Refine search for max value
         loc = start_loc + step * (float(maxi) - 0.5);
         for (int i=0; i<10; i++) {
-            maxval = max(maxval, colorToVal($sample(u_volumetex, loc)));
+            maxval = max(maxval, colorToVal($sample(getTex(i_tex), loc)));
             loc += step * 0.1;
         }
-        gl_FragColor = $cmap(maxval);
+        gl_FragColor += getCmap(i_tex)(maxval);
+        """,
+    after_sampling="""
+        gl_FragColor *= gl_FragColor / u_n_tex;
         """,
 )
 MIP_FRAG_SHADER = FRAG_SHADER.format(**MIP_SNIPPETS)
@@ -290,7 +282,7 @@ TRANSLUCENT_SNIPPETS = dict(
         vec4 integrated_color = vec4(0., 0., 0., 0.);
         """,
     in_loop="""
-            color = $cmap(val);
+            color = getCmap(i_tex)(val);
             float a1 = integrated_color.a;
             float a2 = color.a * (1 - a1);
             float alpha = max(a1 + a2, 0.001);
@@ -311,7 +303,10 @@ TRANSLUCENT_SNIPPETS = dict(
 
         """,
     after_loop="""
-        gl_FragColor = integrated_color;
+        gl_FragColor += integrated_color;
+        """,
+    after_sampling="""
+        gl_FragColor *= gl_FragColor / u_n_tex;
         """,
 )
 TRANSLUCENT_FRAG_SHADER = FRAG_SHADER.format(**TRANSLUCENT_SNIPPETS)
@@ -322,12 +317,15 @@ ADDITIVE_SNIPPETS = dict(
         vec4 integrated_color = vec4(0., 0., 0., 0.);
         """,
     in_loop="""
-        color = $cmap(val);
+        color = getCmap(i_tex)(val);
 
         integrated_color = 1.0 - (1.0 - integrated_color) * (1.0 - color);
         """,
     after_loop="""
-        gl_FragColor = integrated_color;
+        gl_FragColor += integrated_color;
+        """,
+    after_sampling="""
+        gl_FragColor *= gl_FragColor / u_n_tex;
         """,
 )
 ADDITIVE_FRAG_SHADER = FRAG_SHADER.format(**ADDITIVE_SNIPPETS)
@@ -344,10 +342,10 @@ ISO_SNIPPETS = dict(
             // Take the last interval in smaller steps
             vec3 iloc = loc - step;
             for (int i=0; i<10; i++) {
-                val = colorToVal($sample(u_volumetex, iloc));
+                val = colorToVal($sample(getTex(i_tex), iloc));
                 if (val > u_threshold) {
-                    color = $cmap(val);
-                    gl_FragColor = calculateColor(color, iloc, dstep);
+                    color = getCmap(i_tex)(val);
+                    gl_FragColor += calculateColor(i_tex, color, iloc, dstep);
                     iter = nsteps;
                     break;
                 }
@@ -357,14 +355,17 @@ ISO_SNIPPETS = dict(
         """,
     after_loop="""
         """,
+    after_sampling="""
+        gl_FragColor *= gl_FragColor / u_n_tex;
+        """,
 )
 
 ISO_FRAG_SHADER = FRAG_SHADER.format(**ISO_SNIPPETS)
 
 frag_dict = {
-    #'mip': MIP_FRAG_SHADER,
-    #'iso': ISO_FRAG_SHADER,
-    #'translucent': TRANSLUCENT_FRAG_SHADER,
+    'mip': MIP_FRAG_SHADER,
+    'iso': ISO_FRAG_SHADER,
+    'translucent': TRANSLUCENT_FRAG_SHADER,
     'additive': ADDITIVE_FRAG_SHADER,
 }
 
@@ -398,7 +399,7 @@ class MultiVolumeVisual(Visual):
         but has lower performance on desktop platforms.
     """
 
-    def __init__(self, vols, clims=None, method='mip', threshold=None, max_vol=10,
+    def __init__(self, vols, clims=None, method='mip', threshold=None, max_vol=4,
                  relative_step_size=0.8, cmaps=None, emulate_texture=False):
         tex_cls = TextureEmulated3D if emulate_texture else Texture3D
 
@@ -430,22 +431,16 @@ class MultiVolumeVisual(Visual):
         # Generate fragment shader program
         tex_declare = ""
         for index, (key, value) in enumerate(frag_dict.items()):
-            tex = "u_volumetex{}".format(index)
-            cmap = "cmap{}".format(index)
-
             condition = "if (u_n_tex > {})".format(index)
-            sample = "$sample({}, loc)".format(tex)
+            tex = "u_volumetex{}".format(index)
+            cmap = "$cmap{}".format(index)
 
             tex_declare += "uniform $sampler_type {};\n".format(tex)
             gettex += "{} return {};\n".format(condition, tex)
             getcmap += "{} return {};\n".format(condition, cmap)
 
-            color_aggregation += "{} color += {};\n".format(condition, sample)
-            cmap_aggregation += "{} color += $cmap{}({}.g);\n".format(condition, index, sample)
-
             frag_dict[key] = value.format(tex_declare=tex_declare,
-                                          color_aggregation=color_aggregation,
-                                          cmap_aggregation=cmap_aggregation)
+                                          gettex=gettex, getcmap=getcmap)
 
         # Create program
         Visual.__init__(self, vcode=VERT_SHADER, fcode="")
