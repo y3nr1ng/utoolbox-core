@@ -2,14 +2,13 @@ import boltons.debugutils
 boltons.debugutils.pdb_on_exception()
 
 from vispy import app, scene
-from vispy.color import get_colormap
+from vispy.scene.visuals import Volume
 
 import numpy as np
 
 from utoolbox.utils.decorators import timeit
-from utoolbox.viewers.volume import MultiVolume
 
-file_path = 'data/cell4_ch0_stack0000_488nm_0000000msec_0007934731msecAbs_decon.tif'
+file_path = 'data/membrane.tif'
 
 @timeit
 def load_file():
@@ -23,13 +22,12 @@ canvas = scene.SceneCanvas(keys='interactive', size=(800, 600), show=True)
 view = canvas.central_widget.add_view()
 
 # attach data to visual node
-volumes = [
-    (data, None, get_colormap('GrBu'))
-]
-vol_node = MultiVolume(volumes, parent=view.scene)
-vol_node.transform = scene.STTransform(translate=(64, 64, 0))
+vol_node = Volume(data, parent=view.scene)
+vol_node.transform = scene.STTransform(translate=(0, 0, 0))
 
 view.camera = scene.cameras.TurntableCamera(parent=view.scene, fov=60.)
+# flip z-axis
+view.camera.flip = (False, False, True)
 
 canvas.update()
 
