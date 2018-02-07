@@ -545,23 +545,8 @@ class MultiVolumeVisual(Visual):
         if len(cmaps) > len(self._cmaps):
             raise ValueError("Provided colormaps ({n_cmap}) exceeds number of storage ({n_cs})." \
                              .format(n_cmap=len(cmaps), n_cs=len(self._cmaps)))
-
-        #DEBUG
-        from vispy.color import BaseColormap
-        def get_translucent_cmap(r, g, b):
-            class TranslucentCmap(BaseColormap):
-                glsl_map = """
-                vec4 translucent_fire(float t)
-                {{
-                    return vec4(t*{0}, t*{1}, t*{2}, t*0.5);
-                }}
-                """.format(r, g, b)
-            return TranslucentCmap()
-        c = get_translucent_cmap(1, 1, 1)
-
         for index, cmap in enumerate(cmaps):
-            #self._cmaps[index] = get_colormap(cmap)
-            self._cmaps[index] = c
+            self._cmaps[index] = get_colormap(cmap)
             self.shared_program.frag['cmap{}'.format(index)] = Function(self._cmaps[index].glsl_map)
         self.update()
 
