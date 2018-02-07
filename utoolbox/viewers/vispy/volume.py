@@ -208,32 +208,32 @@ void main() {{
     //gl_FragColor = vec4(0.0, nsteps / 3.0 / u_shape.x, 1.0, 1.0);
     //return;
 
-    for (int i_tex = 0; i_tex < u_n_tex; i_tex++)
-    {{
-        {before_loop}
+    {before_loop}
 
-        // This outer loop seems necessary on some systems for large
-        // datasets. Ugly, but it works ...
-        vec3 loc = start_loc;
-        int iter = 0;
-        while (iter < nsteps) {{
-            for (iter=iter; iter<nsteps; iter++)
+    // This outer loop seems necessary on some systems for large
+    // datasets. Ugly, but it works ...
+    vec3 loc = start_loc;
+    int iter = 0;
+    while (iter < nsteps) {{
+        for (iter=iter; iter<nsteps; iter++)
+        {{
+            for (int i_tex = 0; i_tex < u_n_tex; i_tex++)
             {{
                 // Get sample color
                 vec4 color = fromTexture(i_tex, loc);
                 float val = color.g;
 
                 {in_loop}
-
-                // Advance location deeper into the volume
-                loc += step;
             }}
-        }}
 
-        {after_loop}
+            {after_sampling}
+
+            // Advance location deeper into the volume
+            loc += step;
+        }}
     }}
 
-    {after_sampling}
+    {after_loop}
 
     /* Set depth value - from visvis TODO
     int iter_depth = int(maxi);
@@ -304,10 +304,9 @@ TRANSLUCENT_SNIPPETS = dict(
 
         """,
     after_loop="""
-        gl_FragColor += integrated_color;
+        gl_FragColor += integrated_color / u_n_tex;
         """,
     after_sampling="""
-    gl_FragColor *= gl_FragColor / u_n_tex;
         """,
 )
 TRANSLUCENT_FRAG_SHADER = FRAG_SHADER.format_map(DefaultFormat(**TRANSLUCENT_SNIPPETS))
@@ -323,10 +322,9 @@ ADDITIVE_SNIPPETS = dict(
                 integrated_color = 1.0 - (1.0 - integrated_color) * (1.0 - color);
         """,
     after_loop="""
-        gl_FragColor += integrated_color;
+        gl_FragColor += integrated_color / u_n_tex;
         """,
     after_sampling="""
-    gl_FragColor *= gl_FragColor / u_n_tex;
         """,
 )
 ADDITIVE_FRAG_SHADER = FRAG_SHADER.format_map(DefaultFormat(**ADDITIVE_SNIPPETS))

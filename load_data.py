@@ -23,7 +23,7 @@ canvas = scene.SceneCanvas(keys='interactive', size=(800, 600), show=True)
 view = canvas.central_widget.add_view()
 
 # attach data to visual node
-vol_node = MultiVolume([data], cmaps=['GrBu'], method='mip', max_vol=1,
+vol_node = MultiVolume([data], cmaps=['grays'], method='translucent', max_vol=1,
                        parent=view.scene)
 vol_node.transform = scene.STTransform(translate=(0, 0, 0))
 
