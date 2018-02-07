@@ -102,3 +102,6 @@ ENV/
 
 # macOS residues
 .DS_Store
+
+# Examples
+examples/
