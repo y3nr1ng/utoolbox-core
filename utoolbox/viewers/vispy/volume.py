@@ -243,9 +243,20 @@ void main() {{
 
 
 MIP_SNIPPETS = dict(
+    before_tracing="""
+    float maxval = -99999.0; // The maximum encountered value
+    int maxi = 0;  // Where the maximum value was encountered
+    """,
+    before_lookup="""
+    """,
+    in_lookup="""
+    """,
+    in_tracing="""
+    """,
+    after_tracing="""
+    """,
+
     before_loop="""
-        float maxval = -99999.0; // The maximum encountered value
-        int maxi = 0;  // Where the maximum value was encountered
         """,
     in_loop="""
         if( val > maxval ) {
@@ -270,14 +281,23 @@ MIP_FRAG_SHADER = FRAG_SHADER.format_map(DefaultFormat(**MIP_SNIPPETS))
 
 
 TRANSLUCENT_SNIPPETS = dict(
-    before_loop="""
-        vec4 integrated_color = vec4(0., 0., 0., 0.);
-        """,
-    in_loop="""
-            color = fromColormap(i_tex, val);
+    before_tracing="""
+    vec4 integrated_color = vec4(0., 0., 0., 0.);
+    """,
+    before_lookup="""
+            vec4 color = vec4(0., 0., 0., 0.);
+            float val;
+    """,
+    in_lookup="""
+                val = fromTexture(i_tex, loc).g;
+                color += fromColormap(i_tex, val);
+    """,
+    in_tracing="""
+            color *= 1. / u_n_tex;
+
             float a1 = integrated_color.a;
-            float a2 = color.a * (1 - a1);
-            float alpha = max(a1 + a2, 0.001);
+            float a2 = color.a * (1-a1);
+            float alpha = max(a1+a2, 0.001);
 
             // Doesn't work.. GLSL optimizer bug?
             //integrated_color = (integrated_color * a1 / alpha) +
@@ -292,13 +312,10 @@ TRANSLUCENT_SNIPPETS = dict(
                 // stop integrating if the fragment becomes opaque
                 iter = nsteps;
             }
-
-        """,
-    after_loop="""
-        gl_FragColor += integrated_color / u_n_tex;
-        """,
-    after_sampling="""
-        """,
+    """,
+    after_tracing="""
+    gl_FragColor = integrated_color;
+    """,
 )
 TRANSLUCENT_FRAG_SHADER = FRAG_SHADER.format_map(DefaultFormat(**TRANSLUCENT_SNIPPETS))
 
@@ -308,7 +325,7 @@ ADDITIVE_SNIPPETS = dict(
     vec4 integrated_color = vec4(0., 0., 0., 0.);
     """,
     before_lookup="""
-            vec4 color = vec4(0, 0, 0, 0);
+            vec4 color = vec4(0., 0., 0., 0.);
             float val;
     """,
     in_lookup="""
@@ -360,7 +377,7 @@ ISO_FRAG_SHADER = FRAG_SHADER.format_map(DefaultFormat(**ISO_SNIPPETS))
 frag_dict = {
     #'mip': MIP_FRAG_SHADER,
     #'iso': ISO_FRAG_SHADER,
-    #'translucent': TRANSLUCENT_FRAG_SHADER,
+    'translucent': TRANSLUCENT_FRAG_SHADER,
     'additive': ADDITIVE_FRAG_SHADER,
 }
 
@@ -545,6 +562,12 @@ class MultiVolumeVisual(Visual):
         if len(cmaps) > len(self._cmaps):
             raise ValueError("Provided colormaps ({n_cmap}) exceeds number of storage ({n_cs})." \
                              .format(n_cmap=len(cmaps), n_cs=len(self._cmaps)))
+
+        # append default colormap 'grays'
+        if len(cmaps) < len(self._cmaps):
+            for _ in range(len(cmaps), len(self._cmaps)):
+                cmaps.append('grays')
+
         for index, cmap in enumerate(cmaps):
             self._cmaps[index] = get_colormap(cmap)
             self.shared_program.frag['cmap{}'.format(index)] = Function(self._cmaps[index].glsl_map)
