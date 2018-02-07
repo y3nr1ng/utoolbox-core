@@ -91,12 +91,12 @@ float colorToVal(vec4 color)
 
 vec4 fromTexture(int index, vec3 loc)
 {{
-    %(from_texture)s
+%(from_texture)s
 }}
 
 vec4 fromColormap(int index, float val)
 {{
-    %(from_colormap)s
+%(from_colormap)s
 }}
 
 vec4 calculateColor(int index, vec4 betterColor, vec3 loc, vec3 step)
@@ -221,7 +221,7 @@ void main() {{
             {{
                 // Get sample color
                 vec4 color = fromTexture(i_tex, loc);
-                float val = color.g
+                float val = color.g;
 
                 {in_loop}
 
@@ -272,7 +272,7 @@ MIP_SNIPPETS = dict(
         gl_FragColor += fromColormap(i_tex, maxval);
         """,
     after_sampling="""
-        gl_FragColor *= gl_FragColor / u_n_tex;
+    gl_FragColor *= gl_FragColor / u_n_tex;
         """,
 )
 MIP_FRAG_SHADER = FRAG_SHADER.format_map(DefaultFormat(**MIP_SNIPPETS))
@@ -307,7 +307,7 @@ TRANSLUCENT_SNIPPETS = dict(
         gl_FragColor += integrated_color;
         """,
     after_sampling="""
-        gl_FragColor *= gl_FragColor / u_n_tex;
+    gl_FragColor *= gl_FragColor / u_n_tex;
         """,
 )
 TRANSLUCENT_FRAG_SHADER = FRAG_SHADER.format_map(DefaultFormat(**TRANSLUCENT_SNIPPETS))
@@ -318,15 +318,15 @@ ADDITIVE_SNIPPETS = dict(
         vec4 integrated_color = vec4(0., 0., 0., 0.);
         """,
     in_loop="""
-        color = fromColormap(i_tex, val);
+                color = fromColormap(i_tex, val);
 
-        integrated_color = 1.0 - (1.0 - integrated_color) * (1.0 - color);
+                integrated_color = 1.0 - (1.0 - integrated_color) * (1.0 - color);
         """,
     after_loop="""
         gl_FragColor += integrated_color;
         """,
     after_sampling="""
-        gl_FragColor *= gl_FragColor / u_n_tex;
+    gl_FragColor *= gl_FragColor / u_n_tex;
         """,
 )
 ADDITIVE_FRAG_SHADER = FRAG_SHADER.format_map(DefaultFormat(**ADDITIVE_SNIPPETS))
@@ -357,7 +357,7 @@ ISO_SNIPPETS = dict(
     after_loop="""
         """,
     after_sampling="""
-        gl_FragColor *= gl_FragColor / u_n_tex;
+    gl_FragColor *= gl_FragColor / u_n_tex;
         """,
 )
 
@@ -409,9 +409,6 @@ class MultiVolumeVisual(Visual):
         self._clims = [None for _ in range(len(vols))]
         self._need_vertex_update = True
 
-        # Set the colormap
-        self._cmaps = [get_colormap(cmap) for cmap in cmaps]
-
         # Create gloo objects
         self._vertices = VertexBuffer()
         self._texcoord = VertexBuffer(
@@ -428,6 +425,8 @@ class MultiVolumeVisual(Visual):
         self._texes = [tex_cls((10, 10, 10), interpolation='linear',
                                wrapping='clamp_to_edge')
                        for _ in range(max_vol)]
+        # Create colormaps
+        self._cmaps = [None for _ in range(max_vol)]
 
         # Generate fragment shader program
         tex_declare = ""
@@ -440,8 +439,6 @@ class MultiVolumeVisual(Visual):
             fromtex += "{:s} return $sample({:s}, loc);\n".format(condition, tex)
             fromcmap += "{:s} return $cmap{:d}(val);\n".format(condition, i)
         for key, value in frag_dict.items():
-            print(key)
-            print(value)
             frag_dict[key] = value % {
                 'texture_declaration': tex_declare,
                 'from_texture': fromtex,
@@ -449,7 +446,7 @@ class MultiVolumeVisual(Visual):
             }
 
         # Create program
-        Visual.__init__(self, vcode=VERT_SHADER, fcode="")
+        super().__init__(vcode=VERT_SHADER, fcode="")
         for i in range(len(vols)):
             self.shared_program['u_volumetex{}'.format(i)] = self._texes[i]
         self.shared_program['a_position'] = self._vertices
@@ -467,6 +464,7 @@ class MultiVolumeVisual(Visual):
 
         # Set params
         self.method = method
+        self.cmaps = cmaps
         self.relative_step_size = relative_step_size
         #TODO use threshold for each volume
         self.threshold = threshold if (threshold is not None) else 0
@@ -549,9 +547,11 @@ class MultiVolumeVisual(Visual):
         return self._cmaps
 
     @cmaps.setter
-    def cmaps(self, cmap):
-        if isinstance(cmap, tuple):
-            index, cmap = cmap
+    def cmaps(self, cmaps):
+        if len(cmaps) > len(self._cmaps):
+            raise ValueError("Provided colormaps ({n_cmap}) exceeds number of storage ({n_cs})." \
+                             .format(n_cmap=len(cmaps), n_cs=len(self._cmaps)))
+        for index, cmap in enumerate(cmaps):
             self._cmaps[index] = get_colormap(cmap)
             self.shared_program.frag['cmap{}'.format(index)] = Function(self._cmaps[index].glsl_map)
         self.update()
@@ -684,7 +684,3 @@ class MultiVolumeVisual(Visual):
             self._create_vertex_data()
 
 MultiVolume = create_visual_node(MultiVolumeVisual)
-
-if __name__ == '__main__':
-    #TODO get shaders
-    pass
