@@ -84,11 +84,6 @@ float rand(vec2 co)
     return fract(sin(dot(co.xy ,vec2(12.9898, 78.233))) * 43758.5453);
 }}
 
-float colorToVal(vec4 color)
-{{
-    return color.g;
-}}
-
 vec4 fromTexture(int index, vec3 loc)
 {{
 %(from_texture)s
@@ -112,16 +107,16 @@ vec4 calculateColor(int index, vec4 betterColor, vec3 loc, vec3 step)
     vec3 N; // normal
     color1 = fromTexture( index, loc+vec3(-step[0],0.0,0.0) );
     color2 = fromTexture( index, loc+vec3(step[0],0.0,0.0) );
-    N[0] = colorToVal(color1) - colorToVal(color2);
-    betterColor = max(max(color1, color2),betterColor);
+    N[0] = color1.g - color2.g;
+    betterColor = max(max(color1, color2), betterColor);
     color1 = fromTexture( index, loc+vec3(0.0,-step[1],0.0) );
     color2 = fromTexture( index, loc+vec3(0.0,step[1],0.0) );
-    N[1] = colorToVal(color1) - colorToVal(color2);
-    betterColor = max(max(color1, color2),betterColor);
+    N[1] = color1.g - color2.g;
+    betterColor = max(max(color1, color2), betterColor);
     color1 = fromTexture( index, loc+vec3(0.0,0.0,-step[2]) );
     color2 = fromTexture( index, loc+vec3(0.0,0.0,step[2]) );
-    N[2] = colorToVal(color1) - colorToVal(color2);
-    betterColor = max(max(color1, color2),betterColor);
+    N[2] = color1.g - color2.g;
+    betterColor = max(max(color1, color2), betterColor);
     float gm = length(N); // gradient magnitude
     N = normalize(N);
 
@@ -164,7 +159,7 @@ vec4 calculateColor(int index, vec4 betterColor, vec3 loc, vec3 step)
     }}
 
     // Calculate final color by componing different components
-    final_color = color2 * ( ambient_color + diffuse_color) + specular_color;
+    final_color = color2 * (ambient_color + diffuse_color) + specular_color;
     final_color.a = color2.a;
 
     // Done
@@ -196,7 +191,7 @@ void main() {{
 
     // Decide how many steps to take
     int nsteps = int(-distance / u_relative_step_size + 0.5);
-    if( nsteps < 1 )
+    if (nsteps < 1)
         discard;
 
     // Get starting location and step vector in texture coordinates
@@ -208,7 +203,7 @@ void main() {{
     //gl_FragColor = vec4(0.0, nsteps / 3.0 / u_shape.x, 1.0, 1.0);
     //return;
 
-    {before_loop}
+    {before_tracing}
 
     // This outer loop seems necessary on some systems for large
     // datasets. Ugly, but it works ...
@@ -217,23 +212,21 @@ void main() {{
     while (iter < nsteps) {{
         for (iter=iter; iter<nsteps; iter++)
         {{
-            for (int i_tex = 0; i_tex < u_n_tex; i_tex++)
-            {{
-                // Get sample color
-                vec4 color = fromTexture(i_tex, loc);
-                float val = color.g;
+            {before_lookup}
 
-                {in_loop}
+            for (int i_tex=0; i_tex<u_n_tex; i_tex++)
+            {{
+                {in_lookup}
             }}
 
-            {after_sampling}
+            {in_tracing}
 
             // Advance location deeper into the volume
             loc += step;
         }}
     }}
 
-    {after_loop}
+    {after_tracing}
 
     /* Set depth value - from visvis TODO
     int iter_depth = int(maxi);
@@ -246,8 +239,6 @@ void main() {{
     gl_FragDepth = (iproj.z+1.0)/2.0;
     */
 }}
-
-
 """
 
 
@@ -266,7 +257,7 @@ MIP_SNIPPETS = dict(
         // Refine search for max value
         loc = start_loc + step * (float(maxi) - 0.5);
         for (int i=0; i<10; i++) {
-            maxval = max(maxval, colorToVal(fromTexture(i_tex, loc)));
+            maxval = max(maxval, fromTexture(i_tex, loc).g);
             loc += step * 0.1;
         }
         gl_FragColor += fromColormap(i_tex, maxval);
@@ -313,19 +304,24 @@ TRANSLUCENT_FRAG_SHADER = FRAG_SHADER.format_map(DefaultFormat(**TRANSLUCENT_SNI
 
 
 ADDITIVE_SNIPPETS = dict(
-    before_loop="""
-        vec4 integrated_color = vec4(0., 0., 0., 0.);
-        """,
-    in_loop="""
-                color = fromColormap(i_tex, val);
-
-                integrated_color = 1.0 - (1.0 - integrated_color) * (1.0 - color);
-        """,
-    after_loop="""
-        gl_FragColor += integrated_color / u_n_tex;
-        """,
-    after_sampling="""
-        """,
+    before_tracing="""
+    vec4 integrated_color = vec4(0., 0., 0., 0.);
+    """,
+    before_lookup="""
+            vec4 color = vec4(0, 0, 0, 0);
+            float val;
+    """,
+    in_lookup="""
+                val = fromTexture(i_tex, loc).g;
+                color += fromColormap(i_tex, val);
+    """,
+    in_tracing="""
+            color *= 1. / u_n_tex;
+            integrated_color = 1.0 - (1.0 - integrated_color) * (1.0 - color);
+    """,
+    after_tracing="""
+    gl_FragColor = integrated_color;
+    """,
 )
 ADDITIVE_FRAG_SHADER = FRAG_SHADER.format_map(DefaultFormat(**ADDITIVE_SNIPPETS))
 
@@ -341,7 +337,7 @@ ISO_SNIPPETS = dict(
             // Take the last interval in smaller steps
             vec3 iloc = loc - step;
             for (int i=0; i<10; i++) {
-                val = colorToVal(fromTexture(i_tex, iloc));
+                val = fromTexture(i_tex, iloc).g;
                 if (val > u_threshold) {
                     color = fromColormap(i_tex, val);
                     gl_FragColor += calculateColor(i_tex, color, iloc, dstep);
@@ -362,9 +358,9 @@ ISO_SNIPPETS = dict(
 ISO_FRAG_SHADER = FRAG_SHADER.format_map(DefaultFormat(**ISO_SNIPPETS))
 
 frag_dict = {
-    'mip': MIP_FRAG_SHADER,
-    'iso': ISO_FRAG_SHADER,
-    'translucent': TRANSLUCENT_FRAG_SHADER,
+    #'mip': MIP_FRAG_SHADER,
+    #'iso': ISO_FRAG_SHADER,
+    #'translucent': TRANSLUCENT_FRAG_SHADER,
     'additive': ADDITIVE_FRAG_SHADER,
 }
 
@@ -529,7 +525,7 @@ class MultiVolumeVisual(Visual):
         #NOTE _tex.set_data() is efficient if vol is of same shape
         self._texes[index].set_data(vol)
         if self._vol_shape is None or self._vol_shape != vol.shape:
-            self.shared_program['u_shape'] = tuple(vol.shape)
+            self.shared_program['u_shape'] = (vol.shape[2], vol.shape[1], vol.shape[0])
             self._vol_shape = vol.shape
             self._need_vertex_update = True
 
@@ -549,8 +545,23 @@ class MultiVolumeVisual(Visual):
         if len(cmaps) > len(self._cmaps):
             raise ValueError("Provided colormaps ({n_cmap}) exceeds number of storage ({n_cs})." \
                              .format(n_cmap=len(cmaps), n_cs=len(self._cmaps)))
+
+        #DEBUG
+        from vispy.color import BaseColormap
+        def get_translucent_cmap(r, g, b):
+            class TranslucentCmap(BaseColormap):
+                glsl_map = """
+                vec4 translucent_fire(float t)
+                {{
+                    return vec4(t*{0}, t*{1}, t*{2}, t*0.5);
+                }}
+                """.format(r, g, b)
+            return TranslucentCmap()
+        c = get_translucent_cmap(1, 1, 1)
+
         for index, cmap in enumerate(cmaps):
-            self._cmaps[index] = get_colormap(cmap)
+            #self._cmaps[index] = get_colormap(cmap)
+            self._cmaps[index] = c
             self.shared_program.frag['cmap{}'.format(index)] = Function(self._cmaps[index].glsl_map)
         self.update()
 
@@ -585,6 +596,11 @@ class MultiVolumeVisual(Visual):
             self.shared_program['u_threshold'] = None
 
         self.shared_program.frag = frag_dict[method]
+        #DEBUG
+        header = "=== {} ===".format(method)
+        print(header)
+        print(frag_dict[method])
+        print("=" * len(header))
         self.shared_program.frag['sampler_type'] = self._texes[0].glsl_sampler_type
         self.shared_program.frag['sample'] = self._texes[0].glsl_sample
         self.update()
