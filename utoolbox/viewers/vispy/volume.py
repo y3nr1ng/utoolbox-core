@@ -9,15 +9,17 @@ Note
 ----
     https://github.com/astrofrog/vispy-multivol
 """
-from itertools import izip, count
+from itertools import count
 
-from visy.gloo import Texture3D, TextureEmulated3D, VertexBuffer, IndexBuffer
+from vispy.gloo import Texture3D, TextureEmulated3D, VertexBuffer, IndexBuffer
 from vispy.visuals import Visual
 from vispy.visuals.shaders import Function
 from vispy.color import get_colormap
 from vispy.scene.visuals import create_visual_node
 
 import numpy as np
+
+from utoolbox.utils.defaults import DefaultFormat
 
 # Vertex shader
 VERT_SHADER = """
@@ -54,7 +56,7 @@ void main() {
 FRAG_SHADER = """
 // uniforms
 uniform int u_n_tex;
-{texture_declaration}
+%(texture_declaration)s
 uniform vec3 u_shape;
 uniform float u_threshold;
 uniform float u_relative_step_size;
@@ -79,7 +81,6 @@ vec3 view_ray;
 float rand(vec2 co)
 {{
     // Create a pseudo-random number between 0 and 1.
-    // http://stackoverflow.com/questions/4200224
     return fract(sin(dot(co.xy ,vec2(12.9898, 78.233))) * 43758.5453);
 }}
 
@@ -90,12 +91,12 @@ float colorToVal(vec4 color)
 
 $sampler_type getTex(int index)
 {{
-    {gettex}
+    %(get_texture)s
 }}
 
-$cmap getCmap(int index)
+vec4 fromColormap(int index, float val)
 {{
-    {getcmap}
+    %(from_colormap)s
 }}
 
 vec4 calculateColor(int index, vec4 betterColor, vec3 loc, vec3 step)
@@ -268,13 +269,13 @@ MIP_SNIPPETS = dict(
             maxval = max(maxval, colorToVal($sample(getTex(i_tex), loc)));
             loc += step * 0.1;
         }
-        gl_FragColor += getCmap(i_tex)(maxval);
+        gl_FragColor += fromColormap(i_tex, maxval);
         """,
     after_sampling="""
         gl_FragColor *= gl_FragColor / u_n_tex;
         """,
 )
-MIP_FRAG_SHADER = FRAG_SHADER.format(**MIP_SNIPPETS)
+MIP_FRAG_SHADER = FRAG_SHADER.format_map(DefaultFormat(**MIP_SNIPPETS))
 
 
 TRANSLUCENT_SNIPPETS = dict(
@@ -282,7 +283,7 @@ TRANSLUCENT_SNIPPETS = dict(
         vec4 integrated_color = vec4(0., 0., 0., 0.);
         """,
     in_loop="""
-            color = getCmap(i_tex)(val);
+            color = fromColormap(i_tex, val);
             float a1 = integrated_color.a;
             float a2 = color.a * (1 - a1);
             float alpha = max(a1 + a2, 0.001);
@@ -309,7 +310,7 @@ TRANSLUCENT_SNIPPETS = dict(
         gl_FragColor *= gl_FragColor / u_n_tex;
         """,
 )
-TRANSLUCENT_FRAG_SHADER = FRAG_SHADER.format(**TRANSLUCENT_SNIPPETS)
+TRANSLUCENT_FRAG_SHADER = FRAG_SHADER.format_map(DefaultFormat(**TRANSLUCENT_SNIPPETS))
 
 
 ADDITIVE_SNIPPETS = dict(
@@ -317,7 +318,7 @@ ADDITIVE_SNIPPETS = dict(
         vec4 integrated_color = vec4(0., 0., 0., 0.);
         """,
     in_loop="""
-        color = getCmap(i_tex)(val);
+        color = fromColormap(i_tex, val);
 
         integrated_color = 1.0 - (1.0 - integrated_color) * (1.0 - color);
         """,
@@ -328,7 +329,7 @@ ADDITIVE_SNIPPETS = dict(
         gl_FragColor *= gl_FragColor / u_n_tex;
         """,
 )
-ADDITIVE_FRAG_SHADER = FRAG_SHADER.format(**ADDITIVE_SNIPPETS)
+ADDITIVE_FRAG_SHADER = FRAG_SHADER.format_map(DefaultFormat(**ADDITIVE_SNIPPETS))
 
 
 ISO_SNIPPETS = dict(
@@ -344,7 +345,7 @@ ISO_SNIPPETS = dict(
             for (int i=0; i<10; i++) {
                 val = colorToVal($sample(getTex(i_tex), iloc));
                 if (val > u_threshold) {
-                    color = getCmap(i_tex)(val);
+                    color = fromColormap(i_tex, val);
                     gl_FragColor += calculateColor(i_tex, color, iloc, dstep);
                     iter = nsteps;
                     break;
@@ -360,7 +361,7 @@ ISO_SNIPPETS = dict(
         """,
 )
 
-ISO_FRAG_SHADER = FRAG_SHADER.format(**ISO_SNIPPETS)
+ISO_FRAG_SHADER = FRAG_SHADER.format_map(DefaultFormat(**ISO_SNIPPETS))
 
 frag_dict = {
     'mip': MIP_FRAG_SHADER,
@@ -399,8 +400,8 @@ class MultiVolumeVisual(Visual):
         but has lower performance on desktop platforms.
     """
 
-    def __init__(self, vols, clims=None, method='mip', threshold=None, max_vol=4,
-                 relative_step_size=0.8, cmaps=None, emulate_texture=False):
+    def __init__(self, vols, clims=None, cmaps=None, method='mip', max_vol=4,
+                 threshold=None, relative_step_size=0.8, emulate_texture=False):
         tex_cls = TextureEmulated3D if emulate_texture else Texture3D
 
         # Storage of information of volume
@@ -430,17 +431,22 @@ class MultiVolumeVisual(Visual):
 
         # Generate fragment shader program
         tex_declare = ""
-        for index, (key, value) in enumerate(frag_dict.items()):
-            condition = "if (u_n_tex > {})".format(index)
-            tex = "u_volumetex{}".format(index)
-            cmap = "$cmap{}".format(index)
-
-            tex_declare += "uniform $sampler_type {};\n".format(tex)
-            gettex += "{} return {};\n".format(condition, tex)
-            getcmap += "{} return {};\n".format(condition, cmap)
-
-            frag_dict[key] = value.format(tex_declare=tex_declare,
-                                          gettex=gettex, getcmap=getcmap)
+        gettex = ""
+        fromcmap = ""
+        for i in range(max_vol):
+            tex = "u_volumetex{}".format(i)
+            tex_declare += "uniform $sampler_type {:s};\n".format(tex)
+            condition = "if (index == {:d})".format(i)
+            gettex += "{:s} return {:s};\n".format(condition, tex)
+            fromcmap += "{:s} return $cmap{:d}(val);\n".format(condition, i)
+        for key, value in frag_dict.items():
+            print(key)
+            print(value)
+            frag_dict[key] = value % {
+                'texture_declaration': tex_declare,
+                'get_texture': gettex,
+                'from_colormap': fromcmap
+            }
 
         # Create program
         Visual.__init__(self, vcode=VERT_SHADER, fcode="")
@@ -462,7 +468,8 @@ class MultiVolumeVisual(Visual):
         # Set params
         self.method = method
         self.relative_step_size = relative_step_size
-        self.threshold = threshold if (threshold is not None) else vol.mean()
+        #TODO use threshold for each volume
+        self.threshold = threshold if (threshold is not None) else 0
         self.freeze()
 
     def set_data(self, vols, clims=None, resize=False):
@@ -484,7 +491,7 @@ class MultiVolumeVisual(Visual):
         elif (len(vols) != len(clims)):
             raise ValueError("Number of clims does not match number of volumes.")
 
-        for index, vol, clim in izip(count(), vols, clims):
+        for index, vol, clim in zip(count(), vols, clims):
             self.set_idata(index, vol, clim, resize)
         self.shared_program['u_n_tex'] = len(vols)
 
