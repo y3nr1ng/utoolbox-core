@@ -1,5 +1,5 @@
 import boltons.debugutils
-boltons.debugutils.pdb_on_exception()
+#boltons.debugutils.pdb_on_exception()
 
 from vispy import app, scene
 from vispy.color import get_colormap
@@ -7,7 +7,7 @@ from vispy.color import get_colormap
 import numpy as np
 
 from utoolbox.utils.decorators import timeit
-from utoolbox.viewer.vispy.volume import MultiVolume
+from utoolbox.viewers.vispy.volume import MultiVolume
 
 file_path = 'data/membrane.tif'
 
