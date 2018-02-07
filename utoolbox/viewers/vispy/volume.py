@@ -58,7 +58,6 @@ FRAG_SHADER = """
 uniform int u_n_tex;
 %(texture_declaration)s
 uniform vec3 u_shape;
-uniform float u_threshold;
 uniform float u_relative_step_size;
 
 //varyings
@@ -67,22 +66,8 @@ varying vec3 v_position;
 varying vec4 v_nearpos;
 varying vec4 v_farpos;
 
-// uniforms for lighting. Hard coded until we figure out how to do lights
-const vec4 u_ambient = vec4(0.2, 0.4, 0.2, 1.0);
-const vec4 u_diffuse = vec4(0.8, 0.2, 0.2, 1.0);
-const vec4 u_specular = vec4(1.0, 1.0, 1.0, 1.0);
-const float u_shininess = 40.0;
-
-//varying vec3 lightDirs[1];
-
 // global holding view direction in local coordinates
 vec3 view_ray;
-
-float rand(vec2 co)
-{{
-    // Create a pseudo-random number between 0 and 1.
-    return fract(sin(dot(co.xy ,vec2(12.9898, 78.233))) * 43758.5453);
-}}
 
 vec4 fromTexture(int index, vec3 loc)
 {{
@@ -92,78 +77,6 @@ vec4 fromTexture(int index, vec3 loc)
 vec4 fromColormap(int index, float val)
 {{
 %(from_colormap)s
-}}
-
-vec4 calculateColor(int index, vec4 betterColor, vec3 loc, vec3 step)
-{{
-    // Calculate color by incorporating lighting
-    vec4 color1;
-    vec4 color2;
-
-    // View direction
-    vec3 V = normalize(view_ray);
-
-    // calculate normal vector from gradient
-    vec3 N; // normal
-    color1 = fromTexture( index, loc+vec3(-step[0],0.0,0.0) );
-    color2 = fromTexture( index, loc+vec3(step[0],0.0,0.0) );
-    N[0] = color1.g - color2.g;
-    betterColor = max(max(color1, color2), betterColor);
-    color1 = fromTexture( index, loc+vec3(0.0,-step[1],0.0) );
-    color2 = fromTexture( index, loc+vec3(0.0,step[1],0.0) );
-    N[1] = color1.g - color2.g;
-    betterColor = max(max(color1, color2), betterColor);
-    color1 = fromTexture( index, loc+vec3(0.0,0.0,-step[2]) );
-    color2 = fromTexture( index, loc+vec3(0.0,0.0,step[2]) );
-    N[2] = color1.g - color2.g;
-    betterColor = max(max(color1, color2), betterColor);
-    float gm = length(N); // gradient magnitude
-    N = normalize(N);
-
-    // Flip normal so it points towards viewer
-    float Nselect = float(dot(N,V) > 0.0);
-    N = (2.0*Nselect - 1.0) * N;  // ==  Nselect * N - (1.0-Nselect)*N;
-
-    // Get color of the texture (albeido)
-    color1 = betterColor;
-    color2 = color1;
-    // todo: parametrise color1_to_color2
-
-    // Init colors
-    vec4 ambient_color = vec4(0.0, 0.0, 0.0, 0.0);
-    vec4 diffuse_color = vec4(0.0, 0.0, 0.0, 0.0);
-    vec4 specular_color = vec4(0.0, 0.0, 0.0, 0.0);
-    vec4 final_color;
-
-    // todo: allow multiple light, define lights on viewvox or subscene
-    int nlights = 1;
-    for (int i=0; i<nlights; i++)
-    {{
-        // Get light direction (make sure to prevent zero devision)
-        vec3 L = normalize(view_ray);  //lightDirs[i];
-        float lightEnabled = float( length(L) > 0.0 );
-        L = normalize(L+(1.0-lightEnabled));
-
-        // Calculate lighting properties
-        float lambertTerm = clamp( dot(N,L), 0.0, 1.0 );
-        vec3 H = normalize(L+V); // Halfway vector
-        float specularTerm = pow( max(dot(H,N),0.0), u_shininess);
-
-        // Calculate mask
-        float mask1 = lightEnabled;
-
-        // Calculate colors
-        ambient_color +=  mask1 * u_ambient;  // * gl_LightSource[i].ambient;
-        diffuse_color +=  mask1 * lambertTerm;
-        specular_color += mask1 * specularTerm * u_specular;
-    }}
-
-    // Calculate final color by componing different components
-    final_color = color2 * (ambient_color + diffuse_color) + specular_color;
-    final_color.a = color2.a;
-
-    // Done
-    return final_color;
 }}
 
 // for some reason, this has to be the last function in order for the
@@ -308,7 +221,7 @@ TRANSLUCENT_SNIPPETS = dict(
 
             integrated_color.a = alpha;
 
-            if( alpha > 0.99 ){
+            if (alpha > 0.99) {
                 // stop integrating if the fragment becomes opaque
                 iter = nsteps;
             }
@@ -343,40 +256,8 @@ ADDITIVE_SNIPPETS = dict(
 ADDITIVE_FRAG_SHADER = FRAG_SHADER.format_map(DefaultFormat(**ADDITIVE_SNIPPETS))
 
 
-ISO_SNIPPETS = dict(
-    before_loop="""
-        vec4 color3 = vec4(0.0);  // final color
-        vec3 dstep = 1.5 / u_shape;  // step to sample derivative
-        gl_FragColor = vec4(0.0);
-    """,
-    in_loop="""
-        if (val > u_threshold-0.2) {
-            // Take the last interval in smaller steps
-            vec3 iloc = loc - step;
-            for (int i=0; i<10; i++) {
-                val = fromTexture(i_tex, iloc).g;
-                if (val > u_threshold) {
-                    color = fromColormap(i_tex, val);
-                    gl_FragColor += calculateColor(i_tex, color, iloc, dstep);
-                    iter = nsteps;
-                    break;
-                }
-                iloc += step * 0.1;
-            }
-        }
-        """,
-    after_loop="""
-        """,
-    after_sampling="""
-    gl_FragColor *= gl_FragColor / u_n_tex;
-        """,
-)
-
-ISO_FRAG_SHADER = FRAG_SHADER.format_map(DefaultFormat(**ISO_SNIPPETS))
-
 frag_dict = {
     #'mip': MIP_FRAG_SHADER,
-    #'iso': ISO_FRAG_SHADER,
     'translucent': TRANSLUCENT_FRAG_SHADER,
     'additive': ADDITIVE_FRAG_SHADER,
 }
@@ -412,7 +293,7 @@ class MultiVolumeVisual(Visual):
     """
 
     def __init__(self, vols, clims=None, cmaps=None, method='mip', max_vol=4,
-                 threshold=None, relative_step_size=0.8, emulate_texture=False):
+                 relative_step_size=0.8, emulate_texture=False):
         tex_cls = TextureEmulated3D if emulate_texture else Texture3D
 
         # Storage of information of volume
@@ -477,8 +358,6 @@ class MultiVolumeVisual(Visual):
         self.method = method
         self.cmaps = cmaps
         self.relative_step_size = relative_step_size
-        #TODO use threshold for each volume
-        self.threshold = threshold if (threshold is not None) else 0
         self.freeze()
 
     def set_data(self, vols, clims=None, resize=False):
@@ -599,9 +478,6 @@ class MultiVolumeVisual(Visual):
             raise ValueError('Volume render method should be in %r, not %r' %
                              (known_methods, method))
         self._method = method
-        # Get rid of specific variables - they may become invalid
-        if 'u_threshold' in self.shared_program:
-            self.shared_program['u_threshold'] = None
 
         self.shared_program.frag = frag_dict[method]
         #DEBUG
@@ -611,19 +487,6 @@ class MultiVolumeVisual(Visual):
         print("=" * len(header))
         self.shared_program.frag['sampler_type'] = self._texes[0].glsl_sampler_type
         self.shared_program.frag['sample'] = self._texes[0].glsl_sample
-        self.update()
-
-    @property
-    def threshold(self):
-        """ The threshold value to apply for the isosurface render method.
-        """
-        return self._threshold
-
-    @threshold.setter
-    def threshold(self, value):
-        self._threshold = float(value)
-        if 'u_threshold' in self.shared_program:
-            self.shared_program['u_threshold'] = self._threshold
         self.update()
 
     @property
