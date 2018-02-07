@@ -31,29 +31,22 @@ def get_translucent_cmap(r, g, b, name="untitled"):
         glsl_map = """
         vec4 translucent_{name}(float t)
         {{
-            return vec4(t*{0}, t*{1}, t*{2}, t*0.5);
+            return vec4(t*{0}, t*{1}, t*{2}, 1.);
         }}
         """.format(r, g, b, name=name)
     return Translucent()
 
 # attach data to visual node
-vol_node = MultiVolume([membrane_data, cytosol_data], clims=[(100, 2560), (100, 2560)],
+vol_node = MultiVolume([membrane_data, cytosol_data], clims=[(64, 3584), (32, 3584)],
                        cmaps=[get_translucent_cmap(0, 1, 0, "green"), get_translucent_cmap(0, 0, 1, "blue")],
                        method='additive', max_vol=2, parent=view.scene)
 vol_node.transform = scene.STTransform(translate=(0, 0, 0))
-
-#vol_node_1 = Volume(membrane_data, clim=(0, 756), cmap='grays', method='mip', parent=view.scene)
-#vol_node_1.transform = scene.STTransform(translate=(0, 0, 0))
-
-#vol_node_2 = Volume(cytosol_data, clim=(0, 756), cmap='grays', method='mip', parent=view.scene)
-#vol_node_2.transform = scene.STTransform(translate=(0, 0, 0))
 
 view.camera = scene.cameras.TurntableCamera(parent=view.scene, fov=60.)
 # flip z-axis
 view.camera.flip = (False, False, True)
 
 canvas.update()
-canvas.measure_fps()
 
 if __name__ == '__main__':
     """
