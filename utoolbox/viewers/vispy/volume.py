@@ -89,9 +89,9 @@ float colorToVal(vec4 color)
     return color.g;
 }}
 
-$sampler_type getTex(int index)
+vec4 fromTexture(int index, vec3 loc)
 {{
-    %(get_texture)s
+    %(from_texture)s
 }}
 
 vec4 fromColormap(int index, float val)
@@ -110,16 +110,16 @@ vec4 calculateColor(int index, vec4 betterColor, vec3 loc, vec3 step)
 
     // calculate normal vector from gradient
     vec3 N; // normal
-    color1 = $sample( getTex(index), loc+vec3(-step[0],0.0,0.0) );
-    color2 = $sample( getTex(index), loc+vec3(step[0],0.0,0.0) );
+    color1 = fromTexture( index, loc+vec3(-step[0],0.0,0.0) );
+    color2 = fromTexture( index, loc+vec3(step[0],0.0,0.0) );
     N[0] = colorToVal(color1) - colorToVal(color2);
     betterColor = max(max(color1, color2),betterColor);
-    color1 = $sample( getTex(index), loc+vec3(0.0,-step[1],0.0) );
-    color2 = $sample( getTex(index), loc+vec3(0.0,step[1],0.0) );
+    color1 = fromTexture( index, loc+vec3(0.0,-step[1],0.0) );
+    color2 = fromTexture( index, loc+vec3(0.0,step[1],0.0) );
     N[1] = colorToVal(color1) - colorToVal(color2);
     betterColor = max(max(color1, color2),betterColor);
-    color1 = $sample( getTex(index), loc+vec3(0.0,0.0,-step[2]) );
-    color2 = $sample( getTex(index), loc+vec3(0.0,0.0,step[2]) );
+    color1 = fromTexture( index, loc+vec3(0.0,0.0,-step[2]) );
+    color2 = fromTexture( index, loc+vec3(0.0,0.0,step[2]) );
     N[2] = colorToVal(color1) - colorToVal(color2);
     betterColor = max(max(color1, color2),betterColor);
     float gm = length(N); // gradient magnitude
@@ -220,7 +220,7 @@ void main() {{
             for (iter=iter; iter<nsteps; iter++)
             {{
                 // Get sample color
-                vec4 color = $sample(getTex(i_tex), loc);
+                vec4 color = fromTexture(i_tex, loc);
                 float val = color.g
 
                 {in_loop}
@@ -266,7 +266,7 @@ MIP_SNIPPETS = dict(
         // Refine search for max value
         loc = start_loc + step * (float(maxi) - 0.5);
         for (int i=0; i<10; i++) {
-            maxval = max(maxval, colorToVal($sample(getTex(i_tex), loc)));
+            maxval = max(maxval, colorToVal(fromTexture(i_tex, loc)));
             loc += step * 0.1;
         }
         gl_FragColor += fromColormap(i_tex, maxval);
@@ -343,7 +343,7 @@ ISO_SNIPPETS = dict(
             // Take the last interval in smaller steps
             vec3 iloc = loc - step;
             for (int i=0; i<10; i++) {
-                val = colorToVal($sample(getTex(i_tex), iloc));
+                val = colorToVal(fromTexture(i_tex, iloc));
                 if (val > u_threshold) {
                     color = fromColormap(i_tex, val);
                     gl_FragColor += calculateColor(i_tex, color, iloc, dstep);
@@ -431,20 +431,20 @@ class MultiVolumeVisual(Visual):
 
         # Generate fragment shader program
         tex_declare = ""
-        gettex = ""
+        fromtex = ""
         fromcmap = ""
         for i in range(max_vol):
             tex = "u_volumetex{}".format(i)
             tex_declare += "uniform $sampler_type {:s};\n".format(tex)
             condition = "if (index == {:d})".format(i)
-            gettex += "{:s} return {:s};\n".format(condition, tex)
+            fromtex += "{:s} return $sample({:s}, loc);\n".format(condition, tex)
             fromcmap += "{:s} return $cmap{:d}(val);\n".format(condition, i)
         for key, value in frag_dict.items():
             print(key)
             print(value)
             frag_dict[key] = value % {
                 'texture_declaration': tex_declare,
-                'get_texture': gettex,
+                'from_texture': fromtex,
                 'from_colormap': fromcmap
             }
 
