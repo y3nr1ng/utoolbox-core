@@ -338,7 +338,7 @@ class MultiVolumeVisual(Visual):
             }
 
         # Create program
-        super().__init__(vcode=VERT_SHADER, fcode="")
+        super(MultiVolumeVisual, self).__init__(vcode=VERT_SHADER, fcode="")
         for i in range(len(vols)):
             self.shared_program['u_volumetex{}'.format(i)] = self._texes[i]
         self.shared_program['a_position'] = self._vertices
