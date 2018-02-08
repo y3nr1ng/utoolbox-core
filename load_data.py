@@ -19,7 +19,6 @@ def load_file(file_path):
     return dtype.SimpleVolume(file_path)
 
 membrane_data = load_file(membrane_path)
-print("(min, max) = ({}, {})".format(np.amin(membrane_data), np.amax(membrane_data)))
 cytosol_data = load_file(cytosol_path)
 
 # create vispy environment
@@ -36,9 +35,13 @@ def get_translucent_cmap(r, g, b, name="untitled"):
         """.format(r, g, b, name=name)
     return Translucent()
 
+green = get_translucent_cmap(0, 1, 0, "green")
+blue = get_translucent_cmap(0, 0, 1, "blue")
+
 # attach data to visual node
-vol_node = MultiVolume([membrane_data, cytosol_data], clims=[(64, 3584), (32, 3584)],
-                       cmaps=[get_translucent_cmap(0, 1, 0, "green"), get_translucent_cmap(0, 0, 1, "blue")],
+vol_node = MultiVolume([membrane_data, cytosol_data],
+                       clims=[(64, 3584), (32, 3584)],
+                       cmaps=[green, blue],
                        method='additive', max_vol=2, parent=view.scene)
 vol_node.transform = scene.STTransform(translate=(0, 0, 0))
 
@@ -47,14 +50,4 @@ view.camera = scene.cameras.TurntableCamera(parent=view.scene, fov=60.)
 view.camera.flip = (False, False, True)
 
 canvas.update()
-
-if __name__ == '__main__':
-    """
-    viewer = app.Application()
-    print(viewer.native)
-    from PyQt5.QtCore import Qt
-    print(canvas.central_widget)
-    canvas.central_widget.setAttribute(Qt.WA_NoSystemBackground, False)
-    viewer.run()
-    """
-    app.run()
+app.run()
