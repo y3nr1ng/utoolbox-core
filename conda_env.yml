@@ -1,7 +1,9 @@
 name: utoolbox
+
 channels:
   - defaults
   - conda-forge
+
 dependencies:
   # core
   - python=3
@@ -12,6 +14,7 @@ dependencies:
 
   # parallel
   - dask
+  - distributed
 
   # file I/O
   - conda-forge::imageio
@@ -22,5 +25,6 @@ dependencies:
   - conda-forge::vispy
 
   # utils
+  - scikit-image
   - pip:
     - boltons
