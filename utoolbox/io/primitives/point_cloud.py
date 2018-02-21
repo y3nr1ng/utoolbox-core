@@ -1,2 +1,0 @@
-class PointCloud(object):
-    pass
