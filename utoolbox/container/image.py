@@ -3,13 +3,13 @@ import numpy as np
 from .registry import BaseContainer
 
 class Image(BaseContainer, np.ndarray):
-    """Container for 2-D volumetric image"""
+    """Container for 2-D planer image"""
     def __new__(cls, source, shape=None, dtype=None):
         if source is None:
             # create array of specified size
             if shape is None:
                 raise ValueError("Image size is not specified.")
-            return super(Volume, cls).__new__(cls, shape=shape, dtype=dtype)
+            return super(Image, cls).__new__(cls, shape=shape, dtype=dtype)
         else:
             #TODO use utoolbox.io to determine the proper way to open
             import imageio
