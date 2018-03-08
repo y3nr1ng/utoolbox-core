@@ -7,6 +7,7 @@ channels:
 dependencies:
   # core
   - python=3
+  - cython
 
   # numerics
   - numpy
