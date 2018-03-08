@@ -62,6 +62,7 @@ class run_once(object):
         return hash(self._func)
 
 def timeit(func):
+    """Benchmark the execution time of the wrapped function."""
     def timed(*args, **kwargs):
         t_start = timer()
         result = func(*args, **kwargs)
