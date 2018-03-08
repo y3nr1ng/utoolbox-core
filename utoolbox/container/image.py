@@ -3,7 +3,7 @@ import numpy as np
 from .registry import BaseContainer
 
 class Image(BaseContainer, np.ndarray):
-    """Container for 2-D planer image"""
+    """Container for planer image"""
     def __new__(cls, source, shape=None, dtype=None):
         if source is None:
             # create array of specified size
