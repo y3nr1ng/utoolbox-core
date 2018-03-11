@@ -1,6 +1,9 @@
 import logging
 logger = logging.getLogger(__name__)
 
+import re
+from collections import OrderedDict
+
 containers = {}
 
 class ContainerRegistry(type):
@@ -11,30 +14,85 @@ class ContainerRegistry(type):
         logger.debug("New container \"{}\" added.".format(cls))
         return cls
 
+class Metadata(OrderedDict):
+    """
+    Metadata provides the means to get and set keys as attributes while behaves
+    as much as possible as a normal dict. Keys that are not valid identifiers or
+    names of keywords cannot be used as attributes.
+
+    Reference
+    ---------
+    imageio.core.util.Dict
+    """
+    __reserved_names__ = dir(OrderedDict())
+    __pure_names__ = dir(dict())
+
+    def __getattribute__(self, key):
+        try:
+            return object.__getattribute__(self, key)
+        except AttributeError:
+            if key in self:
+                return self[key]
+            else:
+                raise
+
+    def __setattr__(self, key, val):
+        if key in Metadata.__reserved_names__:
+            if key not in Metadata.__pure_names__:
+                return OrderedDict.__setattr__(self, key, val)
+            else:
+                raise AttributeError(
+                    "reserved name can only be set via `metadata[{}] = X`" \
+                    .format(key)
+                )
+        else:
+            self[key] = val
+
+    def __dir__(self):
+        is_identifier = lambda x: bool(re.match(r'[a-z_]\w*$', x, re.I))
+        names = [
+            k for k in self.keys() if isinstance(k, str) and is_identifier(k)
+        ]
+        return Metadata.__reserved_names__ + names
+
 class BaseContainer(metaclass=ContainerRegistry):
-    def __init__(self, *args, resolution=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         """
         Parameters
         ----------
-        resolution : tuple or list
-            Resolution of the unit elements in the container.
+        metadata : dict, optional
+            Metadata to attach with this container.
+        resolution : tuple or list, optional
+            Resolution of the unit elements in the container. Default to
+            isotropic spacing between dimensions.
         """
-        self.resolution = resolution
+        self._copy_metadata(kwargs.pop('metadata', {}))
+        self._set_metadata(**kwargs)
+        self._set_default_metadata()
+
+    def _copy_metadata(self, metadata):
+        """Make a 2-level deep copy of the metadata dictionary."""
+        for key, val in metadata.items():
+            if isinstance(val, dict):
+                val = Metadata(val)
+            self.metadata[key] = val
+
+    def _set_metadata(self, **kwargs):
+        for key in list(kwargs):
+            self.metadata[key] = kwargs.pop(key)
+
+    def _set_default_metadata(self):
+        # resolution
+        if 'resolution' not in self.metadata:
+            try:
+                self.metadata.resolution = tuple([1.] * self.ndim)
+            except AttributeError as e:
+                raise Exception("ndim is not defined in the sub-class") from e
 
     @property
-    def ndim(self):
-        raise NotImplementedError
-
-    @property
-    def resolution(self):
-        return self._resolution
-
-    @resolution.setter
-    def resolution(self, resolution):
-        if resolution is None:
-            resolution = tuple([1.] * self.ndim)
-        elif isinstance(resolution, list):
-            resolution = tuple(resolution)
-        elif not isinstance(resolution, tuple):
-            raise ValueError("invalid resolution parameter")
-        self._resolution = resolution
+    def metadata(self):
+        try:
+            return self._metadata
+        except AttributeError:
+            self._metadata = Metadata()
+            return self._metadata
