@@ -10,8 +10,8 @@ def _extract_mask(data, **kwargs):
     phi = kwargs.pop('phi', 'checkerboard')
     mask, phi, _  = chan_vese(
         data,
-        mu=1e-2, tol=1e-4, max_iter=500, dt=1.,
-        init_level_set=phi
+        mu=1e-2, tol=1e-4, max_iter=500, dt=1., init_level_set=phi,
+        extended_output=True
     )
     return binary_fill_holes(mask), phi
 
@@ -23,11 +23,16 @@ def extract_mask(data, **kwargs):
 
     Parameters
     ----------
+    iterative : bool
+        Initialize level set from previous result or not.
     """
+    iterative = kwargs.pop('iterative', True)
     if isinstance(data, GeneratorType):
         mask, phi = _extract_mask(next(data), **kwargs)
         masks = [mask]
         for d in data:
+            if not iterative:
+                phi = 'checkerboard'
             mask, phi = _extract_mask(d, phi=phi, **kwargs)
             masks.append(mask)
         return masks
