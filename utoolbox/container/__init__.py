@@ -1,1 +1,1 @@
-from .volume import Volume
+from .array import Image, Volume
