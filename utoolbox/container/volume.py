@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger(__name__)
+
 import numpy as np
 
 from .registry import BaseContainer
@@ -31,14 +34,18 @@ class Volume(BaseContainer, np.ndarray):
             # in the middle of __new__ or from templating
             return
 
-    def __array_wrap__ (self, out, context=None):
+    def __array_wrap__ (self, array, context=None):
         """Return a native ndarray when reducting ufunc is applied."""
-        if not out.shape:
+        if not array.shape:
+            logger.debug("__array_wrap__ -> scalar")
             # scalar
-            return out.dtype.type(out)
-        elif out.shape != self.shape:
+            return array.dtype.type(array)
+        elif array.shape != self.shape:
+            logger.debug("__array_wrap__ -> np.ndarray")
+            logger.debug("context={}".format(context))
             # to native ndarray
-            return out.view(type=np.ndarray)
+            return array.view(type=np.ndarray)
         else:
+            logger.debug("__array_wrap__ -> utoolbox.container.Volume")
             # remain as utoolbox.container.Volume
-            return out
+            return array
