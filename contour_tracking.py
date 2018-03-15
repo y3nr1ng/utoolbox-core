@@ -1,16 +1,34 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-from scipy.ndimage.measurements import center_of_mass
 
 points = pd.read_pickle("data/ruffling_2d/contours.pkl")
 
 n_bins = 24
 bins = np.linspace(-np.pi, np.pi, n_bins+1, dtype=np.float)
+pol_grid = np.linspace(-np.pi, np.pi, n_bins, endpoint=False)
+
+# create plots
+fig = plt.figure()
+fig.subplots_adjust(wspace=0.5)
+ax_d = fig.add_subplot(1, 2, 1, projection='polar')
+ax_d.set_title('Relative Extents', y=1.2)
+ax_d.set_theta_direction(-1)
+ax_d.set_theta_zero_location('E')
+bar_d = ax_d.bar(pol_grid, np.zeros_like(pol_grid), width=2*np.pi/n_bins, color='lightblue', edgecolor='k')
+ax_d.set_yticks([0, 1])
+
+ax_v = fig.add_subplot(1, 2, 2, projection='polar')
+ax_v.set_title('Unit Velocity', y=1.2)
+ax_v.set_theta_direction(-1)
+ax_v.set_theta_zero_location('E')
+bar_v = ax_v.bar(pol_grid, np.zeros_like(pol_grid), width=2*np.pi/n_bins, color='lightblue', edgecolor='k')
+ax_v.set_yticks([-1, 0, 1])
 
 cxs = []
 cys = []
+distance = np.zeros(n_bins, dtype=np.float)
+velocity = np.zeros_like(distance)
 cardinal_map = {}
 for iframe in points.index.levels[0]:
     x = points.loc[iframe, 'x'].values.astype(np.float)
@@ -30,13 +48,32 @@ for iframe in points.index.levels[0]:
     cardinal = np.digitize(theta, bins) - 1
 
     # directional distance, maximum
-    distance = np.zeros(n_bins, dtype=np.float)
+    distance.fill(0)
     for c, r in zip(cardinal, radius):
         distance[c] = max(distance[c], r)
     # normalize
-    distance /= np.amax(distance)
+    rel_distance = distance / np.amax(distance)
 
-    cardinal_map[iframe] = pd.DataFrame({'distance': distance})
+    data = {'distance': distance}
+
+    if iframe > 0:
+        velocity = distance - cardinal_map[iframe-1]['distance'].values
+        velocity /= np.amax(velocity)
+        data['velocity'] = velocity
+    rel_velocity = velocity / np.amax(velocity)
+    np.nan_to_num(rel_velocity, copy=False)
+
+    # save to DataFrame
+    cardinal_map[iframe] = pd.DataFrame(data)
+
+    # save plot
+    for obj, height in zip(bar_d, rel_distance):
+        obj.set_height(height)
+    for obj, height in zip(bar_v, rel_velocity):
+        obj.set_height(height)
+    fig.canvas.draw()
+
+    fig.savefig("data/ruffling_2d/cardinal_{:03}.tif".format(iframe))
 
 com = pd.DataFrame({'cx': cxs, 'cy': cys})
 com.to_pickle("data/ruffling_2d/com.pkl")

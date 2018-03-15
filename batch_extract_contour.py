@@ -17,7 +17,6 @@ def load_data(root):
         #TODO more sophisticate filename filter
         if fname.endswith(".tif"):
             files.append(os.path.join(root, fname))
-    files = files[0:5]
     print("{} data founded under \"{}\"".format(len(files), root))
 
     #TODO sort by timestamp
