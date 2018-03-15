@@ -1,6 +1,7 @@
 from types import GeneratorType
 
 from skimage.segmentation import find_boundaries
+from skimage.morphology import remove_small_objects
 
 from scipy.ndimage.morphology import binary_fill_holes
 
@@ -13,7 +14,12 @@ def _extract_mask(data, **kwargs):
         mu=1e-2, tol=1e-4, max_iter=500, dt=1., init_level_set=phi,
         extended_output=True
     )
-    return binary_fill_holes(mask), phi
+
+    # fix morphology
+    mask = binary_fill_holes(mask)
+    mask = remove_small_objects(mask, min_size=256, in_place=True)
+
+    return mask, phi
 
 def extract_mask(data, **kwargs):
     """
