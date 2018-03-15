@@ -12,10 +12,7 @@ dependencies:
   # numerics
   - numpy
   - pandas
-
-  # parallel
-  - dask
-  - distributed
+  - scipy
 
   # file I/O
   - conda-forge::imageio
@@ -24,6 +21,7 @@ dependencies:
   - pyqt
   - pyopengl
   - conda-forge::vispy
+  - matplotlib
 
   # utils
   - scikit-image
