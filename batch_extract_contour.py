@@ -1,15 +1,25 @@
 import os
+import logging
+handler = logging.StreamHandler()
+formatter = logging.Formatter(
+    '%(levelname).1s %(asctime)s [%(name)s] %(message)s', '%H:%M:%S'
+)
+handler.setFormatter(formatter)
+logging.basicConfig(level=logging.DEBUG, handlers=[handler])
+logger = logging.getLogger(__name__)
 
 import numpy as np
 import pandas as pd
 from skimage.exposure import rescale_intensity
 import imageio
+import click
 
+import utoolbox.utils.files as fileutils
 from utoolbox.container import Volume
 from utoolbox.analysis.roi import extract_mask, mask_to_contour
 
 
-source_folder = "data/RFiSHp2aLFCYC/decon/488"
+source_folder = os.path.join(*["data", "RFiSHp2aLFCYC", "decon", "488"])
 
 def load_data(root):
     files = []
@@ -46,3 +56,17 @@ for index, contour in enumerate(contours):
 
 points = pd.concat(points.values(), axis=0, keys=points.keys())
 points.to_pickle("data/ruffling_2d/contours.pkl")
+
+
+
+@click.command()
+@click.argument('folder', help='source directory')
+def batch_extract_contour(folder):
+    file_list = fileutils.list_files(
+        folder,
+        name_filters=[fileutils.ExtensionFilter('tif')]
+    )
+
+
+if __name__ == '__main__':
+    batch_extract_contour()
