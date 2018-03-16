@@ -3,6 +3,8 @@ import re
 import logging
 logger = logging.getLogger(__name__)
 
+from PyQt5 import QtWidgets
+
 class ExtensionFilter(object):
     def __init__(self, extensions):
         if isinstance(extensions, list):
@@ -42,3 +44,6 @@ def list_files(root, name_filters=None):
             file_list.append(os.path.join(root, name))
     logger.info("{} data found under \"{}\"".format(len(file_list), root))
     return file_list
+
+def get_local_directory(root='.', prompt="Select a directory..."):
+    return QtWidgets.QFileDialog.getExistingDirectory(None, prompt, root)
