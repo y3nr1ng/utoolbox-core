@@ -20,7 +20,7 @@ class DenseArray(BaseContainer, np.ndarray):
             if isinstance(source, np.ndarray):
                 obj = source.view(cls)
             else:
-                obj = self._load_externally(source).view(cls)
+                obj = cls._load_externally(source).view(cls)
 
         return obj
 
@@ -48,17 +48,20 @@ class DenseArray(BaseContainer, np.ndarray):
             # remain as utoolbox.container.Volume
             return array
 
-    def _load_externally(self, source):
+    @staticmethod
+    def _load_externally(source):
         raise NotImplementedError
 
 class Image(DenseArray):
     """2-D, single channel image."""
-    def _load_externally(self, source):
+    @staticmethod
+    def _load_externally(source):
         #TODO use utoolbox.io to determine the proper way to open
         return imageio.imread(source)
 
 class Volume(DenseArray):
     """3-D, single channel image."""
-    def _load_externally(self, source):
+    @staticmethod
+    def _load_externally(source):
         #TODO use utoolbox.io to determine the proper way to open
         return imageio.volread(source)
