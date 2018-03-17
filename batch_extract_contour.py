@@ -57,8 +57,6 @@ for index, contour in enumerate(contours):
 points = pd.concat(points.values(), axis=0, keys=points.keys())
 points.to_pickle("data/ruffling_2d/contours.pkl")
 
-
-
 @click.command()
 @click.argument('folder', help='source directory')
 def batch_extract_contour(folder):

@@ -25,6 +25,7 @@ dependencies:
   - progressbar2
 
   # utils
+  - ipywidgets
   - scikit-image
   - click
   - pip:
