@@ -24,6 +24,10 @@ dependencies:
   - matplotlib
   - progressbar2
 
+  # distributed
+  - dask
+  - distributed
+
   # utils
   - ipywidgets
   - scikit-image
