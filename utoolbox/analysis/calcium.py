@@ -24,7 +24,7 @@ def f_f0(data, f0_range):
     f0 = _f0(data, f0_range)
 
     with np.errstate(divide='ignore'):
-        data = numpy.nan_to_num(data/f0, copy=False)
+        data = np.nan_to_num(data/f0, copy=False)
     # blank the f0 baselines
     data[f0_range[0]:f0_range[1], ...] = 0
 
