@@ -40,7 +40,7 @@ _shear_src_texref = _shear_kernel_module.get_texref("tex")
 
 def _shear(volume, angle, interpolation='linear', blocks=(16, 16, 1)):
     angle = math.radians(angle)
-    dz, dy, dx = volume.resolution
+    dz, dy, dx = volume.metadata.resolution
     pixel_offset = dz * math.cos(angle) / dx
     print("offset={}".format(pixel_offset))
 
