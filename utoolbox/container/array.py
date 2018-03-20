@@ -15,7 +15,7 @@ class DenseArray(BaseContainer, np.ndarray):
     """
     def __new__(cls, source=None, **kwargs):
         if source is None:
-            obj = super(Volume, cls).__new__(cls, **kwargs)
+            obj = np.ndarray.__new__(cls, **kwargs)
         else:
             if isinstance(source, np.ndarray):
                 obj = source.view(cls)
@@ -30,23 +30,86 @@ class DenseArray(BaseContainer, np.ndarray):
             self._copy_metadata(obj.metadata)
         else:
             # in the middle of __new__ or from templating
-            return
+            if obj is not None:
+                self._set_default_metadata()
 
-    def __array_wrap__ (self, array, context=None):
-        """Return a native ndarray when reducting ufunc is applied."""
-        if not array.shape:
-            logger.debug("__array_wrap__ -> scalar")
-            # scalar
-            return array.dtype.type(array)
-        elif array.shape != self.shape:
-            logger.debug("__array_wrap__ -> np.ndarray")
-            logger.debug("context={}".format(context))
-            # to native ndarray
-            return array.view(type=np.ndarray)
+#    def __array_wrap__ (self, array, context=None):
+#        """Return a native ndarray when reducting ufunc is applied."""
+#        if not array.shape:
+#            logger.debug("__array_wrap__ -> scalar")
+#            # scalar
+#            return array.dtype.type(array)
+#        elif array.shape != self.shape:
+#            logger.debug("__array_wrap__ -> np.ndarray")
+#            logger.debug("context={}".format(context))
+#            # to native ndarray
+#            return array.view(type=np.ndarray)
+#        else:
+#            logger.debug("__array_wrap__ -> utoolbox.container.Volume")
+#            # remain as utoolbox.container.Volume
+#            return array
+
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        # take note which inputs are converted to ndarray
+        args = []
+        input_no = []
+        for i, arg in enumerate(inputs):
+            if isinstance(arg, Volume):
+                input_no.append(i)
+                args.append(arg.view(np.ndarray))
+            else:
+                args.append(arg)
+        logger.debug("native input @ {}".format(input_no))
+
+        outputs = kwargs.pop('out', None)
+        output_no = []
+        if outputs:
+            out_args = []
+            for i, arg in enumerate(outputs):
+                if isinstance(arg, Volume):
+                    output_no.append(i)
+                    out_args.append(arg.view(np.ndarray))
+                else:
+                    out_args.append(arg)
+            kwargs['out'] = tuple(out_args)
         else:
-            logger.debug("__array_wrap__ -> utoolbox.container.Volume")
-            # remain as utoolbox.container.Volume
-            return array
+            outputs = (None,) * ufunc.nout
+        logger.debug("native output @ {}".format(input_no))
+
+        results = np.ndarray.__array_ufunc__(
+            self, ufunc, method, *args, **kwargs
+        )
+        if results is NotImplemented:
+            return NotImplemented
+
+        if ufunc.nout == 1:
+            results = (results,)
+
+        results = tuple(
+            (np.asarray(result).view(Volume) if output is None else output)
+            for result, output in zip(results, outputs)
+        )
+
+        if method == 'reduce':
+            axis = kwargs.get('axis', None)
+            if axis is None:
+                axis = ()
+            elif not isinstance(axis, tuple):
+                axis = (axis, )
+
+            # cherry-pick the resolution
+            if not kwargs.get('keepdims', False):
+                if axis:
+                    resolution = tuple(
+                        x for i, x in enumerate(inputs[0].metadata.resolution)
+                        if i not in axis
+                    )
+                else:
+                    # unit spacing for scalar
+                    resolution = (1., )
+                results[0].metadata.resolution = resolution
+
+        return results[0] if len(results) == 1 else results
 
     @staticmethod
     def _load_externally(source):
