@@ -33,22 +33,6 @@ class DenseArray(BaseContainer, np.ndarray):
             if obj is not None:
                 self._set_default_metadata()
 
-#    def __array_wrap__ (self, array, context=None):
-#        """Return a native ndarray when reducting ufunc is applied."""
-#        if not array.shape:
-#            logger.debug("__array_wrap__ -> scalar")
-#            # scalar
-#            return array.dtype.type(array)
-#        elif array.shape != self.shape:
-#            logger.debug("__array_wrap__ -> np.ndarray")
-#            logger.debug("context={}".format(context))
-#            # to native ndarray
-#            return array.view(type=np.ndarray)
-#        else:
-#            logger.debug("__array_wrap__ -> utoolbox.container.Volume")
-#            # remain as utoolbox.container.Volume
-#            return array
-
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         # take note which inputs are converted to ndarray
         args = []
