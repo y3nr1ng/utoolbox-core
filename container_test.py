@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 import numpy as np
 from utoolbox.container import Volume
 
-path = "data/RFiSHp2aLFCYC/decon/488/cell4_ch0_stack0000_488nm_0000000msec_0007934731msecAbs_decon.tif"
+path = "data/20171201_RFiSHp2aLFCYC/decon/488/cell4_ch0_stack0000_488nm_0000000msec_0007934731msecAbs_decon.tif"
 
 raw = Volume(path, resolution=(0.3, 0.102, 0.102))
 #raw = Volume(path)
