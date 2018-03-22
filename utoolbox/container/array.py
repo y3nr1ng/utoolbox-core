@@ -25,7 +25,7 @@ class DenseArray(BaseContainer, np.ndarray):
         return obj
 
     def __array_finalize__(self, obj):
-        if isinstance(obj, Volume):
+        if isinstance(obj, DenseArray):
             # from view-casting
             self._copy_metadata(obj.metadata)
         else:
@@ -38,7 +38,7 @@ class DenseArray(BaseContainer, np.ndarray):
         args = []
         input_no = []
         for i, arg in enumerate(inputs):
-            if isinstance(arg, Volume):
+            if isinstance(arg, DenseArray):
                 input_no.append(i)
                 args.append(arg.view(np.ndarray))
             else:
@@ -50,7 +50,7 @@ class DenseArray(BaseContainer, np.ndarray):
         if outputs:
             out_args = []
             for i, arg in enumerate(outputs):
-                if isinstance(arg, Volume):
+                if isinstance(arg, DenseArray):
                     output_no.append(i)
                     out_args.append(arg.view(np.ndarray))
                 else:
@@ -70,7 +70,7 @@ class DenseArray(BaseContainer, np.ndarray):
             results = (results,)
 
         results = tuple(
-            (np.asarray(result).view(Volume) if output is None else output)
+            (np.asarray(result).view(DenseArray) if output is None else output)
             for result, output in zip(results, outputs)
         )
 
