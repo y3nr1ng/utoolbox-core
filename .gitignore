@@ -105,3 +105,6 @@ ENV/
 
 # Examples
 examples/
+
+# dask.distributed
+dask-worker-space/
