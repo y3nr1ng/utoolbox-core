@@ -50,4 +50,4 @@ def df_f0(data, f0_range, mode='increase'):
 
 def delta_f(data):
     """Measure rapid frame-to-frame changes in intensity."""
-    pass
+    raise NotImplementedError
