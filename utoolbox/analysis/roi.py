@@ -7,17 +7,18 @@ from scipy.ndimage.morphology import binary_fill_holes
 
 from utoolbox.segmentation import chan_vese
 
-def _extract_mask(data, **kwargs):
+def _extract_mask(data, mu=1e-2, tol=1e-4, max_iter=500, dt=1., min_size=256,
+                  **kwargs):
     phi = kwargs.pop('phi', 'checkerboard')
     mask, phi, _  = chan_vese(
         data,
-        mu=1e-2, tol=1e-4, max_iter=500, dt=1., init_level_set=phi,
+        mu=mu, tol=tol, max_iter=max_iter, dt=dt, init_level_set=phi,
         extended_output=True
     )
 
     # fix morphology
     mask = binary_fill_holes(mask)
-    mask = remove_small_objects(mask, min_size=256, in_place=True)
+    mask = remove_small_objects(mask, min_size=min_size, in_place=True)
 
     return mask, phi
 
@@ -31,6 +32,8 @@ def extract_mask(data, **kwargs):
     ----------
     iterative : bool
         Initialize level set from previous result or not.
+    min_size : int
+        Minimum size of the feature, default is 256.
     """
     iterative = kwargs.pop('iterative', True)
     if isinstance(data, GeneratorType):
