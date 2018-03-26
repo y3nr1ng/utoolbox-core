@@ -68,7 +68,6 @@ class BaseContainer(metaclass=ContainerRegistry):
         """
         self._copy_metadata(kwargs.pop('metadata', {}))
         self._set_metadata(**kwargs)
-        self._set_default_metadata()
 
     def _copy_metadata(self, metadata):
         """Make a 2-level deep copy of the metadata dictionary."""
@@ -81,17 +80,6 @@ class BaseContainer(metaclass=ContainerRegistry):
         """Save directly assigned attributes as part of the metadata."""
         for key in list(kwargs):
             self.metadata[key] = kwargs.pop(key)
-
-    def _set_default_metadata(self):
-        """
-        Set default value for required metadata, currently includes:
-         - resolution
-        """
-        if 'resolution' not in self.metadata:
-            try:
-                self.metadata.resolution = tuple([1.] * self.ndim)
-            except AttributeError as e:
-                raise Exception("ndim is not defined in the sub-class") from e
 
     @property
     def metadata(self):

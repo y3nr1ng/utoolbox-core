@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 #####
 
-source_folder = os.path.join(*["data", "RFiSHp2aLFCYC", "decon", "488"])
+source_folder = os.path.join(*["data", "20171201_RFiSHp2aLFCYC", "decon", "488"])
 file_list = fileutils.list_files(
     source_folder,
     name_filters=[
@@ -32,7 +32,9 @@ print("[0] = {}".format(file_list[0]))
 #####
 
 raw = Volume(file_list[0], resolution=(0.3, 0.102, 0.102))
+print("type(raw) = {}".format(type(raw)))
 print("resolution = {}".format(raw.metadata.resolution))
 
-raw_xy = np.sum(raw, axis=0)
+raw_xy = np.amax(raw, axis=0)
+print("type(raw_xy) = {}".format(type(raw_xy)))
 print("resolution = {}".format(raw_xy.metadata.resolution))
