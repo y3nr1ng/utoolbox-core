@@ -6,8 +6,8 @@ import imageio
 
 from .registry import BaseContainer
 
-class DenseArray(BaseContainer, np.ndarray):
-    """Container for data represented by dense array.
+class Rasters(BaseContainer, np.ndarray):
+    """Container for data represented by dense arrays.
 
     Reference
     ---------
@@ -25,20 +25,20 @@ class DenseArray(BaseContainer, np.ndarray):
         return obj
 
     def __array_finalize__(self, obj):
-        if isinstance(obj, DenseArray):
+        if isinstance(obj, Rasters):
             # from view-casting
             self._copy_metadata(obj.metadata)
         else:
             # in the middle of __new__ or from templating
             if obj is not None:
-                self._set_default_metadata()
+                self.metadata.resolution = tuple([1.] * self.ndim)
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         # take note which inputs are converted to ndarray
         args = []
         input_no = []
         for i, arg in enumerate(inputs):
-            if isinstance(arg, DenseArray):
+            if isinstance(arg, Rasters):
                 input_no.append(i)
                 args.append(arg.view(np.ndarray))
             else:
@@ -50,16 +50,17 @@ class DenseArray(BaseContainer, np.ndarray):
         if outputs:
             out_args = []
             for i, arg in enumerate(outputs):
-                if isinstance(arg, DenseArray):
+                if isinstance(arg, Rasters):
                     output_no.append(i)
                     out_args.append(arg.view(np.ndarray))
                 else:
                     out_args.append(arg)
             kwargs['out'] = tuple(out_args)
         else:
-            outputs = (None,) * ufunc.nout
+            outputs = (None, ) * ufunc.nout
         logger.debug("native output @ {}".format(input_no))
 
+        # run the actual ufunc
         results = np.ndarray.__array_ufunc__(
             self, ufunc, method, *args, **kwargs
         )
@@ -67,10 +68,10 @@ class DenseArray(BaseContainer, np.ndarray):
             return NotImplemented
 
         if ufunc.nout == 1:
-            results = (results,)
+            results = (results, )
 
         results = tuple(
-            (np.asarray(result).view(DenseArray) if output is None else output)
+            (np.asarray(result).view(Rasters) if output is None else output)
             for result, output in zip(results, outputs)
         )
 
@@ -99,14 +100,14 @@ class DenseArray(BaseContainer, np.ndarray):
     def _load_externally(source):
         raise NotImplementedError
 
-class Image(DenseArray):
+class Image(Rasters):
     """2-D, single channel image."""
     @staticmethod
     def _load_externally(source):
         #TODO use utoolbox.io to determine the proper way to open
         return imageio.imread(source)
 
-class Volume(DenseArray):
+class Volume(Rasters):
     """3-D, single channel image."""
     @staticmethod
     def _load_externally(source):
