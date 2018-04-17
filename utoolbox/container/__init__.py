@@ -1,1 +1,2 @@
-from .array import Image, Volume
+from .raster import Raster
+from .series import TimeSeries
