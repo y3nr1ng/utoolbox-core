@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 from utoolbox.container import Volume
 
-mem_data = Volume("data/RFiSHp2aLFCYC/decon/488/cell4_ch0_stack0000_488nm_0000000msec_0007934731msecAbs_decon.tif")
+mem_data = Volume("data/20171201_RFiSHp2aLFCYC/decon/488/cell4_ch0_stack0000_488nm_0000000msec_0007934731msecAbs_decon.tif")
 print(mem_data.shape)
 print(mem_data.dtype)
 
@@ -45,7 +45,7 @@ labels_shuffle = lut[labels]
 imageio.volwrite("data/segments_shuffle.tif", labels_shuffle)
 
 from utoolbox.container import Volume
-mem_data = Volume("data/RFiSHp2aLFCYC/decon/488/cell4_ch0_stack0000_488nm_0000000msec_0007934731msecAbs_decon.tif")
+mem_data = Volume("data/20171201_RFiSHp2aLFCYC/decon/488/cell4_ch0_stack0000_488nm_0000000msec_0007934731msecAbs_decon.tif")
 
 histogram = np.zeros_like(lut, dtype=np.float32)
 n_histogram = np.zeros_like(lut, dtype=np.int32)
