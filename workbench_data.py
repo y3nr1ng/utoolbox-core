@@ -4,7 +4,8 @@ import logging
 import numpy as np
 
 import utoolbox.utils.files as fileutils
-from utoolbox.container import Volume
+from utoolbox.container import Raster
+from utoolbox.io.layouts import Volume
 
 #####
 
@@ -13,7 +14,7 @@ formatter = logging.Formatter(
     '%(levelname).1s %(asctime)s [%(name)s] %(message)s', '%H:%M:%S'
 )
 handler.setFormatter(formatter)
-logging.basicConfig(level=logging.DEBUG, handlers=[handler])
+logging.basicConfig(level=logging.INFO, handlers=[handler])
 logger = logging.getLogger(__name__)
 
 #####
@@ -31,7 +32,7 @@ print("[0] = {}".format(file_list[0]))
 
 #####
 
-raw = Volume(file_list[0], resolution=(0.3, 0.102, 0.102))
+raw = Raster(Volume, file_list[0], resolution=(0.3, 0.102, 0.102))
 print("type(raw) = {}".format(type(raw)))
 print("resolution = {}".format(raw.metadata.resolution))
 
