@@ -5,7 +5,7 @@ import pandas as pd
 
 from .registry import BaseContainer
 
-class TimeSeries(BaseContainer, pd.Series):
+class TimeSeries(BaseContainer):
     """
     Container for a time series.
 
