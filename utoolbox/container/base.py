@@ -1,18 +1,9 @@
-import logging
-logger = logging.getLogger(__name__)
-
-import re
+import abc
 from collections import OrderedDict
+import logging
+import re
 
-containers = {}
-
-class ContainerRegistry(type):
-    """Keep a record for all available data container types."""
-    def __new__(meta, name, bases, attrs):
-        cls = type.__new__(meta, name, bases, attrs)
-        containers[name] = cls
-        logger.debug("New container \"{}\" added.".format(cls))
-        return cls
+logger = logging.getLogger(__name__)
 
 class Metadata(OrderedDict):
     """
@@ -55,7 +46,7 @@ class Metadata(OrderedDict):
         ]
         return Metadata.__reserved_names__ + names
 
-class BaseContainer(metaclass=ContainerRegistry):
+class BaseContainer(metaclass=abc.ABCMeta):
     def __init__(self, *args, **kwargs):
         """
         Parameters
@@ -88,3 +79,7 @@ class BaseContainer(metaclass=ContainerRegistry):
         except AttributeError:
             self._metadata = Metadata()
             return self._metadata
+
+    @abc.abstractmethod
+    def save(self, dest):
+        pass

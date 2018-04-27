@@ -5,7 +5,7 @@ import numpy as np
 
 import utoolbox.utils.files as fileutils
 from utoolbox.container import Raster
-from utoolbox.io.layouts import Volume
+from utoolbox.container.layouts import Volume
 
 #####
 
@@ -14,7 +14,7 @@ formatter = logging.Formatter(
     '%(levelname).1s %(asctime)s [%(name)s] %(message)s', '%H:%M:%S'
 )
 handler.setFormatter(formatter)
-logging.basicConfig(level=logging.INFO, handlers=[handler])
+logging.basicConfig(level=logging.DEBUG, handlers=[handler])
 logger = logging.getLogger(__name__)
 
 #####
@@ -32,10 +32,12 @@ print("[0] = {}".format(file_list[0]))
 
 #####
 
-raw = Raster(Volume, file_list[0], resolution=(0.3, 0.102, 0.102))
-print("type(raw) = {}".format(type(raw)))
-print("resolution = {}".format(raw.metadata.resolution))
-
-raw_xy = np.amax(raw, axis=0)
-print("type(raw_xy) = {}".format(type(raw_xy)))
-print("resolution = {}".format(raw_xy.metadata.resolution))
+im1 = Raster(file_list[0], layout=Volume)
+im1_dup = Raster(im1, layout=Volume)
+im2 = Raster(shape=(128, 128))
+print(type(im1))
+print(im1._layout)
+print(type(im1_dup))
+print(im1_dup._layout)
+print(type(im2))
+print(im2._layout)

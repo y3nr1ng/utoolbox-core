@@ -1,39 +1,33 @@
 import logging
-logger = logging.getLogger(__name__)
 
 import numpy as np
 import imageio
 
-from .registry import BaseContainer
+from .base import BaseContainer
+
+logger = logging.getLogger(__name__)
 
 class Raster(BaseContainer, np.ndarray):
     """Container for data represented by dense arrays.
-
-    Parameters
-    ----------
-    layout : utoolbox.io.layouts
-        Type of the raster.
     """
-    def __new__(cls, layout, source=None, **kwargs):
-        if source is None:
+    def __new__(cls, array=None, **kwargs):
+        layout = kwargs.pop('layout', None)
+        if array is None:
             obj = np.ndarray.__new__(cls, **kwargs)
         else:
-            if not isinstance(source, np.ndarray):
-                source = layout.read(source)
-            obj = source.view(cls)
-
-        obj.layout = layout
-
+            if not isinstance(array, cls):
+                try:
+                    array = layout.read(array)
+                except AttributeError:
+                    raise TypeError("logical layout not specified")
+            obj = array.view(cls)
+        obj._layout = layout
         return obj
 
     def __array_finalize__(self, obj):
         if isinstance(obj, Raster):
             # from view-casting
             self._copy_metadata(obj.metadata)
-        else:
-            # in the middle of __new__ or from templating
-            if obj is not None:
-                self.metadata.resolution = tuple([1.] * self.ndim)
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         # convert inputs to ndarray
@@ -104,6 +98,3 @@ class Raster(BaseContainer, np.ndarray):
                 results[0].metadata.resolution = resolution
 
         return results[0] if len(results) == 1 else results
-
-    def save(self, file):
-        self.layout.write(file, self)
