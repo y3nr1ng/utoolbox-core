@@ -18,6 +18,9 @@ class LayoutRegistry(type):
         return cls
 
 class BaseLayout(metaclass=LayoutRegistry):
+    def __str__(self):
+        return "Base"
+
     @staticmethod
     def read(src):
         raise NotImplementedError
@@ -27,6 +30,9 @@ class BaseLayout(metaclass=LayoutRegistry):
         raise NotImplementedError
 
 class Volume(BaseLayout):
+    def __str__(self):
+        return "Volume"
+
     @staticmethod
     def read(src):
         return imageio.volread(src)
@@ -39,7 +45,16 @@ class LayeredImage(BaseLayout):
     pass
 
 class Image(BaseLayout):
-    pass
+    def __str__(self):
+        return "Image"
+
+    @staticmethod
+    def read(src):
+        return imageio.imread(src)
+
+    @staticmethod
+    def write(dest, data):
+        imageio.imwrite(dest, data)
 
 class MultiChannelVolume(BaseLayout):
     pass
