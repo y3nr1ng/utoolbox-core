@@ -23,13 +23,10 @@ class Raster(BaseContainer, np.ndarray):
             obj = array.view(cls)
         obj.metadata.layout = layout
         return obj
-
-    """
-    def __array_finalize__(self, obj):
-        if isinstance(obj, Raster):
-            # from view-casting
-            self._copy_metadata(obj.metadata)
-    """
+        
+    def __str__(self):
+        size = 'x'.join([str(i) for i in self.shape])
+        return "Raster, {}, {}".format(size, self.dtype)
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         # convert input of Raster to ndarray
@@ -70,7 +67,7 @@ class Raster(BaseContainer, np.ndarray):
             if isinstance(_out, Raster):
                 _out._copy_metadata(self.metadata)
 
-        # trim unused result 
+        # trim unused result
         return outputs[0] if len(outputs) == 1 else outputs
 
     def save(self, dst):
