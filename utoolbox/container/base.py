@@ -81,5 +81,5 @@ class BaseContainer(metaclass=abc.ABCMeta):
             return self._metadata
 
     @abc.abstractmethod
-    def save(self, dest):
+    def save(self, dst):
         pass
