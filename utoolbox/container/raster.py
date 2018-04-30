@@ -21,80 +21,57 @@ class Raster(BaseContainer, np.ndarray):
                 except AttributeError:
                     raise TypeError("logical layout not specified")
             obj = array.view(cls)
-        obj._layout = layout
+        obj.metadata.layout = layout
         return obj
 
+    """
     def __array_finalize__(self, obj):
         if isinstance(obj, Raster):
             # from view-casting
             self._copy_metadata(obj.metadata)
+    """
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
-        # convert inputs to ndarray
+        # convert input of Raster to ndarray
         in_args = []
-        in_ind = []
-        for i, arg in enumerate(inputs):
-            if isinstance(arg, Raster):
-                in_ind.append(i)
-                in_args.append(arg.view(np.ndarray))
+        for _in in inputs:
+            if isinstance(_in, Raster):
+                in_args.append(_in.view(np.ndarray))
             else:
-                in_args.append(arg)
-        logger.debug("{} inputs require conversion".format(len(in_ind)))
-        if in_ind:
-            logger.debug("... {}".format(in_ind))
+                in_args.append(_in)
 
-        out_args = kwargs.pop('out', None)
-        out_ind = []
-        if out_args:
-            args = []
-            for i, arg in enumerate(out_args):
-                if isinstance(arg, Raster):
-                    out_ind.append(i)
-                    args.append(arg.view(np.ndarray))
+        # temporary convert output of Raster to ndarray
+        if 'out' in kwargs:
+            out_args = []
+            for _out in kwargs.pop('out', None):
+                if isinstance(_out, Raster):
+                    out_args.append(_out.view(np.ndarray))
                 else:
-                    args.append(arg)
-            kwargs['out'] = tuple(args)
+                    out_args.append(_out)
+            kwargs['out'] = tuple(out_args)
         else:
             out_args = (None, ) * ufunc.nout
-        logger.debug("{} outputs require conversion".format(len(out_ind)))
-        if out_ind:
-            logger.debug("... {}".format(out_ind))
-        out_ind = tuple(out_ind)
 
-        # run the actual ufunc
+        # run the method
         results = np.ndarray.__array_ufunc__(
             self, ufunc, method, *in_args, **kwargs
         )
         if results is NotImplemented:
             return NotImplemented
-
         if ufunc.nout == 1:
             results = (results, )
 
-        results = tuple(
-            (np.asarray(result).view(Raster) if arg is None else arg)
-            for result, arg in zip(results, out_args)
+        # convert back to Raster and duplicate metadata
+        outputs = tuple(
+            (np.asarray(res).view(Raster) if _out is None else _out)
+            for res, _out in zip(results, out_args)
         )
+        for _out in outputs:
+            if isinstance(_out, Raster):
+                _out._copy_metadata(self.metadata)
 
-        logger.debug(results)
+        # trim unused result 
+        return outputs[0] if len(outputs) == 1 else outputs
 
-        if method == 'reduce':
-            axis = kwargs.get('axis', None)
-            if axis is None:
-                axis = ()
-            elif not isinstance(axis, tuple):
-                axis = (axis, )
-
-            # cherry-pick the resolution
-            if not kwargs.get('keepdims', False):
-                if axis:
-                    resolution = tuple(
-                        x for i, x in enumerate(inputs[0].metadata.resolution)
-                        if i not in axis
-                    )
-                else:
-                    # unit spacing for scalar
-                    resolution = (1., )
-                results[0].metadata.resolution = resolution
-
-        return results[0] if len(results) == 1 else results
+    def save(self, dst):
+        self.metadata.layout.write(dst, self)
