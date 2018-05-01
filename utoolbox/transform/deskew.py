@@ -16,7 +16,6 @@ __global__
 void shear_kernel(
     const float factor,
     int iv,
-    const int nx, const int nz,
     const int nu, const int nw, // output size
     float *result
 ) {
@@ -65,9 +64,10 @@ def _shear(volume, spacing, angle, blocks=(16, 16, 1)):
     #   (CUDA Programming Guide, 3.2.11.1, (3))
     # - swap dimension (ZYX -> YZX) for better caching on GPU
     volume = volume.astype(np.int32).swapaxes(0, 1).copy()
-    logger.debug("volume.shape={}".format(volume.shape))
-    logger.debug("min(volume)={}".format(volume.min()))
-    logger.debug("max(volume)={}".format(volume.max()))
+    logger.debug("before")
+    logger.debug(".. shape={}".format(volume.shape))
+    logger.debug(".. min={}".format(volume.min()))
+    logger.debug(".. max={}".format(volume.max()))
 
     # create array descriptor for texture binding
     desc = driver.ArrayDescriptor3D()
@@ -76,7 +76,7 @@ def _shear(volume, spacing, angle, blocks=(16, 16, 1)):
     desc.depth = ny
     desc.format = driver.array_format.SIGNED_INT32
     desc.num_channels = 1
-    desc.flags |= driver.array3d_flags.ARRAY3D_LAYERED
+    desc.flags |= driver.array3d_flags.ARRAY3D_LAYERED #TODO patch upstream
 
     # upload to array
     a_volume = driver.Array(desc)
@@ -92,6 +92,8 @@ def _shear(volume, spacing, angle, blocks=(16, 16, 1)):
     _shear_src_texref.set_array(a_volume)
     _shear_src_texref.set_address_mode(0, driver.address_mode.BORDER)
     _shear_src_texref.set_address_mode(1, driver.address_mode.BORDER)
+    # returned data type has to be float
+    # (CUDA Programming Guide, 3.2.11.1, (7))
     _shear_src_texref.set_filter_mode(driver.filter_mode.LINEAR)
 
     result = np.zeros(shape=(nv, nw, nu), dtype=np.float32)
@@ -101,7 +103,6 @@ def _shear(volume, spacing, angle, blocks=(16, 16, 1)):
         _shear_kernel_function(
             np.float32(offset),
             np.int32(iv),
-            np.int32(nx), np.int32(nz),
             np.int32(nu), np.int32(nw),
             driver.Out(result),
             grid=grids, block=blocks, texrefs=[_shear_src_texref]
@@ -110,8 +111,9 @@ def _shear(volume, spacing, angle, blocks=(16, 16, 1)):
     # free the resource
     a_volume.free()
 
-    logger.debug("min(result)={}".format(result.min()))
-    logger.debug("max(result)={}".format(result.max()))
+    logger.debug("after")
+    logger.debug(".. min={}".format(result.min()))
+    logger.debug(".. max={}".format(result.max()))
 
     result = result.swapaxes(0, 1)
     return result
@@ -148,11 +150,9 @@ def deskew(volume, angle, resample=False):
         spacing = (1, ) * volume.ndim
     dtype = volume.dtype
 
-    volume = volume[:, ::4, ::4].copy()
-
     result = _shear(volume, spacing, angle)
     if resample:
         raise NotImplementedError
-    result = result.astype(dtype)
+    #result = result.astype(dtype)
 
     return result

@@ -8,6 +8,7 @@ import utoolbox.utils.files as fileutils
 from utoolbox.container import Raster
 from utoolbox.container.layouts import Volume
 from utoolbox.transform import deskew
+from utoolbox.utils.decorators import timeit
 
 #####
 
@@ -40,5 +41,8 @@ logger.debug("im1.layout={}".format(im1.metadata.layout))
 
 #####
 
-im2 = deskew(im1, 30)
+@timeit
+def operation():
+    return deskew(im1, 30)
+im2 = operation()
 imageio.volwrite("data/test.tif", im2)
