@@ -5,8 +5,12 @@ methods.
 import abc
 import logging
 logger = logging.getLogger(__name__)
+import warnings
 
 import imageio
+
+def log_warn(message, *args, **kwargs):
+    logger.warn(message)
 
 class BaseLayout(metaclass=abc.ABCMeta):
     @staticmethod
@@ -32,7 +36,9 @@ class BaseLayout(metaclass=abc.ABCMeta):
 class Volume(BaseLayout):
     @staticmethod
     def read(src):
-        return imageio.volread(src)
+        with warnings.catch_warnings():
+            warnings.showwarning = log_warn
+            return imageio.volread(src)
 
     @staticmethod
     def write(dst, data):
@@ -50,7 +56,9 @@ class Volume(BaseLayout):
 class Image(BaseLayout):
     @staticmethod
     def read(src):
-        return imageio.imread(src)
+        with warnings.catch_warnings():
+            warnings.showwarning = log_warn
+            return imageio.imread(src)
 
     @staticmethod
     def write(dst, data):

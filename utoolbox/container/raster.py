@@ -1,7 +1,7 @@
 import logging
 
-import numpy as np
 import imageio
+import numpy as np
 
 from .base import BaseContainer
 
@@ -23,7 +23,7 @@ class Raster(BaseContainer, np.ndarray):
             obj = array.view(cls)
         obj.metadata.layout = layout
         return obj
-        
+
     def __str__(self):
         size = 'x'.join([str(i) for i in self.shape])
         return "Raster, {}, {}".format(size, self.dtype)
