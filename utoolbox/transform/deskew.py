@@ -1,69 +1,119 @@
+import logging
+logger = logging.getLogger(__name__)
 import math
-import pycuda.driver as cuda
-import pycuda.compiler
-import pycuda.autoinit
 
 import numpy as np
+import pycuda.autoinit
+from pycuda import compiler, driver, gpuarray
 
-from utoolbox.container import Volume
+from utoolbox.container import Raster
+from utoolbox.container.layouts import Volume
 
 _shear_kernel_source = """
-texture<float, cudaTextureType2DLayered> tex;
+texture<int, cudaTextureType2DLayered, cudaReadModeElementType> tex;
 
 __global__
 void shear_kernel(
     const float factor,
-    const int iz,
-    const int nx, const int ny,   // input size
-    const int nu, const int nv,   // output size
+    int iv,
+    const int nx, const int nz,
+    const int nu, const int nw, // output size
     float *result
 ) {
-    const int iu = blockIdx.x * blockDim.x + threadIdx.x;
-    const int iv = blockIdx.y * blockDim.y + threadIdx.y;
-    if ((iu >= nu) || (iv >= nv)) {
+    const int iu = blockIdx.x*blockDim.x + threadIdx.x;
+    const int iw = blockIdx.y*blockDim.y + threadIdx.y;
+    if ((iu >= nu) || (iw >= nw)) {
         return;
     }
 
-    // calculate linear memory index
-    const int i = (iz * (nu*nv)) + (iv*nu) + iu;
+    const int i = iv * (nu*nw) + iw * nu + iu;
 
-    // calculate the coordinate before transformation
-    const float ix = iu - factor*iz;
-    const float iy = iv;
+    float ix = (iu - factor*iw) + 0.5f;
+    float iz = iw + 0.5f;
 
-    result[i] = tex2DLayered(tex, ix, iy, iz);
+    result[i] = tex2DLayered(tex, ix, iz, iv);
 }
 """
-_shear_kernel_module = pycuda.compiler.SourceModule(_shear_kernel_source)
+_shear_kernel_module = compiler.SourceModule(_shear_kernel_source)
 _shear_kernel_function = _shear_kernel_module.get_function("shear_kernel")
 _shear_src_texref = _shear_kernel_module.get_texref("tex")
 
-def _shear(volume, angle, interpolation='linear', blocks=(16, 16, 1)):
+def _shear_subblock(volume, origin, shape, spacing, offset, blocks=(16, 16, 1)):
+    pass
+
+def _estimate_deskew_parameters(shape, spacing, angle):
     angle = math.radians(angle)
-    dz, dy, dx = volume.metadata.resolution
-    pixel_offset = dz * math.cos(angle) / dx
-    print("offset={}".format(pixel_offset))
+    dz, dy, dx = spacing
+    pixel_offset = dz / math.tan(angle) / dx
 
-    nz, ny, nx = volume.shape
-    nx = int(math.ceil(dx + pixel_offset * (nz-1)))
-    print("new_size=({}, {}, {})".format(nz, ny, nx))
+    nz, ny, nx = shape
+    nx += int(math.ceil(pixel_offset * (nz-1)))
 
-    cuda.matrix_to_texref(volume, _shear_src_texref, order='C')
-    _shear_src_texref.set_filter_mode(cuda.filter_mode.LINEAR)
+    return (nz, ny, nx), pixel_offset
 
-    grids = (nx // blocks[0], ny // blocks[1], 1)
-    print(grids)
+def _shear(volume, spacing, angle, blocks=(16, 16, 1)):
+    shape = volume.shape
+    nz, ny, nx = shape
+    dz, dy, dz = spacing
 
-    result = np.zeros_like(volume)
-    for iz in range(nz):
+    shape, offset = _estimate_deskew_parameters(shape, spacing, angle)
+    nw, nv, nu = shape
+    logger.info("shape {} -> {}".format(volume.shape, shape))
+    logger.info("offset(px)={:.5f}".format(offset))
+
+    # - only signed data type is supported as texel
+    #   (CUDA Programming Guide, 3.2.11.1, (3))
+    # - swap dimension (ZYX -> YZX) for better caching on GPU
+    volume = volume.astype(np.int32).swapaxes(0, 1).copy()
+    logger.debug("volume.shape={}".format(volume.shape))
+    logger.debug("min(volume)={}".format(volume.min()))
+    logger.debug("max(volume)={}".format(volume.max()))
+
+    # create array descriptor for texture binding
+    desc = driver.ArrayDescriptor3D()
+    desc.width = nx
+    desc.height = nz
+    desc.depth = ny
+    desc.format = driver.array_format.SIGNED_INT32
+    desc.num_channels = 1
+    desc.flags |= driver.array3d_flags.ARRAY3D_LAYERED
+
+    # upload to array
+    a_volume = driver.Array(desc)
+    copy_func = driver.Memcpy3D()
+    copy_func.set_src_host(volume)
+    copy_func.set_dst_array(a_volume)
+    copy_func.width_in_bytes = copy_func.src_pitch = volume.strides[1]
+    copy_func.src_height = copy_func.height = nz
+    copy_func.depth = ny
+    copy_func()
+
+    # bind array to texture
+    _shear_src_texref.set_array(a_volume)
+    _shear_src_texref.set_address_mode(0, driver.address_mode.BORDER)
+    _shear_src_texref.set_address_mode(1, driver.address_mode.BORDER)
+    _shear_src_texref.set_filter_mode(driver.filter_mode.LINEAR)
+
+    result = np.zeros(shape=(nv, nw, nu), dtype=np.float32)
+
+    grids = (-(-nu//blocks[0]), -(-nw//blocks[1]), 1)
+    for iv in range(nv):
         _shear_kernel_function(
-            np.float32(pixel_offset),
-            iz,
-            volume.shape[1], volume.shape[0],
-            nx, ny,
-            cuda.Out(result),
-            texrefs=[_shear_src_texref], blocks=bocks, grid=grids
+            np.float32(offset),
+            np.int32(iv),
+            np.int32(nx), np.int32(nz),
+            np.int32(nu), np.int32(nw),
+            driver.Out(result),
+            grid=grids, block=blocks, texrefs=[_shear_src_texref]
         )
+
+    # free the resource
+    a_volume.free()
+
+    logger.debug("min(result)={}".format(result.min()))
+    logger.debug("max(result)={}".format(result.max()))
+
+    result = result.swapaxes(0, 1)
     return result
 
 def deskew(volume, angle, resample=False):
@@ -78,7 +128,7 @@ def deskew(volume, angle, resample=False):
 
     Parameters
     ----------
-    volume : Volume
+    volume : Raster
         SPIM data.
     angle : float
         Elevation of the objective lens with respect to the sample holder in
@@ -92,12 +142,15 @@ def deskew(volume, angle, resample=False):
       account and normalized.
     - Shearing **always** happened along the X-axis.
     """
-    if not isinstance(volume, Volume):
-        raise ValueError("utoolbox.container.Volume is required.")
+    try:
+        spacing = volume.metadata.spacing
+    except AttributeError:
+        spacing = (1, ) * volume.ndim
     dtype = volume.dtype
 
-    volume = volume.astype(np.float32)
-    result = _shear(volume, angle)
+    volume = volume[:, ::4, ::4].copy()
+
+    result = _shear(volume, spacing, angle)
     if resample:
         raise NotImplementedError
     result = result.astype(dtype)
