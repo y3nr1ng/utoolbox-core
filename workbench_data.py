@@ -35,7 +35,7 @@ print("[0] = {}".format(file_list[0]))
 
 #####
 
-im1 = Raster(file_list[0], layout=Volume, spacing=(.3, .102, .102))
+im1 = Raster(file_list[0], layout=Volume, spacing=(.5, .102, .102))
 logger.debug(im1)
 logger.debug("im1.layout={}".format(im1.metadata.layout))
 
