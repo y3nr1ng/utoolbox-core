@@ -9,6 +9,13 @@ from pycuda import compiler, driver, gpuarray
 from utoolbox.container import Raster
 from utoolbox.container.layouts import Volume
 
+"""
+_rotate_kernel_source = """
+"""
+_rotate_kernel_module = compiler.SourceModule(_rotate_kernel_source)
+_rotate_kernel_function = _rotate_kernel_module.get_function("rotate_kernel")
+"""
+
 _shear_kernel_source = """
 texture<int, cudaTextureType2DLayered, cudaReadModeElementType> tex;
 
@@ -40,10 +47,10 @@ _shear_src_texref = _shear_kernel_module.get_texref("tex")
 def _shear_subblock(volume, origin, shape, spacing, offset, blocks=(16, 16, 1)):
     pass
 
-def _estimate_deskew_parameters(shape, spacing, angle):
+def _estimate_shear_parameters(shape, spacing, angle):
     angle = math.radians(angle)
     dz, dy, dx = spacing
-    pixel_offset = dz / math.tan(angle) / dx
+    pixel_offset = dz * math.tan(angle) / dx #TODO verify
 
     nz, ny, nx = shape
     nx += int(math.ceil(pixel_offset * (nz-1)))
@@ -55,7 +62,7 @@ def _shear(volume, spacing, angle, blocks=(16, 16, 1)):
     nz, ny, nx = shape
     dz, dy, dz = spacing
 
-    shape, offset = _estimate_deskew_parameters(shape, spacing, angle)
+    shape, offset = _estimate_shear_parameters(shape, spacing, angle)
     nw, nv, nu = shape
     logger.info("shape {} -> {}".format(volume.shape, shape))
     logger.info("offset(px)={:.5f}".format(offset))
