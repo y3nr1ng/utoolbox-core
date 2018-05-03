@@ -19,7 +19,6 @@ dependencies:
 
   # visualize
   - pyqt
-  - pyopengl
   - conda-forge::vispy
   - matplotlib
   - progressbar2
@@ -32,5 +31,8 @@ dependencies:
   - ipywidgets
   - scikit-image
   - click
+
+  # pip
   - pip:
     - boltons
+    - pycuda
