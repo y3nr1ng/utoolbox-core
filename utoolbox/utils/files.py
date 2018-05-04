@@ -47,3 +47,6 @@ def list_files(root, name_filters=None):
 
 def get_local_directory(root='.', prompt="Select a directory..."):
     return QtWidgets.QFileDialog.getExistingDirectory(None, prompt, root)
+
+def get_open_file(root='.', prompt="Select a file..."):
+    return QtWidgets.QFileDialog.getOpenFileName(None, prompt, root)[0]
