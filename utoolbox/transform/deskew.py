@@ -1,3 +1,4 @@
+import itertools
 import logging
 logger = logging.getLogger(__name__)
 import math
@@ -8,15 +9,9 @@ from pycuda import compiler, driver, gpuarray
 
 from utoolbox.container import Raster
 from utoolbox.container.layouts import Volume
+from utoolbox.utils.files import convert_size
 
-"""
-_rotate_kernel_source = """
-"""
-_rotate_kernel_module = compiler.SourceModule(_rotate_kernel_source)
-_rotate_kernel_function = _rotate_kernel_module.get_function("rotate_kernel")
-"""
-
-_shear_kernel_source = """
+_deskew_kernel_source = """
 texture<int, cudaTextureType2DLayered, cudaReadModeElementType> tex;
 
 __global__
@@ -40,12 +35,64 @@ void shear_kernel(
     result[i] = tex2DLayered(tex, ix, iz, iv);
 }
 """
-_shear_kernel_module = compiler.SourceModule(_shear_kernel_source)
-_shear_kernel_function = _shear_kernel_module.get_function("shear_kernel")
-_shear_src_texref = _shear_kernel_module.get_texref("tex")
+_deskew_kernel_module = compiler.SourceModule(_deskew_kernel_source)
+_shear_kernel_function = _deskew_kernel_module.get_function("shear_kernel")
+_shear_src_texref = _deskew_kernel_module.get_texref("tex")
 
 def _shear_subblock(volume, origin, shape, spacing, offset, blocks=(16, 16, 1)):
     pass
+
+def _generate_block_info(shape, factor):
+    nw, nv, nu = shape
+    fw, fv, fu = factor
+
+    # block size
+    bu = -(-nu//fu)
+    bv = -(-nv//fv)
+    bw = -(-nw//fw)
+
+    # location of the offsets
+    ou = list(range(0, nu, bu))
+    ov = list(range(0, nv, bv))
+    ow = list(range(0, nw, bw))
+
+    return list(itertools.product(ow, ov, ou)), (bw, bv, bu)
+
+def _calculate_split_factor(shape, dtype=np.float32):
+    """
+    Calculate how the block size should split in order to fit in device memory.
+
+    Parameter
+    ---------
+    shape : tuple of int
+        Size of the result volume.
+    """
+    nw, nv, nu = shape
+    dtype_bytes = np.dtype(dtype).itemsize
+    bytes_required = (nu*nv*nw) * dtype_bytes
+    bytes_free, _ = driver.mem_get_info()
+    #DEBUG explicitly shrink free size
+    bytes_free = 2**20 * 100
+    logger.debug("required={} / free={}".format(
+        convert_size(bytes_required), convert_size(bytes_free))
+    )
+
+    fu = 1
+    fv = 1
+    # divide the largest dimension (Y or Z) in half and repeat
+    while bytes_required > bytes_free:
+        if nu >= nv:
+            fu *= 2
+            nu //= 2
+        else:
+            fv *= 2
+            nv //= 2
+        bytes_required = (nu*nv*nw) * dtype_bytes
+
+    factor = (1, fv, fu)
+    logger.debug("split_factor={}".format(factor))
+
+    return factor
 
 def _estimate_shear_parameters(shape, spacing, angle):
     angle = math.radians(angle)
@@ -104,6 +151,13 @@ def _shear(volume, spacing, angle, blocks=(16, 16, 1)):
     _shear_src_texref.set_filter_mode(driver.filter_mode.LINEAR)
 
     result = np.zeros(shape=(nv, nw, nu), dtype=np.float32)
+
+    factor = _calculate_split_factor(result.shape, result.dtype)
+    offset, bs = _generate_block_info(result.shape, factor)
+    logger.debug("offsets={}".format(offset))
+    
+    a_volume.free()
+    raise RuntimeError
 
     grids = (-(-nu//blocks[0]), -(-nw//blocks[1]), 1)
     for iv in range(nv):
