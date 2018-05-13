@@ -36,7 +36,7 @@ def list_files(root, name_filters=None):
     ----------
     root : str
         Relative or absolute path that will be the root directory.
-    filter : (optional) list of filters
+    name_filters : (optional) list of filters
         Filtering conditions.
     """
     file_list = []
@@ -47,12 +47,15 @@ def list_files(root, name_filters=None):
     return file_list
 
 def get_local_directory(root='.', prompt="Select a directory..."):
+    """Select an existing folder using system dialog."""
     return QtWidgets.QFileDialog.getExistingDirectory(None, prompt, root)
 
 def get_open_file(root='.', prompt="Select a file..."):
+    """Select an existing file using system dialog."""
     return QtWidgets.QFileDialog.getOpenFileName(None, prompt, root)[0]
 
 def convert_size(size_bytes):
+    """Convert bytes to human readable formatself."""
     if size_bytes == 0:
        return "0B"
     size_name = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
