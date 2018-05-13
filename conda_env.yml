@@ -17,11 +17,11 @@ dependencies:
   # file I/O
   - conda-forge::imageio
 
-  # visualize
+  # visual
+  - progressbar2
   - pyqt
   - conda-forge::vispy
   - matplotlib
-  - progressbar2
 
   # distributed
   - dask
