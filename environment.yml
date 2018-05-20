@@ -2,25 +2,25 @@ name: utoolbox
 
 channels:
   - defaults
-  - conda-forge
 
 dependencies:
   # core
-  - python=3
+  - python=3.6
+  - cython
   - ipykernel
-
+  
   # numerics
   - numpy
   - pandas
   - scipy
 
   # file I/O
-  - conda-forge::imageio
+  - imageio
 
   # visual
   - progressbar2
   - pyqt
-  - conda-forge::vispy
+  #- conda-forge::vispy
   - matplotlib
 
   # distributed
