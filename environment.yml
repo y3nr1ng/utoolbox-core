@@ -2,17 +2,20 @@ name: utoolbox
 
 channels:
   - defaults
+  - simpleitk
 
 dependencies:
   # core
   - python=3.6
   - cython
   - ipykernel
-  
-  # numerics
+
+  # numerics and processing
   - numpy
   - pandas
   - scipy
+  - scikit-image
+  - simpleitk
 
   # file I/O
   - imageio
@@ -29,7 +32,6 @@ dependencies:
 
   # utils
   - ipywidgets
-  - scikit-image
   - click
 
   # pip
