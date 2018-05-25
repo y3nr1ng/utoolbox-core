@@ -2,6 +2,7 @@ import logging
 
 import imageio
 import numpy as np
+import SimpleITK as sitk
 
 from .base import BaseContainer
 
@@ -72,3 +73,19 @@ class Raster(BaseContainer, np.ndarray):
 
     def save(self, dst):
         self.metadata.layout.write(dst, self)
+
+    def to_sitk(self):
+        """
+        Convert to SimpleITK image container format with relevant parameters.
+        """
+        image = sitk.GetImageFromArray(self)
+
+        # migrate spacing if assigned
+        try:
+            spacing = list(self.metadata.spacing)
+        except AttributeError:
+            spacing = [1] * self.ndim
+        # sitk used reversed ordering
+        image.SetSpacing(spacing[::-1])
+
+        return image
