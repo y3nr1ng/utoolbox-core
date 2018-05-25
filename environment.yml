@@ -23,7 +23,6 @@ dependencies:
 
   # visual
   - progressbar2
-  - pyqt
   - vispy
   - matplotlib
 
@@ -38,4 +37,9 @@ dependencies:
   # pip
   - pip:
     - boltons
-    #- pycuda
+    # 2018.05.25
+    # Install from conda will force install MKL instead of OpenBLAS
+    - tifffile
+    # 2018.05.25
+    # pyqt from conda-forge will source from outdated SIP causing segfault
+    - pyqt5
