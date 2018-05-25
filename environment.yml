@@ -1,7 +1,7 @@
 name: utoolbox
 
 channels:
-  - defaults
+  - conda-forge
   - simpleitk
 
 dependencies:
@@ -9,6 +9,7 @@ dependencies:
   - python=3.6
   - cython
   - ipykernel
+  - pyopencl
 
   # numerics and processing
   - numpy
@@ -23,7 +24,7 @@ dependencies:
   # visual
   - progressbar2
   - pyqt
-  #- conda-forge::vispy
+  - vispy
   - matplotlib
 
   # distributed
@@ -37,4 +38,4 @@ dependencies:
   # pip
   - pip:
     - boltons
-    - pycuda
+    #- pycuda
