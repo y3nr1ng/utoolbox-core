@@ -8,10 +8,15 @@ class SystemTray(QSystemTrayIcon):
         super(SystemTray, self).__init__(parent)
         self.setIcon(QIcon("disconnect.png"))
 
+        info_action = QAction("Hello world!", self)
+        info_action.setEnabled(False)
+
         quit_action = QAction("Exit", self)
         quit_action.triggered.connect(qApp.quit)
 
         context_menu = QMenu()
+        context_menu.addAction(info_action)
+        context_menu.addSeparator()
         context_menu.addAction(quit_action)
 
         self.setContextMenu(context_menu)
