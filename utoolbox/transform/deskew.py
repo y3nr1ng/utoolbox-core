@@ -37,7 +37,7 @@ void shear_kernel(
 """
 _deskew_kernel_module = compiler.SourceModule(_deskew_kernel_source)
 _shear_kernel_function = _deskew_kernel_module.get_function("shear_kernel")
-_shear_src_texref = _deskew_kernel_module.get_texref("tex")
+_src_texref = _deskew_kernel_module.get_texref("tex")
 
 def _shear_subblock(volume, origin, shape, spacing, offset, blocks=(16, 16, 1)):
     pass
@@ -143,19 +143,19 @@ def _shear(volume, spacing, angle, blocks=(16, 16, 1)):
     copy_func()
 
     # bind array to texture
-    _shear_src_texref.set_array(a_volume)
-    _shear_src_texref.set_address_mode(0, driver.address_mode.BORDER)
-    _shear_src_texref.set_address_mode(1, driver.address_mode.BORDER)
+    _src_texref.set_array(a_volume)
+    _src_texref.set_address_mode(0, driver.address_mode.BORDER)
+    _src_texref.set_address_mode(1, driver.address_mode.BORDER)
     # returned data type has to be float
     # (CUDA Programming Guide, 3.2.11.1, (7))
-    _shear_src_texref.set_filter_mode(driver.filter_mode.LINEAR)
+    _src_texref.set_filter_mode(driver.filter_mode.LINEAR)
 
     result = np.zeros(shape=(nv, nw, nu), dtype=np.float32)
 
     factor = _calculate_split_factor(result.shape, result.dtype)
     offset, bs = _generate_block_info(result.shape, factor)
     logger.debug("offsets={}".format(offset))
-    
+
     a_volume.free()
     raise RuntimeError
 
@@ -166,7 +166,7 @@ def _shear(volume, spacing, angle, blocks=(16, 16, 1)):
             np.int32(iv),
             np.int32(nu), np.int32(nw),
             driver.Out(result),
-            grid=grids, block=blocks, texrefs=[_shear_src_texref]
+            grid=grids, block=blocks, texrefs=[_src_texref]
         )
 
     # free the resource
@@ -179,7 +179,22 @@ def _shear(volume, spacing, angle, blocks=(16, 16, 1)):
     result = result.swapaxes(0, 1)
     return result
 
-def deskew(volume, angle, resample=False):
+def _upload_texture(volume):
+    pass
+
+def _estimate_resample_parameters(shape, spacing, shift, angle):
+    pass
+
+def _estimate_shear_parameters(shape, spacing, shift):
+    _, _, dx = spacing
+    pixel_shift = shift / dx
+
+    nz, ny, nx = shape
+    nx += int(math.ceil(pixel_shift * (nz-1)))
+
+    return (nz, ny, nx), pixel_shift
+
+def deskew(volume, shift, resample=False, angle=None):
     """Deskew acquired SPIM volume of specified angle.
 
     The deskew process can be treated as two steps: shear and rotate. Data
@@ -193,11 +208,13 @@ def deskew(volume, angle, resample=False):
     ----------
     volume : Raster
         SPIM data.
+    shift : float
+        Sample stage shift range, in um.
+    resample : bool, default to False
+        If true, rotate the volume to global coordinate.
     angle : float
         Elevation of the objective lens with respect to the sample holder in
         degrees following the right-hand rule.
-    resample : bool, default to False
-        If true, rotate the volume to global coordinate.
 
     Note
     ----
@@ -211,9 +228,13 @@ def deskew(volume, angle, resample=False):
         spacing = (1, ) * volume.ndim
     dtype = volume.dtype
 
+    shape, shift = _estimate_shear_parameters(volume.shape, spacing, shift)
+
     result = _shear(volume, spacing, angle)
     if resample:
         raise NotImplementedError
+        if not angle:
+            raise ValueError("Must provide angle when resample.")
     #result = result.astype(dtype)
 
     return result
