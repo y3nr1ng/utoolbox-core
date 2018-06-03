@@ -1,6 +1,7 @@
 import logging
 
 import imageio
+import itk
 import numpy as np
 import SimpleITK as sitk
 
@@ -89,3 +90,25 @@ class Raster(BaseContainer, np.ndarray):
         image.SetSpacing(spacing[::-1])
 
         return image
+
+    def to_itk(self):
+        """
+        Convert to ITK image container format with relevant parameters.
+        """
+        image = itk.GetImageFromArray(self)
+
+        filter = itk.ChangeInformationImageFilter[image].New()
+        filter.SetInput(image)
+        
+        # migrate spacing if assigned
+        try:
+            spacing = list(self.metadata.spacing)
+        except AttributeError:
+            spacing = [1] * self.ndim
+        # itk used reversed ordering
+        filter.SetOutputSpacing(spacing[::-1])
+        filter.ChangeSpacingOn()
+
+        filter.UpdateOutputInformation();
+
+        return filter.GetOutput()
