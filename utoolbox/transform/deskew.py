@@ -1,208 +1,159 @@
+import os
 import itertools
 import logging
 logger = logging.getLogger(__name__)
 import math
 
 import numpy as np
-import pycuda.autoinit
-from pycuda import compiler, driver, gpuarray
+import pyopencl as cl
 
 from utoolbox.container import Raster
 from utoolbox.container.layouts import Volume
 from utoolbox.utils.files import convert_size
 
-_deskew_kernel_source = """
-texture<int, cudaTextureType2DLayered, cudaReadModeElementType> tex;
+class DeskewTransform(object):
+    def __init__(self, shift):
+        #TODO auto prioritize
+        platform = None
+        try:
+            for _platform in cl.get_platforms():
+                for device in _platform.get_devices(device_type=cl.device_type.GPU):
+                    if device.get_info(cl.device_info.VENDOR_ID) == 16918272:
+                        platform = _platform
+                        self.device = device
+                        raise StopIteration
+        except:
+            pass
+        logger.debug(self.device.get_info(cl.device_info.NAME))
+        self.context = cl.Context(
+            devices=[self.device],
+            properties=[(cl.context_properties.PLATFORM, _platform)]
+        )
+        self.queue = cl.CommandQueue(self.context)
+        fpath = os.path.join(os.path.dirname(__file__), "deskew.cl")
+        with open(fpath, 'r') as fd:
+            source = fd.read()
+            self.program = cl.Program(self.context, source).build(devices=[self.device])
 
-__global__
-void shear_kernel(
-    const float factor,
-    int iv,
-    const int nu, const int nw, // output size
-    float *result
-) {
-    const int iu = blockIdx.x*blockDim.x + threadIdx.x;
-    const int iw = blockIdx.y*blockDim.y + threadIdx.y;
-    if ((iu >= nu) || (iw >= nw)) {
-        return;
-    }
+        # the uploaded raw data
+        self.ref_vol = None
 
-    const int i = iv * (nu*nw) + iw * nu + iu;
+        # pixels to shift
+        self.pixel_shift = shift
 
-    float ix = (iu - factor*iw) + 0.5f;
-    float iz = iw + 0.5f;
+    def __call__(self, volume):
+        # transpose zyx to yzx for 2D-layered texture
+        volume = volume.swapaxes(0, 1).copy()
+        self._upload_texture(volume)
 
-    result[i] = tex2DLayered(tex, ix, iz, iv);
-}
-"""
-_deskew_kernel_module = compiler.SourceModule(_deskew_kernel_source)
-_shear_kernel_function = _deskew_kernel_module.get_function("shear_kernel")
-_src_texref = _deskew_kernel_module.get_texref("tex")
+        # allocate host-side result buffer
+        nw, nv, nu = volume.shape
+        nu += int(math.ceil(self.pixel_shift * (nv-1)))
+        result = np.zeros(shape=(nw, nv, nu), dtype=volume.dtype)
 
-def _shear_subblock(volume, origin, shape, spacing, offset, blocks=(16, 16, 1)):
-    pass
+#        # determine block size from remaining spaces, 200MB
+#        factor = self._calculate_split_factor(result, 200*2**20)
+#        offset, bs = self._generate_block_info(result.shape, factor)
+#        logger.debug("block size = {}".format(bs))
 
-def _generate_block_info(shape, factor):
-    nw, nv, nu = shape
-    fw, fv, fu = factor
-
-    # block size
-    bu = -(-nu//fu)
-    bv = -(-nv//fv)
-    bw = -(-nw//fw)
-
-    # location of the offsets
-    ou = list(range(0, nu, bu))
-    ov = list(range(0, nv, bv))
-    ow = list(range(0, nw, bw))
-
-    return list(itertools.product(ow, ov, ou)), (bw, bv, bu)
-
-def _calculate_split_factor(shape, dtype=np.float32):
-    """
-    Calculate how the block size should split in order to fit in device memory.
-
-    Parameter
-    ---------
-    shape : tuple of int
-        Size of the result volume.
-    """
-    nw, nv, nu = shape
-    dtype_bytes = np.dtype(dtype).itemsize
-    bytes_required = (nu*nv*nw) * dtype_bytes
-    bytes_free, _ = driver.mem_get_info()
-    #DEBUG explicitly shrink free size
-    bytes_free = 2**20 * 100
-    logger.debug("required={} / free={}".format(
-        convert_size(bytes_required), convert_size(bytes_free))
-    )
-
-    fu = 1
-    fv = 1
-    # divide the largest dimension (Y or Z) in half and repeat
-    while bytes_required > bytes_free:
-        if nu >= nv:
-            fu *= 2
-            nu //= 2
-        else:
-            fv *= 2
-            nv //= 2
-        bytes_required = (nu*nv*nw) * dtype_bytes
-
-    factor = (1, fv, fu)
-    logger.debug("split_factor={}".format(factor))
-
-    return factor
-
-def _estimate_shear_parameters(shape, spacing, angle):
-    angle = math.radians(angle)
-    dz, dy, dx = spacing
-    pixel_offset = dz * math.tan(angle) / dx #TODO verify
-
-    nz, ny, nx = shape
-    nx += int(math.ceil(pixel_offset * (nz-1)))
-
-    return (nz, ny, nx), pixel_offset
-
-def _shear(volume, spacing, angle, blocks=(16, 16, 1)):
-    shape = volume.shape
-    nz, ny, nx = shape
-    dz, dy, dz = spacing
-
-    shape, offset = _estimate_shear_parameters(shape, spacing, angle)
-    nw, nv, nu = shape
-    logger.info("shape {} -> {}".format(volume.shape, shape))
-    logger.info("offset(px)={:.5f}".format(offset))
-
-    # - only signed data type is supported as texel
-    #   (CUDA Programming Guide, 3.2.11.1, (3))
-    # - swap dimension (ZYX -> YZX) for better caching on GPU
-    volume = volume.astype(np.int32).swapaxes(0, 1).copy()
-    logger.debug("before")
-    logger.debug(".. shape={}".format(volume.shape))
-    logger.debug(".. min={}".format(volume.min()))
-    logger.debug(".. max={}".format(volume.max()))
-
-    # create array descriptor for texture binding
-    desc = driver.ArrayDescriptor3D()
-    desc.width = nx
-    desc.height = nz
-    desc.depth = ny
-    desc.format = driver.array_format.SIGNED_INT32
-    desc.num_channels = 1
-    desc.flags |= driver.array3d_flags.ARRAY3D_LAYERED #TODO patch upstream
-
-    # upload to array
-    a_volume = driver.Array(desc)
-    copy_func = driver.Memcpy3D()
-    copy_func.set_src_host(volume)
-    copy_func.set_dst_array(a_volume)
-    copy_func.width_in_bytes = copy_func.src_pitch = volume.strides[1]
-    copy_func.src_height = copy_func.height = nz
-    copy_func.depth = ny
-    copy_func()
-
-    # bind array to texture
-    _src_texref.set_array(a_volume)
-    _src_texref.set_address_mode(0, driver.address_mode.BORDER)
-    _src_texref.set_address_mode(1, driver.address_mode.BORDER)
-    # returned data type has to be float
-    # (CUDA Programming Guide, 3.2.11.1, (7))
-    _src_texref.set_filter_mode(driver.filter_mode.LINEAR)
-
-    result = np.zeros(shape=(nv, nw, nu), dtype=np.float32)
-
-    factor = _calculate_split_factor(result.shape, result.dtype)
-    offset, bs = _generate_block_info(result.shape, factor)
-    logger.debug("offsets={}".format(offset))
-
-    a_volume.free()
-    raise RuntimeError
-
-    grids = (-(-nu//blocks[0]), -(-nw//blocks[1]), 1)
-    for iv in range(nv):
-        _shear_kernel_function(
-            np.float32(offset),
-            np.int32(iv),
-            np.int32(nu), np.int32(nw),
-            driver.Out(result),
-            grid=grids, block=blocks, texrefs=[_src_texref]
+        # layer buffer
+        d_buf = cl.Buffer(
+            self.context,
+            cl.mem_flags.WRITE_ONLY,
+            size=volume[0, ...].nbytes
         )
 
-    # free the resource
-    a_volume.free()
+        kernel = self.program.shear
+        for iw in range(nw):
+            logger.debug(".. kernel")
+            kernel.set_args(
+                self.ref_vol,
+                np.float32(self.pixel_shift),
+                np.int32(iw),
+                np.int32(nu), np.int32(nv),
+                d_buf
+            )
+            cl.enqueue_nd_range_kernel(
+                self.queue,
+                kernel,
+                (nu, nv),   # global size
+                None       # local size
+            )
+            logger.debug(".. copy")
+            cl.enqueue_copy(self.queue, result[iw, ...], d_buf)
+            logger.debug("{} / {}".format(iw+1, nw))
 
-    logger.debug("after")
-    logger.debug(".. min={}".format(result.min()))
-    logger.debug(".. max={}".format(result.max()))
+        d_buf.release()
 
-    result = result.swapaxes(0, 1)
-    return result
+        # transpose back
+        return result.copy()
 
-def _upload_texture(volume):
-    pass
+    def _upload_texture(self, array):
+        # force convert to float for linear interpolation
+        array = array.astype(np.float32).copy()
 
-def _estimate_resample_parameters(shape, spacing, shift, angle):
-    pass
+        dtype = array.dtype
+        shape = array.shape
+        strides = array.strides
 
-def _estimate_shear_parameters(shape, spacing, shift):
-    _, _, dx = spacing
-    pixel_shift = shift / dx
+        self.ref_vol = cl.Image(
+            self.context,
+            cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
+            cl.ImageFormat(
+                cl.channel_order.R,
+                cl.DTYPE_TO_CHANNEL_TYPE[dtype]
+            ),
+            shape=shape[::-1],
+            pitches=strides[::-1][1:],
+            hostbuf=array,
+            is_array=True
+        )
 
-    nz, ny, nx = shape
-    nx += int(math.ceil(pixel_shift * (nz-1)))
+    def _calculate_split_factor(self, array, mem_lim):
+        """
+        Calculate how the block size should split in order to fit in device memory.
+        """
+        nw, nv, nu = array.shape
+        bytes_required = (nu*nv*nw) * np.dtype(array.dtype).itemsize
+        logger.debug("requires {} / available {}".format(
+            convert_size(bytes_required), convert_size(mem_lim))
+        )
 
-    return (nz, ny, nx), pixel_shift
+        fu = 1
+        fv = 1
+        # divide the largest dimension (Y or Z) in half and repeat
+        while bytes_required > mem_lim:
+            if nu >= nv:
+                fu *= 2
+                nu //= 2
+            else:
+                fv *= 2
+                nv //= 2
+            bytes_required /= 2
 
-def deskew(volume, shift, resample=False, angle=None):
+        factor = (1, fv, fu)
+        logger.debug("split factor = {}".format(factor))
+
+        return factor
+
+    def _generate_block_info(self, shape, factor):
+        nw, nv, nu = shape
+        fw, fv, fu = factor
+
+        # block size
+        bu = -(-nu//fu)
+        bv = -(-nv//fv)
+        bw = -(-nw//fw)
+
+        # location of the offsets
+        ou = list(range(0, nu, bu))
+        ov = list(range(0, nv, bv))
+        ow = list(range(0, nw, bw))
+
+        return list(itertools.product(ow, ov, ou)), (bw, bv, bu)
+
+def deskew(volume, shift):
     """Deskew acquired SPIM volume of specified angle.
-
-    The deskew process can be treated as two steps: shear and rotate. Data
-    generated through sample scan method will contain an implicit angle due to
-    the orientation of the sample holder, shearing restore the volume to its
-    intended spatial topology. To display the layered data without elevation
-    angle from the surface, rotation is required, however, this resampling
-    process will cause voxel intensity deviate from their true value further.
 
     Parameters
     ----------
@@ -210,11 +161,6 @@ def deskew(volume, shift, resample=False, angle=None):
         SPIM data.
     shift : float
         Sample stage shift range, in um.
-    resample : bool, default to False
-        If true, rotate the volume to global coordinate.
-    angle : float
-        Elevation of the objective lens with respect to the sample holder in
-        degrees following the right-hand rule.
 
     Note
     ----
@@ -228,13 +174,13 @@ def deskew(volume, shift, resample=False, angle=None):
         spacing = (1, ) * volume.ndim
     dtype = volume.dtype
 
-    shape, shift = _estimate_shear_parameters(volume.shape, spacing, shift)
+    if not issubclass(dtype.type, np.integer):
+        raise TypeError("not an integer raster")
 
-    result = _shear(volume, spacing, angle)
-    if resample:
-        raise NotImplementedError
-        if not angle:
-            raise ValueError("Must provide angle when resample.")
+    pixel_shift = shift / spacing[2]
+    transform = DeskewTransform(pixel_shift)
+    result = transform(volume)
+
     #result = result.astype(dtype)
 
     return result

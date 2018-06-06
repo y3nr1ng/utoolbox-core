@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 #####
 
-source_folder = os.path.join(*["data", "20171201_RFiSHp2aLFCYC", "raw", "488"])
+source_folder = os.path.join(*["data", "20170112_RFiSHp2aLFCYC", "raw", "488"])
 file_list = fileutils.list_files(
     source_folder,
     name_filters=[
@@ -43,6 +43,6 @@ logger.debug("im1.layout={}".format(im1.metadata.layout))
 
 @timeit
 def operation():
-    return deskew(im1, 30)
+    return deskew(im1, 0.5)
 im2 = operation()
 imageio.volwrite("data/test.tif", im2)
