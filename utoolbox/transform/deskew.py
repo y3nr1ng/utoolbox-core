@@ -1,15 +1,12 @@
 import os
-import itertools
 import logging
 logger = logging.getLogger(__name__)
-import math
 
 import numpy as np
 import pyopencl as cl
 
 from utoolbox.container import Raster
 from utoolbox.container.layouts import Volume
-from utoolbox.utils.files import convert_size
 
 class DeskewTransform(object):
     def __init__(self, shift):
@@ -24,7 +21,7 @@ class DeskewTransform(object):
                     raise StopIteration
         except:
             pass
-        logger.debug(self.device.get_info(cl.device_info.NAME))
+        logger.debug("Using '{}'".format(self.device.get_info(cl.device_info.NAME)))
         self.context = cl.Context(
             devices=[self.device],
             properties=[(cl.context_properties.PLATFORM, _platform)]
@@ -33,7 +30,8 @@ class DeskewTransform(object):
         fpath = os.path.join(os.path.dirname(__file__), "deskew.cl")
         with open(fpath, 'r') as fd:
             source = fd.read()
-            self.program = cl.Program(self.context, source).build(devices=[self.device])
+            self.program =
+                cl.Program(self.context, source).build(devices=[self.device])
 
         # the uploaded raw data
         self.ref_vol = None
@@ -49,7 +47,7 @@ class DeskewTransform(object):
         # allocate host-side result buffer
         dtype = volume.dtype
         nw, nv, nu = volume.shape
-        nu += int(math.ceil(self.pixel_shift * (nv-1)))
+        nu += int(-(-(self.pixel_shift * (nv-1))//1))
         result = np.zeros(shape=(nw, nv, nu), dtype=dtype)
 
         # layer buffer
@@ -105,7 +103,7 @@ class DeskewTransform(object):
             is_array=True
         )
 
-def deskew(volume, shift):
+def deskew(volume, shift, rotate=False, resample=False):
     """Deskew acquired SPIM volume of specified angle.
 
     Parameters
@@ -114,6 +112,7 @@ def deskew(volume, shift):
         SPIM data.
     shift : float
         Sample stage shift range, in um.
+    angle :
 
     Note
     ----
@@ -125,10 +124,9 @@ def deskew(volume, shift):
         spacing = volume.metadata.spacing
     except AttributeError:
         spacing = (1, ) * volume.ndim
-    dtype = volume.dtype
 
-    if not issubclass(dtype.type, np.integer):
-        raise TypeError("not an integer raster")
+    if not np.issubdtype(volume.dtype, np.uint16)
+        raise TypeError("only 16-bit unsigned integer is supported")
 
     pixel_shift = shift / spacing[2]
     transform = DeskewTransform(pixel_shift)
