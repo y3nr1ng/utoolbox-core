@@ -18,10 +18,10 @@ class DeskewTransform(object):
         try:
             for _platform in cl.get_platforms():
                 for device in _platform.get_devices(device_type=cl.device_type.GPU):
-                    if device.get_info(cl.device_info.VENDOR_ID) == 16918272:
-                        platform = _platform
-                        self.device = device
-                        raise StopIteration
+                    #if device.get_info(cl.device_info.VENDOR_ID) == 16918272:
+                    platform = _platform
+                    self.device = device
+                    raise StopIteration
         except:
             pass
         logger.debug(self.device.get_info(cl.device_info.NAME))
@@ -47,25 +47,22 @@ class DeskewTransform(object):
         self._upload_texture(volume)
 
         # allocate host-side result buffer
+        dtype = volume.dtype
         nw, nv, nu = volume.shape
         nu += int(math.ceil(self.pixel_shift * (nv-1)))
-        result = np.zeros(shape=(nw, nv, nu), dtype=volume.dtype)
-
-#        # determine block size from remaining spaces, 200MB
-#        factor = self._calculate_split_factor(result, 200*2**20)
-#        offset, bs = self._generate_block_info(result.shape, factor)
-#        logger.debug("block size = {}".format(bs))
+        result = np.zeros(shape=(nw, nv, nu), dtype=dtype)
 
         # layer buffer
+        h_buf = np.zeros(shape=(nv, nu), dtype=dtype)
         d_buf = cl.Buffer(
             self.context,
             cl.mem_flags.WRITE_ONLY,
-            size=volume[0, ...].nbytes
+            size=h_buf.nbytes
         )
 
         kernel = self.program.shear
+        p = 0
         for iw in range(nw):
-            logger.debug(".. kernel")
             kernel.set_args(
                 self.ref_vol,
                 np.float32(self.pixel_shift),
@@ -73,20 +70,19 @@ class DeskewTransform(object):
                 np.int32(nu), np.int32(nv),
                 d_buf
             )
-            cl.enqueue_nd_range_kernel(
-                self.queue,
-                kernel,
-                (nu, nv),   # global size
-                None       # local size
-            )
-            logger.debug(".. copy")
-            cl.enqueue_copy(self.queue, result[iw, ...], d_buf)
-            logger.debug("{} / {}".format(iw+1, nw))
+            cl.enqueue_nd_range_kernel(self.queue, kernel, h_buf.shape, None)
+            cl.enqueue_copy(self.queue, h_buf, d_buf)
+            result[iw, ...] = h_buf
+
+            pp = int((iw+1)/nw * 10)
+            if pp > p:
+                p = pp
+                logger.debug("{}%".format(p*10))
 
         d_buf.release()
 
         # transpose back
-        return result.copy()
+        return result.swapaxes(0, 1).copy()
 
     def _upload_texture(self, array):
         # force convert to float for linear interpolation
