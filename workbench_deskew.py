@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 #####
 
+"""
 source_folder = os.path.join(*["data", "20170112_RFiSHp2aLFCYC", "raw", "488"])
 file_list = fileutils.list_files(
     source_folder,
@@ -32,10 +33,13 @@ file_list = fileutils.list_files(
 )
 
 print("[0] = {}".format(file_list[0]))
+"""
+
+file_path = os.path.join("data", "sample1_zp6um_561.tif")
 
 #####
 
-im1 = Raster(file_list[0], layout=Volume, spacing=(.5, .102, .102))
+im1 = Raster(file_path, layout=Volume, spacing=(1., .102, .102))
 logger.debug(im1)
 logger.debug("im1.layout={}".format(im1.metadata.layout))
 
@@ -43,6 +47,6 @@ logger.debug("im1.layout={}".format(im1.metadata.layout))
 
 @timeit
 def operation():
-    return deskew(im1, 0.5)
+    return deskew(im1, 0.6)
 im2 = operation()
 imageio.volwrite("data/test.tif", im2)
