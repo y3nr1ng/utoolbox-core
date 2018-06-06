@@ -109,49 +109,6 @@ class DeskewTransform(object):
             is_array=True
         )
 
-    def _calculate_split_factor(self, array, mem_lim):
-        """
-        Calculate how the block size should split in order to fit in device memory.
-        """
-        nw, nv, nu = array.shape
-        bytes_required = (nu*nv*nw) * np.dtype(array.dtype).itemsize
-        logger.debug("requires {} / available {}".format(
-            convert_size(bytes_required), convert_size(mem_lim))
-        )
-
-        fu = 1
-        fv = 1
-        # divide the largest dimension (Y or Z) in half and repeat
-        while bytes_required > mem_lim:
-            if nu >= nv:
-                fu *= 2
-                nu //= 2
-            else:
-                fv *= 2
-                nv //= 2
-            bytes_required /= 2
-
-        factor = (1, fv, fu)
-        logger.debug("split factor = {}".format(factor))
-
-        return factor
-
-    def _generate_block_info(self, shape, factor):
-        nw, nv, nu = shape
-        fw, fv, fu = factor
-
-        # block size
-        bu = -(-nu//fu)
-        bv = -(-nv//fv)
-        bw = -(-nw//fw)
-
-        # location of the offsets
-        ou = list(range(0, nu, bu))
-        ov = list(range(0, nv, bv))
-        ow = list(range(0, nw, bw))
-
-        return list(itertools.product(ow, ov, ou)), (bw, bv, bu)
-
 def deskew(volume, shift):
     """Deskew acquired SPIM volume of specified angle.
 
