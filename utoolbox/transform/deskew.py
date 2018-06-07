@@ -43,6 +43,8 @@ class DeskewTransform(object):
         self.ref_volume = None
         # result host buffer
         self.result = None
+        self.h_buf = None
+        self.d_buf = None
 
         # pixels to shift
         self.pixel_shift = shift
@@ -57,15 +59,18 @@ class DeskewTransform(object):
         nw, nv, nu = volume.shape
         nu += int(-(-(self.pixel_shift * (nv-1))//1))
         if not (self.result and self.result.shape == (nw, nv, nu)):
+            logger.info("input resized, reallocating buffers...")
+
+            # result buffer
             self.result = np.zeros(shape=(nw, nv, nu), dtype=dtype)
 
-        # layer buffer
-        h_buf = np.zeros(shape=(nv, nu), dtype=dtype)
-        d_buf = cl.Buffer(
-            self.context,
-            cl.mem_flags.WRITE_ONLY,
-            size=h_buf.nbytes
-        )
+            # staging buffers between host and device
+            self.h_buf = np.zeros(shape=(nv, nu), dtype=dtype)
+            self.d_buf = cl.Buffer(
+                self.context,
+                cl.mem_flags.WRITE_ONLY,
+                size=self.h_buf.nbytes
+            )
 
         p = 0
         for iw in range(nw):
@@ -74,18 +79,21 @@ class DeskewTransform(object):
                 np.float32(self.pixel_shift),
                 np.int32(iw),
                 np.int32(nu), np.int32(nv),
-                d_buf
+                self.d_buf
             )
-            cl.enqueue_nd_range_kernel(self.queue, self.kernel, h_buf.shape, None)
-            cl.enqueue_copy(self.queue, h_buf, d_buf)
-            self.result[iw, ...] = h_buf
+            cl.enqueue_nd_range_kernel(
+                self.queue,
+                self.kernel,
+                self.h_buf.shape,   # global size
+                None                # local size
+            )
+            cl.enqueue_copy(self.queue, self.h_buf, self.d_buf)
+            self.result[iw, ...] = self.h_buf
 
             pp = int((iw+1)/nw * 10)
             if pp > p:
                 p = pp
                 logger.debug("{}%".format(p*10))
-
-        d_buf.release()
 
         # transpose back
         return self.result.swapaxes(0, 1).copy()
