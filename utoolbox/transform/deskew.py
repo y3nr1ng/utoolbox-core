@@ -1,6 +1,6 @@
 import logging
 logger = logging.getLogger(__name__)
-from math import hypot
+from math import ceil, hypot
 import os
 
 import numpy as np
@@ -59,18 +59,18 @@ class DeskewTransform(object):
         # estimate dimension
         dtype = volume.dtype
         nw, nv0, nu0 = volume.shape
-        offset = int(-(-(self.pixel_shift * (nv0-1))//1))
+        offset = ceil(self.pixel_shift * (nv0-1))
         if self.rotate:
             h = hypot(offset, nv0)
             vsin = nv0/h
             vcos = offset/h
 
             # rotated dimension and new origin
-            nu = int(-(-(nu0*vcos + h)//1))
-            nv = int(-(-(nu0*vsin)//1))
+            nu = ceil(nu0*vcos + h)
+            nv = ceil(nu0*vsin)
 
             # offset
-            ov = -(-(nv0-nv)//2)
+            ov = ceil((nv0-nv)//2)
         else:
             nu = nu0 + offset
             nv = nv0
