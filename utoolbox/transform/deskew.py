@@ -77,10 +77,8 @@ class DeskewTransform(object):
 
         # allocate host-side result buffer
         if not (self.result and self.result.shape == (nw, nv, nu)):
-            coord = "(u, v, w) = ({}, {}, {})".format(nu, nv, nw)
-            if self.rotate:
-                coord += ", offset = {}".format(ov)
-            logger.info("input resized, {}".format(coord))
+            coord = "{}x{}x{}".format(nv, nw, nu)
+            logger.info("output resized, {}".format(coord))
 
             # result buffer
             self.result = np.zeros(shape=(nw, nv, nu), dtype=dtype)
@@ -93,7 +91,7 @@ class DeskewTransform(object):
                 size=self.h_buf.nbytes
             )
 
-            logger.info("buffers reallocated")
+            logger.info("... buffers reallocated")
 
         p = 0
         for iw in range(nw):

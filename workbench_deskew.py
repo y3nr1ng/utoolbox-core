@@ -47,6 +47,6 @@ logger.debug("im1.layout={}".format(im1.metadata.layout))
 
 @timeit
 def operation():
-    return deskew(im1, 0.5, rotate=True)
+    return deskew(im1, 0.6, rotate=True)
 im2 = operation()
 imageio.volwrite("data/output.tif", im2)
