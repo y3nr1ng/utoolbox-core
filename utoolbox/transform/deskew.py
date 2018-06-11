@@ -1,6 +1,7 @@
-import os
 import logging
 logger = logging.getLogger(__name__)
+from math import hypot
+import os
 
 import numpy as np
 import pyopencl as cl
@@ -34,6 +35,7 @@ class DeskewTransform(object):
             source = fd.read()
             program = cl.Program(self.context, source).build()
             # select kernel to use
+            self.rotate = rotate
             if rotate:
                 self.kernel = program.shear_and_rotate
             else:
@@ -54,12 +56,31 @@ class DeskewTransform(object):
         volume = volume.swapaxes(0, 1).copy()
         self._upload_texture(volume)
 
-        # allocate host-side result buffer
+        # estimate dimension
         dtype = volume.dtype
-        nw, nv, nu = volume.shape
-        nu += int(-(-(self.pixel_shift * (nv-1))//1))
+        nw, nv0, nu0 = volume.shape
+        offset = int(-(-(self.pixel_shift * (nv0-1))//1))
+        if self.rotate:
+            h = hypot(offset, nv0)
+            vsin = nv0/h
+            vcos = offset/h
+
+            # rotated dimension and new origin
+            nu = int(-(-(nu0*vcos + h)//1))
+            nv = int(-(-(nu0*vsin)//1))
+
+            # offset
+            ov = -(-(nv0-nv)//2)
+        else:
+            nu = nu0 + offset
+            nv = nv0
+
+        # allocate host-side result buffer
         if not (self.result and self.result.shape == (nw, nv, nu)):
-            logger.info("input resized, reallocating buffers...")
+            coord = "(u, v, w) = ({}, {}, {})".format(nu, nv, nw)
+            if self.rotate:
+                coord += ", offset = {}".format(ov)
+            logger.info("input resized, {}".format(coord))
 
             # result buffer
             self.result = np.zeros(shape=(nw, nv, nu), dtype=dtype)
@@ -72,15 +93,28 @@ class DeskewTransform(object):
                 size=self.h_buf.nbytes
             )
 
+            logger.info("buffers reallocated")
+
         p = 0
         for iw in range(nw):
-            self.kernel.set_args(
-                self.ref_volume,
-                np.float32(self.pixel_shift),
-                np.int32(iw),
-                np.int32(nu), np.int32(nv),
-                self.d_buf
-            )
+            if self.rotate:
+                self.kernel.set_args(
+                    self.ref_volume,
+                    np.float32(vsin), np.float32(vcos),
+                    np.float32(self.pixel_shift),
+                    np.int32(iw),
+                    np.int32(nu), np.int32(nv),
+                    np.int32(ov),
+                    self.d_buf
+                )
+            else:
+                self.kernel.set_args(
+                    self.ref_volume,
+                    np.float32(self.pixel_shift),
+                    np.int32(iw),
+                    np.int32(nu), np.int32(nv),
+                    self.d_buf
+                )
             cl.enqueue_nd_range_kernel(
                 self.queue,
                 self.kernel,
