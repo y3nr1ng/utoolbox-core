@@ -3,40 +3,33 @@ name: utoolbox
 channels:
   - defaults
   - conda-forge
-  - simpleitk
 
 dependencies:
   # core
   - python=3.6
   - cython
   - ipykernel
-  - pyopencl
 
   # numerics and processing
   - numpy
+  - xarray
   - pandas
   - scipy
-  - scikit-image
-  - simpleitk
 
   # file I/O
   - imageio
   - tifffile
 
   # visual
-  - progressbar2
-  - vispy
   - matplotlib
   # 2018.05.25
   # pyqt from conda-forge will source from outdated SIP causing segfault
-  - pyqt
 
-  # distributed
+  # parallel
   - dask
-  - distributed
+  - pyopencl
 
   # utils
-  - ipywidgets
   - click
 
   # pip
