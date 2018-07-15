@@ -35,7 +35,8 @@ file_list = fileutils.list_files(
 print("[0] = {}".format(file_list[0]))
 """
 
-file_path = os.path.join("data", "sample1_zp6um_561.tif")
+#file_path = os.path.join("data", "sample1_zp6um_561.tif")
+file_path = os.path.join("data", "deskew_sample2.tif")
 
 #####
 
@@ -47,6 +48,7 @@ logger.debug("im1.layout={}".format(im1.metadata.layout))
 
 @timeit
 def operation():
-    return deskew(im1, 0.6, rotate=True)
+    return deskew(im1, 0.5, rotate=False)
 im2 = operation()
+logger.debug("type(im2)={}".format(type(im2)))
 imageio.volwrite("data/output.tif", im2)

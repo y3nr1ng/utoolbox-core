@@ -22,6 +22,7 @@ class Raster(BaseContainer, np.ndarray):
                     array = layout.read(array)
                 except AttributeError:
                     raise TypeError("logical layout not specified")
+            #TODO import from itk
             obj = array.view(cls)
         obj.metadata.layout = layout
         return obj
@@ -99,7 +100,7 @@ class Raster(BaseContainer, np.ndarray):
 
         filter = itk.ChangeInformationImageFilter[image].New()
         filter.SetInput(image)
-        
+
         # migrate spacing if assigned
         try:
             spacing = list(self.metadata.spacing)
