@@ -1,37 +1,30 @@
 name: utoolbox
 
 channels:
-  - defaults
-  - conda-forge
+    - defaults
+    - conda-forge
 
 dependencies:
-  # core
-  - python=3.6
-  - cython
-  - ipykernel
+    # core
+    - python=3.6
+    - cython
+    - ipykernel
 
-  # numerics and processing
-  - numpy
-  - xarray
-  - pandas
-  - scipy
+    # numerics and processing
+    - numpy
+    - scipy
 
-  # file I/O
-  - imageio
-  - tifffile
+    # file I/O
+    - imageio
+    - tifffile
 
-  # visual
-  - matplotlib
-  # 2018.05.25
-  # pyqt from conda-forge will source from outdated SIP causing segfault
+    # gui
+    - pyqt
 
-  # parallel
-  - dask
-  - pyopencl
+    # parallel
+    - dask
+    - pyopencl
 
-  # utils
-  - click
-
-  # pip
-  - pip:
+    # utils
+    - click
     - boltons
