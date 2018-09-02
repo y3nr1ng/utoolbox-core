@@ -1,0 +1,14 @@
+python=3.6
+cython
+ipykernel
+numpy
+xarray
+pandas
+scipy
+imageio
+tifffile
+pyqt
+dask
+pyopencl
+click
+boltons

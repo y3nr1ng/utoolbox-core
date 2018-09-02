@@ -1,0 +1,33 @@
+#!/usr/bin/env python
+
+import warnings
+import yaml
+
+import click
+
+@click.command()
+@click.argument('env_path', type=click.Path(exists=True, dir_okay=False))
+@click.argument('req_path', type=click.Path(dir_okay=False, writable=True))
+def main(env_path, req_path):
+    with open(env_path, 'r') as fd:
+        try:
+            info = yaml.load(fd)
+        except yaml.YAMLError as exec:
+            raise RuntimeError("unable to load {}".format(env_path))
+
+    packages = []
+    for item in info['dependencies']:
+        if type(item) is dict:
+            if 'pip' in item:
+                for sub_item in item['pip']:
+                    packages.append(sub_item)
+            else:
+                warnings.warn("invalid dependency item \"{}\", ignored".format(item))
+        else:
+            packages.append(item)
+
+    with open(req_path, 'w') as fd:
+        fd.write("\n".join(packages))
+
+if __name__ == '__main__':
+    main()
