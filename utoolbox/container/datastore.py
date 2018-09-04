@@ -43,7 +43,6 @@ class FileDatastore(Datastore):
     def __init__(self, location, read_func=None, **kwargs):
         super(FileDatastore, self).__init__(location, **kwargs)
         self._read_func = read_func
-        self._buffer = []
         self._index = 0
         self._read_size = 1
 
@@ -123,7 +122,6 @@ class FileDatastore(Datastore):
 
     def reset(self):
         """Reset datastore to initial state."""
-        self._buffer = []
         self._index = 0
         self._read_size = 1
 
