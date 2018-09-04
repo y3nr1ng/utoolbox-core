@@ -6,7 +6,6 @@ import glob
 import os
 
 __all__ = [
-    'Datastore',
     'FileDatastore',
     'ImageDatastore'
 ]
