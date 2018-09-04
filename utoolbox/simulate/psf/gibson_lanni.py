@@ -9,7 +9,7 @@ References
 [2] Fast and Accurate 3D PSF Computation for Fluorescence Microscopy. Available
     at: https://bit.ly/2PY7nHs
 """
-from collections import namedtuple
+from typing import NamedTuple
 from math import hypot
 
 import numpy as np
@@ -33,43 +33,88 @@ class FastGibsonLanni(PSF):
     [2] Douglass, K. (2018). Implementing a fast Gibson-Lanni PSF solver in
         Python. [online] Kyle M. Douglass. Available at: https://bit.ly/2CcfHAw
     """
-    Parameters = namedtuple('Parameters', [
-        'M',    # magnification
-        'NA',   # numerical aperture
-        'ng0',  # coverslip refraction index, designed value
-        'ng',   # coverslip refraction index, experimental value
-        'ni0',  # immersion medium refraction index, design value
-        'ni',   # immersion medium refraction index, experimental value
-        'ns',   # specimen refractive index
-        'ti0',  # working distance [um]
-        'tg0',  # coverslip thickness [um], design value
-        'tg',   # coverslip thickness [um], experimental value
-        'zd0'   # tube length [um]
-    ])
+    class Parameters(NamedTuple):
+        # magnification
+        M: int
+        # numerical aperture
+        NA: float
+        # immersion medium refraction index, design value
+        ni0: float
+        # immersion medium refraction index, experimental value
+        ni: float
+        # specimen refractive index
+        ns: float
+        # working distance [um]
+        ti0: float
+        # particle distance from coverslip [um]
+        zd0: float = 0.
+        # coverslip refraction index, designed value
+        ng0: float = 1.52
+        # coverslip refraction index, experimental value
+        ng: float = 1.52
+        # coverslip thickness [um], design value
+        tg0: float = 100.
+        # coverslip thickness [um], experimental value
+        tg: float = 100.
+
 
     # number of rescaled Bessels for phase function approximation
     n_basis = 200
     # number of pupil sample along the radial direction
     n_samples = 1000
 
-    # minimum wavelength for series expansion
+    # minimum wavelength for series expansion [450, 700]
     min_wavelength = 0.350
 
-    def __init__(self, parameters, **kwargs):
+    def __init__(self, parameters, has_coverslip=True, **kwargs):
         super(FastGibsonLanni, self).__init__(**kwargs)
         if type(parameters) is not FastGibsonLanni.Parameters:
             raise TypeError("invalid parameter type")
-        self.parameters = parameters
+        self._parameters = parameters
+        self._has_coverslip = has_coverslip
 
     def __call__(self, shape, wavelength, dtype=np.float32, oversampling=2):
         if len(shape) == 2:
-            nz, (ny, nx) = 1, shape
-        else:
-            nz, ny, nx = shape
+            shape = (1, ) + shape
 
-        if (self._buffer is None) or (self._buffer.shape != shape):
-            self._buffer = np.empty(shape, dtype=dtype)
+        return self._generate_zyx_profile(shape, wavelength, dtype, oversampling)
 
+    @property
+    def has_coverslip(self):
+        return self._has_coverslip
+
+    @property
+    def parameters(self):
+        return self._parameters
+
+    def _generate_zyx_profile(self, shape, wavelength, dtype, oversampling):
+        psf_zr, rv = self._generate_zr_profile(shape, wavelength, dtype, oversampling)
+
+        nz, ny, nx = shape
+        # find origin
+        x0, y0 = (nx-1)/2., (ny-1)/2.
+
+        # generate Cartesian grid
+        yxg = np.mgrid[0:ny, 0:nx]
+        rg = np.hypot(yxg[0]-y0, yxg[1]-x0) * self.resolution.dxy
+
+        # radial interpolation
+        psf_zyx = np.empty(shape, dtype=dtype)
+        for iz in range(nz):
+            psf_interp = scipy.interpolate.interp1d(rv, psf_zr[iz, :])
+            psf_zyx[iz, :, :] = psf_interp(rg.ravel()).reshape(ny, nx)
+        try:
+            psf_zyx = np.squeeze(psf_zyx, axis=0)
+        except ValueError:
+            pass
+
+        if self._normalize == 'energy':
+            psf_zyx /= np.sum(psf_zyx)
+
+        return psf_zyx
+
+    def _generate_zr_profile(self, shape, wavelength, dtype, oversampling):
+        nz, ny, nx = shape
         # find origin
         x0, y0 = (nx-1)/2., (ny-1)/2.
 
@@ -77,72 +122,71 @@ class FastGibsonLanni(PSF):
         r_max = round(hypot(nx-x0, ny-y0)) + 1
 
         # polar coordinate, image space
-        rv = self.resolution.dxy * np.arange(0, oversampling*r_max, dtype=dtype) / oversampling
-        # polar coorindate, fourier space
-        p = self.parameters
-        a = min([x for x in [p.NA, p.ng0, p.ng, p.ni0, p.ni, p.ns] if x > 0.]) / p.NA
-        rhov = np.linspace(0, a, FastGibsonLanni.n_samples, dtype=dtype)
+        res = self.resolution
+        rv = res.dxy * np.arange(0, oversampling*r_max, dtype=dtype) / oversampling
 
         # z steps
-        zv = self.resolution.dz * (np.arange(-nz/2., nz/2., dtype=dtype) + .5)
+        zv = res.dz * (np.arange(-nz/2., nz/2., dtype=dtype) + .5)
 
-        # define wavefront aberrations
-        # sample
-        opd_s = p.zd0 * np.sqrt(p.ns*p.ns - p.NA*p.NA * rhov*rhov)
-        # immesion medium
-        opd_i = (zv.reshape(-1, 1) + p.ti0) * np.sqrt(p.ni*p.ni - p.NA*p.NA * rhov*rhov) - p.ti0 * np.sqrt(p.ni0*p.ni0 - p.NA*p.NA * rhov*rhov)
-        # coverslip
-        opd_g = p.tg * np.sqrt(p.ng*p.ng - p.NA*p.NA * rhov*rhov) - p.tg0 * np.sqrt(p.ng0*p.ng0 - p.NA*p.NA * rhov*rhov)
-        # total
-        k = 2*np.pi / wavelength
-        #W = k * (opd_s + opd_i + opd_g)
-        W = k * (opd_s + opd_i)
+        # wavefront aberrations
+        W, rhov = self._opd(wavelength, zv, dtype)
+        # chosen back focal plane aperture size
+        a = rhov[-1]
 
         # sample the phase
         #   shape = (z steps, n_samples)
         phase = np.cos(W) + 1j*np.sin(W)
 
         # basis of Bessel functions
-        scaling_factor = p.NA * (3 * np.arange(1, FastGibsonLanni.n_basis+1, dtype=dtype) - 2) * FastGibsonLanni.min_wavelength / wavelength
+        na = self.parameters.NA
+        scaling_factor = na * (3 * np.arange(1, FastGibsonLanni.n_basis+1, dtype=dtype) - 2) * FastGibsonLanni.min_wavelength / wavelength
         J = scipy.special.jv(0, scaling_factor.reshape(-1, 1) * rhov)
 
         # approximation to the fourier space phase using LSE
         #   shape = (n_basis, z steps)
         C, residuals, _, _ = scipy.linalg.lstsq(J.T, phase.T)
 
-        #return rhov, phase, J, C
-
         # convenient functions for J0 and J1
         J0 = lambda x: scipy.special.jv(0, x)
         J1 = lambda x: scipy.special.jv(1, x)
 
-        beta = k * rv.reshape(-1, 1) * p.NA
+        k = 2*np.pi / wavelength
+        beta = k * rv.reshape(-1, 1) * na
         denom = scaling_factor*scaling_factor - beta*beta
         R = (scaling_factor * J1(scaling_factor*a) * J0(beta*a) * a - beta * J0(scaling_factor*a) * J1(beta*a) * a)
         R /= denom
 
         psf_rz = (np.abs(R.dot(C))**2).T
 
-        # normalize
-        psf_rz /= np.max(psf_rz)
+        if self._normalize == 'peak':
+            psf_rz /= np.max(psf_rz)
 
-        # generate Cartesian grid
-        xyg = np.mgrid[0:ny, 0:nx]
-        rg = np.sqrt((xyg[1]-x0)*(xyg[1]-x0) + (xyg[0]-y0)*(xyg[0]-y0)) * self.resolution.dxy
+        return psf_rz, rv
 
-        psf_xyz = np.empty((nz, ny, nx), dtype=dtype)
-        for iz in range(nz):
-            psf_interp = scipy.interpolate.interp1d(rv, psf_rz[iz, :])
-            psf_xyz[iz, :, :] = psf_interp(rg.ravel()).reshape(ny, nx)
-        print("{}.dtype={}".format("psf_xyz", psf_xyz.dtype))
+    def _opd(self, wavelength, zv, dtype):
+        # polar coorindate, fourier space
+        p = self.parameters
 
-        return psf_xyz
+        _a = [p.NA, p.ni0, p.ni, p.ns]
+        if self.has_coverslip:
+            _a += [p.ng0, p.ng]
+        a = min(*_a) / p.NA
+        rhov = np.linspace(0, a, FastGibsonLanni.n_samples, dtype=dtype)
 
-    def _generate_grid(self, shape):
-        pass
+        # immersion medium
+        opd_i = (zv.reshape(-1, 1) + p.ti0) * np.sqrt(p.ni*p.ni - p.NA*p.NA * rhov*rhov) - p.ti0 * np.sqrt(p.ni0*p.ni0 - p.NA*p.NA * rhov*rhov)
+        if self.has_coverslip:
+            # coverslip
+            opd_g = p.tg * np.sqrt(p.ng*p.ng - p.NA*p.NA * rhov*rhov) - p.tg0 * np.sqrt(p.ng0*p.ng0 - p.NA*p.NA * rhov*rhov)
+            # sample
+            opd_s = p.zd0 * np.sqrt(p.ns*p.ns - p.NA*p.NA * rhov*rhov)
 
-    def _generate_zyx_profile(self):
-        pass
+            opd = opd_i + opd_g + opd_s
+        else:
+            opd = opd_i
 
-    def _generate_zr_profile(self, zv, wavelength):
-        pass
+        # define wavefront aberrations
+        k = 2*np.pi / wavelength
+        W = k * opd
+
+        return W, rhov
