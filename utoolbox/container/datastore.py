@@ -3,7 +3,6 @@ Create datastore for large collections of data.
 """
 from abc import ABCMeta, abstractmethod
 import glob
-import itertools
 import os
 
 __all__ = [
