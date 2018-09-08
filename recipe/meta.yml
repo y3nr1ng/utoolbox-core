@@ -1,0 +1,41 @@
+{% set name = "utoolbox" %}
+{% set setupdata = load_setup_py_data() %}
+
+package:
+    name: {{ name }}
+    {% if environ.get('BRANCH') == "master" %}
+    version: {{ setupdata.get('version') }}
+    {% else %}
+    version: "{{ GIT_DESCRIBE_TAG }}_{{ GIT_BUILD_STR }}"
+    {% endif %}
+
+source:
+    git_url: https://github.com/liuyenting/utoolbox
+
+build:
+    number: 0
+    string: 'py{{ PY_VER|replace(".", "") }}_{{ PKG_BUILDNUM }}'
+    script: python setup.py install --single-version-externally-managed --record record.txt
+    entry_points:
+        {% for key, list in setupdata.get('entry_points').items() %}
+            {% for item in list %}
+        - {{ item }}
+            {% endfor %}
+        {% endfor %}
+
+requirements:
+    build:
+        - python
+        - setuptools
+    run:
+        {% for key, list in setupdata.get('install_requires').items() %}
+            {% for item in list %}
+        - {{ item }}
+            {% endfor %}
+        {% endfor %}
+
+about:
+    home: {{ setupdata.get('url') }}
+    license: {{ setupdata.get('license') }}
+    license_file: LICENSE
+    summary: {{ setupdata.get('description') }}
