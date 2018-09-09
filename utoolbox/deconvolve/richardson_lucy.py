@@ -30,7 +30,7 @@ def find_optimal_size(target, prefer_add=True):
                     return candidate
 
 class RichardsonLucy(object):
-    def __init__(self, shape, n_iter=10, prefer_add=False, context=None):
+    def __init__(self, context, shape, n_iter=10, prefer_add=False):
         self.n_iter = n_iter
         self._in_shape = tuple(shape)
         self._out_shape = tuple(
@@ -43,18 +43,19 @@ class RichardsonLucy(object):
             dn = n_out - n_in
             if dn < 0:
                 # output smaller then input
-                in_roi.append((-dn)//2, (-dn)//2 + n_out)
-                out_roi.append(0, n_out)
+                in_roi.append(slice((-dn)//2, (-dn)//2 + n_out))
+                out_roi.append(slice(0, n_out))
             elif dn > 0:
                 # input smaller then output
-                in_roi.append(0, n_in)
-                out_roi.append(d//2, d//2 + n_in)
+                in_roi.append(slice(0, n_in))
+                out_roi.append(slice(d//2, d//2 + n_in))
             else:
-                in_roi.append(0, n_in)
-                out_roi.append(0, n_out)
+                in_roi.append(slice(0, n_in))
+                out_roi.append(slice(0, n_out))
+        in_roi, out_roi = tuple(in_roi), tuple(out_roi)
         self._crop_func = lambda ref, out: out[out_roi] = ref[in_roi]
 
-        self._context = context
+        self.context = context
 
     def __enter__(self):
         self._allocate_workspace()
@@ -65,6 +66,11 @@ class RichardsonLucy(object):
     def __call__(self, data):
         if data.shape != self._in_shape:
             warn("input size does not match the design specification")
+
+        # copy to staging buffer
+
+        # transfer
+
 
     @property
     def n_iter(self):
@@ -80,8 +86,44 @@ class RichardsonLucy(object):
     def shape(self):
         return self._shape
 
+    def run(self, data):
+        for i_iter in range(self.n_iter):
+            logger.verbose("iter {}".format(i_iter+1))
+            if i_iter > 2:
+                # Andrew-Biggs, 2nd order prediction, clip [0, 1]
+                factor = self._calculate_acceleration_factor()
+            else:
+                Y_k = X_k #TODO
+
+            # move X_k to X_kminus1
+
+            if i_iter > 1:
+                # move G_kminus1 to G_kminus2
+
+            # raw / blurred
+            CC = Y_k #TODO
+            self._filter(CC, no_conj)
+            self.calc_lr_core(CC)
+
+            # determine next iteration
+            self._filter(CC, conj)
+            self.update_curr_estimate()
+
+            self.calc_curr_pref_diff()
+
     def _allocate_workspace(self):
-        pass
+        ### REF staging buffers between host and device ###
+        self.h_buf = np.zeros(shape=(nv, nu), dtype=dtype)
+        self.d_buf =
+
+        in_nbytes = self._in_shape
+        self.d_in = cl.Buffer(
+            self.context,
+            cl.mem_flags.READ_WRITE,
+            size=self.h_in.nbytes
+        )
+
+        self.h_out = None
 
     def _free_workspace(self):
         pass
