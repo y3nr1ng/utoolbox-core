@@ -13,6 +13,7 @@ dependencies:
     # numerics and processing
     - numpy
     - scipy
+    - clfft
 
     # file I/O
     - imageio
@@ -27,4 +28,8 @@ dependencies:
 
     # utils
     - click
+    - coloredlogs
     - boltons
+
+    - pip:
+        - git+https://github.com/geggo/gpyfft.git@master
