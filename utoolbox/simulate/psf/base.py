@@ -29,6 +29,6 @@ class PSF(object, metaclass=ABCMeta):
 
     @normalize.setter
     def normalize(self, strategy):
-        if strategy not in ('none', 'energy', 'max'):
+        if strategy not in ('none', 'energy', 'peak'):
             raise ValueError("invalid normalization strategy")
         self._normalize = strategy
