@@ -38,18 +38,6 @@ def find_optimal_size(target, prefer_add=True):
                 if is_optimal_size(candidate):
                     return candidate
 
-def make_acc_frac_dtype(device):
-    dtype = np.dtype([
-        ('nom', np.float32),
-        ('den', np.float32)
-    ])
-    name = 'acc_frac'
-
-    from pyopencl.tools import get_or_register_dtype, match_dtype_to_c_struct
-    dtype, c_decl = match_dtype_to_c_struct(device, name, dtype)
-    dtype = get_or_register_dtype(name, dtype)
-    return dtype, c_decl
-
 class RichardsonLucy(object):
     def __init__(self, context, shape, prefer_add=False, n_iter=10):
         self.context = context
@@ -82,6 +70,13 @@ class RichardsonLucy(object):
             dst[out_roi] = src[in_roi]
         self._crop_func = _crop_func
 
+        self._estimate_func = ElementwiseKernel(
+            self.context,
+            "float *out, float *ref, float eps",
+            "out[i] = ref[i] / ((out[i] > eps) ? out[i] : eps)",
+            "estimate_func"
+        )
+
     def __enter__(self):
         self.queue = cl.CommandQueue(self.context)
         self._allocate_workspace()
@@ -94,7 +89,21 @@ class RichardsonLucy(object):
         if data.shape != self._in_shape:
             warn("input size does not match the design specification")
 
-        return self.run(data)
+        # copy to staging buffer
+        self.h_buf.fill(0.)
+        self._crop_func(self.h_buf, data)
+        self.d_ref.set(self.h_buf)
+        # NOTE use implicit host-side staging buffer to separate the internal
+        # np.float32 environment and unknown dtype inputs
+        logger.debug("data uploaded")
+
+        self.run(self.d_dec_bufs.tmp, self.d_ref)
+
+        # copy from staging buffer
+        self.d_dec_bufs.tmp.get(ary=self.h_buf)
+        logger.debug("data downloaded")
+
+        return self.h_buf.copy()
 
     @property
     def n_iter(self):
@@ -132,13 +141,13 @@ class RichardsonLucy(object):
         except AttributeError:
             raise RuntimeError("workspace not allocated")
         self.fft.enqueue_arrays(data=self.d_ref, result=self.d_otf)
-        logger.debug("psf converted to otf")
+        logger.debug("psf -> otf")
 
     @property
     def shape(self):
         return self._shape
 
-    def run(self, data, out=None):
+    def run(self, dst_array, src_array):
         """
         init
         ... x_{k+1} = ref
@@ -155,131 +164,90 @@ class RichardsonLucy(object):
         --> return x_{k+1}
         --> return t, bypass acceleration
         """
-        # copy to staging buffer
-        self.h_buf.fill(0.)
-        self._crop_func(self.h_buf, data)
-        self.d_ref.set(self.h_buf)
-        # NOTE use implicit host-side staging buffer to separate the internal
-        # np.float32 environment and unknown dtype inputs
-        logger.debug("... data transferred to device as ref")
-
-        #TODO temporary initialize kernel parameters
-        af_dtype, af_c_decl = make_acc_frac_dtype(self.context.devices[0])
-        preamble = af_c_decl + """
-        //CL//
-
-        acc_frac acc_frac_neutral() {
-            acc_frac frac;
-            frac.nom = frac.den = 0.0f;
-            return frac;
-        }
-
-        acc_frac acc_frac_map(float g1, float g0) {
-            acc_frac frac;
-            frac.nom = g1 * g0;
-            frac.den = g0 * g0;
-            return frac;
-        }
-
-        acc_frac acc_frac_reduce(acc_frac a, acc_frac b) {
-            acc_frac result = a;
-            result.nom += b.nom;
-            result.den += b.den;
-            return result;
-        }
-        """
-        update_acc_factor = ReductionKernel(
-            self.context, af_dtype,
-            neutral="acc_frac_neutral()", reduce_expr="acc_frac_reduce(a, b)", map_expr="acc_frac_map(g1[i], g0[i])",
-            arguments="__global float *g1, __global float *g0",
-            preamble=preamble
-        )
-
-        lr_restraint = ElementwiseKernel(
-            self.context,
-            "float *out, float eps",
-            "out[i] = out[i] > eps ? out[i] : eps",
-            "lr_restraint"
-        )
-        lr_divide = ElementwiseKernel(
-            self.context,
-            "float *out, float *ref",
-            "out[i] = ref[i] / out[i]",
-            "lr_divide"
-        )
+        eps = np.finfo(np.float32).eps
 
         # x_{k+1} = ref
-        self.d_acc_bufs.x1[:] = self.d_ref
+        self.d_acc_bufs.x1[:] = src_array
         # a_k = 0
         a = 0.
-        logger.debug("... x_{k+1} and a_k initialized")
+        logger.debug("[acc] init x_{k+1}, a_k")
 
         # TODO use progress bar
         for i_iter in range(self.n_iter):
             logger.info("iter {}".format(i_iter+1))
 
+            if i_iter > 1:
+                # a_k = L(g_{k+1}, g_k)
+                a_nom = cl.array.dot(self.d_acc_bufs.g1, self.d_acc_bufs.g0).get()
+                a_den = cl.array.dot(self.d_acc_bufs.g0, self.d_acc_bufs.g0).get()
+                logger.debug("... a_frac={:.5f}/{:.5f}".format(a_nom, a_den))
+                a = np.float32(max(min(a_nom/(a_den + eps), 1.), 0.))
+                logger.debug("[acc] a_k={:.5f}, updated".format(a))
+
+            # x: iterated point
+            # y: predicted point
+
             # y_k = (a_k + 1) * x_{k+1} - a_k * x_k
-            self.d_acc_bufs.y = (a+1.) * self.d_acc_bufs.x1 - a * self.d_acc_bufs.x0
-            logger.debug("... y_k updated")
+            self.d_acc_bufs.y = np.float32(a+1) * self.d_acc_bufs.x1 - a * self.d_acc_bufs.x0
+            logger.debug("[acc] y_k updated")
 
             # x_k = x_{k+1}
             self.d_acc_bufs.x0, self.d_acc_bufs.x1 = self.d_acc_bufs.x1, self.d_acc_bufs.x0
-            logger.debug("... x_k updated")
+            logger.debug("[acc] x_k updated")
 
-            ##### x_{k+1} = f(x_{k+1}) #####
-            nz, ny, nx = self._out_shape
-            self.fft.enqueue_arrays(
-                data=self.d_acc_bufs.x1,
-                result=self.d_dec_bufs.fft
-            )
-            self.d_dec_bufs.fft *= self.d_otf
-            self.ifft.enqueue_arrays(
-                data=self.d_dec_bufs.fft,
-                result=self.d_dec_bufs.tmp
-            )
-            self.d_dec_bufs.tmp /= np.float32(nx*ny*nz);
-            logger.debug("... [core] blurred")
-
-            eps = np.finfo(np.float32).eps
-            lr_restraint(self.d_dec_bufs.tmp, eps)
-            lr_divide(self.d_dec_bufs.tmp, self.d_ref)
-            logger.debug("... [core] updated")
-
-            self.fft.enqueue_arrays(
-                data=self.d_dec_bufs.tmp,
-                result=self.d_dec_bufs.fft
-            )
-            self.d_dec_bufs.fft *= self.d_otf.conj()
-            self.ifft.enqueue_arrays(
-                data=self.d_dec_bufs.fft,
-                result=self.d_acc_bufs.x1
-            )
-            self.d_acc_bufs.x1 /= np.float32(nx*ny*nz);
-            logger.debug("... [core] reblurred")
+            # x_{k+1} = f(x_k)
+            self.run_once(self.d_acc_bufs.x1, self.d_acc_bufs.y)
 
             # g_k = g_{k+1}
             self.d_acc_bufs.g0, self.d_acc_bufs.g1 = self.d_acc_bufs.g1, self.d_acc_bufs.g0
             # g_{k+1} = x_{k+1} - y_k
             self.d_acc_bufs.g1 = self.d_acc_bufs.x1 - self.d_acc_bufs.y
-            logger.debug("... g_k and g_{k+1} updated")
+            logger.debug("[acc] g_k, g_{k+1} updated")
 
-            # a_k = L(g_{k+1}, g_k)
-            #a_frac = update_acc_factor(self.d_acc_bufs.g1, self.d_acc_bufs.g0).get()
-            #logger.debug("... a_frac={}".format(a_frac))
-            #a = a_frac['nom'] / (a_frac['den'] + eps)
-            a_nom = cl.array.dot(self.d_acc_bufs.g1, self.d_acc_bufs.g0).get()
-            a_den = cl.array.dot(self.d_acc_bufs.g0, self.d_acc_bufs.g0).get()
-            logger.debug("... a_frac={}/{}".format(a_nom, a_den))
-            a = max(min(a_nom/(a_den + eps), 1.), 0.)
-            logger.debug("... a_k={}, updated".format(a))
+        dst_array[:] = self.d_acc_bufs.x1
 
-        if out:
-            # use provided np.array
-            self.d_acc_bufs.x1.get(ary=out)
-            return out
-        else:
-            # implicitly create a new np.array
-            return self.d_acc_bufs.x1.get()
+    def run_once(self, dst_array, src_array):
+        nz, ny, nx = self._out_shape
+        scale = np.float32(nx*ny*nz)
+        eps = np.finfo(np.float32).eps
+
+        # step 0
+        #   blur by psf
+        self.fft.enqueue_arrays(
+            data=src_array, result=self.d_dec_bufs.fft,
+            forward=True
+        )
+        self.d_dec_bufs.fft *= self.d_otf
+        self.ifft.enqueue_arrays(
+            data=self.d_dec_bufs.fft, result=self.d_dec_bufs.tmp,
+            forward=False
+        )
+        self.d_dec_bufs.tmp /= scale
+        logger.debug("[lr_core] step 0")
+
+        # step 1
+        #   estimate next iteration
+        self._estimate_func(self.d_dec_bufs.tmp, self.d_ref, eps)
+        logger.debug("[lr_core] step 1")
+
+        # step 2
+        #   re-blur
+        self.fft.enqueue_arrays(
+            data=self.d_dec_bufs.tmp, result=self.d_dec_bufs.fft,
+            forward=True
+        )
+        self.d_dec_bufs.fft *= self.d_otf.conj()
+        self.ifft.enqueue_arrays(
+            data=self.d_dec_bufs.fft, result=self.d_dec_bufs.tmp,
+            forward=False
+        )
+        self.d_dec_bufs.tmp /= scale
+        logger.debug("[lr_core] step 2")
+
+        # step 3
+        #   multiply the factor
+        dst_array[:] = src_array * self.d_dec_bufs.tmp
+        logger.debug("[lr_core] step 3")
 
     def _allocate_workspace(self):
         """
