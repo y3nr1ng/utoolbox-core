@@ -140,7 +140,10 @@ class RichardsonLucy(object):
             logger.debug("psf loaded")
         except AttributeError:
             raise RuntimeError("workspace not allocated")
-        self.fft.enqueue_arrays(data=self.d_ref, result=self.d_otf)
+        self.fft.enqueue_arrays(
+            data=self.d_ref, result=self.d_otf,
+            forward=True
+        )
         logger.debug("psf -> otf")
 
     @property
@@ -217,12 +220,11 @@ class RichardsonLucy(object):
             data=src_array, result=self.d_dec_bufs.fft,
             forward=True
         )
-        self.d_dec_bufs.fft *= self.d_otf
+        self.d_dec_bufs.fft *= self.otf
         self.ifft.enqueue_arrays(
             data=self.d_dec_bufs.fft, result=self.d_dec_bufs.tmp,
             forward=False
         )
-        self.d_dec_bufs.tmp /= scale
         logger.debug("[lr_core] step 0")
 
         # step 1
@@ -236,12 +238,11 @@ class RichardsonLucy(object):
             data=self.d_dec_bufs.tmp, result=self.d_dec_bufs.fft,
             forward=True
         )
-        self.d_dec_bufs.fft *= self.d_otf.conj()
+        self.d_dec_bufs.fft *= self.otf.conj()
         self.ifft.enqueue_arrays(
             data=self.d_dec_bufs.fft, result=self.d_dec_bufs.tmp,
             forward=False
         )
-        self.d_dec_bufs.tmp /= scale
         logger.debug("[lr_core] step 2")
 
         # step 3
