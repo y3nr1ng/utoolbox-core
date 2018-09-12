@@ -58,7 +58,7 @@ class ShearedPSF(object):
         for iz in range(nz):
             psf_interp = scipy.interpolate.interp1d(rv, psf_zr[iz, :])
             # NOTE layered shift is reversed to simulate sample scan
-            iz_shift = - (self._pixel_shift * (iz - (nz-1)/2.))
+            iz_shift = self._pixel_shift * (iz - (nz-1)/2.)
             rg = np.hypot(yxg[0]-y0, yxg[1]-x0+iz_shift) * self._psf.resolution.dxy
             psf_zyx[iz, :, :] = psf_interp(rg.ravel()).reshape(ny, nx)
         try:
