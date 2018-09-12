@@ -5,8 +5,17 @@ underlying image that has been blurred by a known point spread function.
 import logging
 from warnings import warn
 
+from gpyfft import FFT
+from gpyfft.gpyfftlib import CLFFT_SINGLE
+from humanfriendly import format_size as format_byte_size
 import numpy as np
 import pyopencl as cl
+import pyopencl.array
+from pyopencl.elementwise import ElementwiseKernel
+from pyopencl.reduction import ReductionKernel
+import pyopencl.tools
+
+from utoolbox.container import AttrDict
 
 logger = logging.getLogger(__name__)
 
@@ -29,48 +38,63 @@ def find_optimal_size(target, prefer_add=True):
                 if is_optimal_size(candidate):
                     return candidate
 
+def make_acc_frac_dtype(device):
+    dtype = np.dtype([
+        ('nom', np.float32),
+        ('den', np.float32)
+    ])
+    name = 'acc_frac'
+
+    from pyopencl.tools import get_or_register_dtype, match_dtype_to_c_struct
+    dtype, c_decl = match_dtype_to_c_struct(device, name, dtype)
+    dtype = get_or_register_dtype(name, dtype)
+    return dtype, c_decl
+
 class RichardsonLucy(object):
-    def __init__(self, context, shape, n_iter=10, prefer_add=False):
-        self.n_iter = n_iter
+    def __init__(self, context, shape, prefer_add=False, n_iter=10):
+        self.context = context
+
         self._in_shape = tuple(shape)
         self._out_shape = tuple(
-            [find_optimal_size(n, prefer_add=prefer_add) for n in shape]
+            [find_optimal_size(n, prefer_add=prefer_add) for n in self._in_shape]
         )
+        logger.info("shape: in={}, out={}".format(self._in_shape, self._out_shape))
+
+        self.n_iter = n_iter
 
         # determine roi
         in_roi, out_roi = [], []
         for n_in, n_out in zip(self._in_shape, self._out_shape):
             dn = n_out - n_in
             if dn < 0:
-                # output smaller then input
+                # smaller output
                 in_roi.append(slice((-dn)//2, (-dn)//2 + n_out))
                 out_roi.append(slice(0, n_out))
             elif dn > 0:
-                # input smaller then output
+                # smaller input
                 in_roi.append(slice(0, n_in))
                 out_roi.append(slice(d//2, d//2 + n_in))
             else:
                 in_roi.append(slice(0, n_in))
                 out_roi.append(slice(0, n_out))
         in_roi, out_roi = tuple(in_roi), tuple(out_roi)
-        self._crop_func = lambda ref, out: out[out_roi] = ref[in_roi]
-
-        self.context = context
+        def _crop_func(dst, src):
+            dst[out_roi] = src[in_roi]
+        self._crop_func = _crop_func
 
     def __enter__(self):
+        self.queue = cl.CommandQueue(self.context)
         self._allocate_workspace()
+        return self
 
-    def __exit__(self):
+    def __exit__(self, *args):
         self._free_workspace()
 
     def __call__(self, data):
         if data.shape != self._in_shape:
             warn("input size does not match the design specification")
 
-        # copy to staging buffer
-
-        # transfer
-
+        return self.run(data)
 
     @property
     def n_iter(self):
@@ -83,47 +107,319 @@ class RichardsonLucy(object):
         self._n_iter = new_n_iter
 
     @property
+    def otf(self):
+        try:
+            return self.d_otf
+        except AttributeError:
+            raise RuntimeError("PSF is not specified")
+
+    @property
+    def psf(self):
+        return self._psf
+
+    @psf.setter
+    def psf(self, data):
+        if data.shape != self._in_shape:
+            warn("input size does not match the design specification")
+        self._psf = np.zeros(self._out_shape, dtype=np.float32)
+        self._crop_func(self._psf, data)
+
+        # generate OTF
+        try:
+            # borrow reference image buffer
+            self.d_ref.set(self._psf)
+            logger.debug("psf loaded")
+        except AttributeError:
+            raise RuntimeError("workspace not allocated")
+        self.fft.enqueue_arrays(data=self.d_ref, result=self.d_otf)
+        logger.debug("psf converted to otf")
+
+    @property
     def shape(self):
         return self._shape
 
-    def run(self, data):
-        for i_iter in range(self.n_iter):
-            logger.verbose("iter {}".format(i_iter+1))
-            if i_iter > 2:
-                # Andrew-Biggs, 2nd order prediction, clip [0, 1]
-                factor = self._calculate_acceleration_factor()
-            else:
-                Y_k = X_k #TODO
+    def run(self, data, out=None):
+        """
+        init
+        ... x_{k+1} = ref
+        ... a_k = 0.
 
-            # move X_k to X_kminus1
+        iter n (y_k, x_{k+1}, x_k, g_{k+1}, g_k)
+        ... y_k = (a_k + 1) * x_{k+1} - a_k * x_k
+        ... t = f(x_{k+1})
+        ... g_k = g_{k+1}
+            g_{k+1} = t - y_k
+        ... x_k = x_{k+1}
+            x_{k+1} = y_k + g_{k+1}
+        ... a_k = L(g_{k+1}, g_k)
+        --> return x_{k+1}
+        --> return t, bypass acceleration
+        """
+        # copy to staging buffer
+        self.h_buf.fill(0.)
+        self._crop_func(self.h_buf, data)
+        self.d_ref.set(self.h_buf)
+        # NOTE use implicit host-side staging buffer to separate the internal
+        # np.float32 environment and unknown dtype inputs
+        logger.debug("... data transferred to device as ref")
 
-            if i_iter > 1:
-                # move G_kminus1 to G_kminus2
+        #TODO temporary initialize kernel parameters
+        af_dtype, af_c_decl = make_acc_frac_dtype(self.context.devices[0])
+        preamble = af_c_decl + """
+        //CL//
 
-            # raw / blurred
-            CC = Y_k #TODO
-            self._filter(CC, no_conj)
-            self.calc_lr_core(CC)
+        acc_frac acc_frac_neutral() {
+            acc_frac frac;
+            frac.nom = frac.den = 0.0f;
+            return frac;
+        }
 
-            # determine next iteration
-            self._filter(CC, conj)
-            self.update_curr_estimate()
+        acc_frac acc_frac_map(float g1, float g0) {
+            acc_frac frac;
+            frac.nom = g1 * g0;
+            frac.den = g0 * g0;
+            return frac;
+        }
 
-            self.calc_curr_pref_diff()
-
-    def _allocate_workspace(self):
-        ### REF staging buffers between host and device ###
-        self.h_buf = np.zeros(shape=(nv, nu), dtype=dtype)
-        self.d_buf =
-
-        in_nbytes = self._in_shape
-        self.d_in = cl.Buffer(
-            self.context,
-            cl.mem_flags.READ_WRITE,
-            size=self.h_in.nbytes
+        acc_frac acc_frac_reduce(acc_frac a, acc_frac b) {
+            acc_frac result = a;
+            result.nom += b.nom;
+            result.den += b.den;
+            return result;
+        }
+        """
+        update_acc_factor = ReductionKernel(
+            self.context, af_dtype,
+            neutral="acc_frac_neutral()", reduce_expr="acc_frac_reduce(a, b)", map_expr="acc_frac_map(g1[i], g0[i])",
+            arguments="__global float *g1, __global float *g0",
+            preamble=preamble
         )
 
-        self.h_out = None
+        lr_restraint = ElementwiseKernel(
+            self.context,
+            "float *out, float eps",
+            "out[i] = out[i] > eps ? out[i] : eps",
+            "lr_restraint"
+        )
+        lr_divide = ElementwiseKernel(
+            self.context,
+            "float *out, float *ref",
+            "out[i] = ref[i] / out[i]",
+            "lr_divide"
+        )
+
+        # x_{k+1} = ref
+        self.d_acc_bufs.x1[:] = self.d_ref
+        # a_k = 0
+        a = 0.
+        logger.debug("... x_{k+1} and a_k initialized")
+
+        # TODO use progress bar
+        for i_iter in range(self.n_iter):
+            logger.info("iter {}".format(i_iter+1))
+
+            # y_k = (a_k + 1) * x_{k+1} - a_k * x_k
+            self.d_acc_bufs.y = (a+1.) * self.d_acc_bufs.x1 - a * self.d_acc_bufs.x0
+            logger.debug("... y_k updated")
+
+            # x_k = x_{k+1}
+            self.d_acc_bufs.x0, self.d_acc_bufs.x1 = self.d_acc_bufs.x1, self.d_acc_bufs.x0
+            logger.debug("... x_k updated")
+
+            ##### x_{k+1} = f(x_{k+1}) #####
+            nz, ny, nx = self._out_shape
+            self.fft.enqueue_arrays(
+                data=self.d_acc_bufs.x1,
+                result=self.d_dec_bufs.fft
+            )
+            self.d_dec_bufs.fft *= self.d_otf
+            self.ifft.enqueue_arrays(
+                data=self.d_dec_bufs.fft,
+                result=self.d_dec_bufs.tmp
+            )
+            self.d_dec_bufs.tmp /= np.float32(nx*ny*nz);
+            logger.debug("... [core] blurred")
+
+            eps = np.finfo(np.float32).eps
+            lr_restraint(self.d_dec_bufs.tmp, eps)
+            lr_divide(self.d_dec_bufs.tmp, self.d_ref)
+            logger.debug("... [core] updated")
+
+            self.fft.enqueue_arrays(
+                data=self.d_dec_bufs.tmp,
+                result=self.d_dec_bufs.fft
+            )
+            self.d_dec_bufs.fft *= self.d_otf.conj()
+            self.ifft.enqueue_arrays(
+                data=self.d_dec_bufs.fft,
+                result=self.d_acc_bufs.x1
+            )
+            self.d_acc_bufs.x1 /= np.float32(nx*ny*nz);
+            logger.debug("... [core] reblurred")
+
+            # g_k = g_{k+1}
+            self.d_acc_bufs.g0, self.d_acc_bufs.g1 = self.d_acc_bufs.g1, self.d_acc_bufs.g0
+            # g_{k+1} = x_{k+1} - y_k
+            self.d_acc_bufs.g1 = self.d_acc_bufs.x1 - self.d_acc_bufs.y
+            logger.debug("... g_k and g_{k+1} updated")
+
+            # a_k = L(g_{k+1}, g_k)
+            #a_frac = update_acc_factor(self.d_acc_bufs.g1, self.d_acc_bufs.g0).get()
+            #logger.debug("... a_frac={}".format(a_frac))
+            #a = a_frac['nom'] / (a_frac['den'] + eps)
+            a_nom = cl.array.dot(self.d_acc_bufs.g1, self.d_acc_bufs.g0).get()
+            a_den = cl.array.dot(self.d_acc_bufs.g0, self.d_acc_bufs.g0).get()
+            logger.debug("... a_frac={}/{}".format(a_nom, a_den))
+            a = max(min(a_nom/(a_den + eps), 1.), 0.)
+            logger.debug("... a_k={}, updated".format(a))
+
+        if out:
+            # use provided np.array
+            self.d_acc_bufs.x1.get(ary=out)
+            return out
+        else:
+            # implicitly create a new np.array
+            return self.d_acc_bufs.x1.get()
+
+    def _allocate_workspace(self):
+        """
+        ... y_k = x_k + (a_k * h_k)
+            h_k = x_k - x_{k-1}
+        ... x_{k+1} = y_k + g_k
+            g_k = f(y_k) - y_k
+        ... a_k = \sum{g_{k-1} * g_{k-2}} / \sum{g_{k-2} * g_{k-2}}
+            a_k \in (0, 1)
+
+        init
+        ... x_{k+1} = ref
+        ... a_k = 0.
+
+        iter 0
+        ... h_k = None
+            y_k = x_{k+1}
+            y_k = (a_k + 1) * x_{k+1} - a_k * x_k
+        ... t = f(x_k)
+        ... g_k = t - y_k
+            x_k = x_{k+1}
+            x_{k+1} = y_k + g_k
+        ... g_{k-2} = g_{k-1}
+            g_{k-1} = g_k
+        ... a_k = 0.
+
+        iter 1
+        ... h_k = x_{k+1} - x_k
+            y_k = x_{k+1}
+        ... t = f(x_{k+1})
+        ... g_k = t - y_k
+            x_k = x_{k+1}
+            x_{k+1} = y_k + g_k
+        ... g_{k-2} = g_{k-1}
+            g_{k-1} = g_k
+        ... a_k = L(g_{k-1}, g_{k-2})
+
+        iter 2
+        ... h_k = x_{k+1} - x_k
+            y_k = x_{k+1} + a_k * h_k
+        ... t = f(x_{k+1})
+        ... g_k = t - y_k
+            x_k = x_{k+1}
+            x_{k+1} = y_k + g_k
+        ... g_{k-2} = g_{k-1}
+            g_{k-1} = g_k
+        ... a_k = L(g_{k-1}, g_{k-2})
+
+        iter n (y_k, x_{k+1}, x_k, g_{k+1}, g_k)
+        ... y_k = (a_k + 1) * x_{k+1} - a_k * x_k
+        ... t = f(x_{k+1})
+        ... g_k = g_{k+1}
+            g_{k+1} = t - y_k
+        ... x_k = x_{k+1}
+            x_{k+1} = y_k + g_{k+1}
+        ... a_k = L(g_{k+1}, g_k)
+        --> return x_{k+1}
+        --> return t, bypass acceleration
+        """
+        # pre-calculate shapes
+        nz, ny, nx = self._out_shape
+        real_shape = (nz, ny, nx)
+        complex_shape = (nz, ny, nx//2+1)
+
+        # create memory pool
+        allocator = cl.tools.ImmediateAllocator(
+            self.queue, mem_flags=cl.mem_flags.READ_WRITE
+        )
+        self._mem_pool = cl.tools.MemoryPool(allocator)
+
+        #TODO wrap this section in ExitStack, callback(_free_workspace)
+
+        # reference image
+        self.h_buf = np.empty(real_shape, dtype=np.float32)
+        self.d_ref = cl.array.empty(
+            self.queue, real_shape, np.float32, allocator=self._mem_pool
+        )
+
+        # otf
+        self.d_otf = cl.array.empty(
+            self.queue, complex_shape, np.complex64, allocator=self._mem_pool
+        )
+
+        # deconvolution io buffers
+        self.d_dec_bufs = AttrDict()
+        self.d_dec_bufs['tmp'] = cl.array.empty(
+            self.queue, real_shape, np.float32, allocator=self._mem_pool
+        )
+        self.d_dec_bufs['fft'] = cl.array.empty(
+            self.queue, complex_shape, np.complex64, allocator=self._mem_pool
+        )
+
+        # deconvolution fft/ifft plans
+        self.fft = FFT(
+            self.context, self.queue,
+            self.d_dec_bufs.tmp,
+            out_array=self.d_dec_bufs.fft
+        )
+        logger.debug(
+            "fft buffer size: {}".format(
+                format_byte_size(self.fft.plan.temp_array_size, binary=True)
+            )
+        )
+
+        self.ifft = FFT(
+            self.context, self.queue,
+            self.d_dec_bufs.fft,
+            out_array=self.d_dec_bufs.tmp,
+            real=True
+        )
+        logger.debug(
+            "ifft buffer size: {}".format(
+                format_byte_size(self.ifft.plan.temp_array_size, binary=True)
+            )
+        )
+
+        # accelerator buffers
+        self.d_acc_bufs = AttrDict()
+        for name in ('y', 'x1', 'x0', 'g1', 'g0'):
+            self.d_acc_bufs[name] = cl.array.empty(
+                self.queue, real_shape, np.float32, allocator=self._mem_pool
+            )
+
+        logger.debug(
+            "held={}, active={}".format(
+                self._mem_pool.held_blocks, self._mem_pool.active_blocks
+            )
+        )
 
     def _free_workspace(self):
-        pass
+        # free reference image
+        self.d_ref.base_data.release()
+
+        # free deconvolution buffers
+        for buffer in self.d_dec_bufs.values():
+            buffer.base_data.release()
+
+        # free accelerator buffers
+        for buffer in self.d_acc_bufs.values():
+            buffer.base_data.release()
+
+        # destroy memory pool
+        self._mem_pool.stop_holding()

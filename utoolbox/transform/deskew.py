@@ -1,5 +1,4 @@
 import logging
-logger = logging.getLogger(__name__)
 from math import ceil, hypot
 import os
 
@@ -8,6 +7,8 @@ import pyopencl as cl
 
 from utoolbox.container import Raster
 from utoolbox.container.layouts import Volume
+
+logger = logging.getLogger(__name__)
 
 class DeskewTransform(object):
     def __init__(self, shift, rotate, resample):
@@ -151,7 +152,7 @@ class DeskewTransform(object):
             is_array=True
         )
 
-def deskew(data, shift, rotate=False, resample=False):
+def deskew(data, shift, spacing=None, rotate=False, resample=False):
     """Deskew acquired SPIM volume of specified angle.
 
     Parameters
@@ -167,9 +168,7 @@ def deskew(data, shift, rotate=False, resample=False):
     ----
     Shearing **always** happened along the X-axis.
     """
-    try:
-        spacing = data.metadata.spacing
-    except AttributeError:
+    if spacing is None:
         spacing = (1, ) * data.ndim
 
     if not np.issubdtype(data.dtype, np.uint16):
