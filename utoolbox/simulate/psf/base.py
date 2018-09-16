@@ -1,9 +1,8 @@
 from abc import ABCMeta, abstractmethod
-from collections import namedtuple
 
 import numpy as np
 
-Resolution = namedtuple('Resolution', ['dxy', 'dz'])
+from utoolbox.container import Resolution
 
 class PSF(object, metaclass=ABCMeta):
     def __init__(self, normalize='peak', resolution=(1, 1)):
