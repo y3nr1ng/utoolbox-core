@@ -1,12 +1,11 @@
 import logging
-from math import ceil, hypot
+from math import radians, cos, ceil, hypot
 import os
 
 import numpy as np
 import pyopencl as cl
 
-from utoolbox.container import Raster
-from utoolbox.container.layouts import Volume
+from utoolbox.container import Resolution
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +51,7 @@ class DeskewTransform(object):
         # pixels to shift
         self.pixel_shift = shift
 
-    def __call__(self, volume):
+    def __call__(self, volume, spacing):
         # transpose zyx to yzx for 2D-layered texture
         volume = volume.swapaxes(0, 1).copy()
         self._upload_texture(volume)
@@ -62,13 +61,13 @@ class DeskewTransform(object):
         nw, nv0, nu0 = volume.shape
         offset = ceil(self.pixel_shift * (nv0-1))
         if self.rotate:
-            h = hypot(offset, nv0)
-            vsin = nv0/h
+            h = hypot(offset, nv0*spacing[1])
+            vsin = nv0/h * spacing[1]
             vcos = offset/h
 
             # rotated dimension and new origin
-            nu = ceil(nu0*vcos + h)
-            nv = ceil(nu0*vsin)
+            nu = ceil(nu0*vcos + h) / spacing[1]
+            nv = ceil(nu0*vsin) / spacing[1]
 
             # offset
             ov = ceil((nv0-nv)//2)
@@ -152,15 +151,13 @@ class DeskewTransform(object):
             is_array=True
         )
 
-def deskew(data, shift, spacing=None, rotate=False, resample=False):
+def deskew(data, spacing, angle, rotate=True):
     """Deskew acquired SPIM volume of specified angle.
 
     Parameters
     ----------
-    volume : Raster
+    data : np.ndarray
         SPIM data.
-    shift : float
-        Sample stage shift range, in um.
     angle : bool, default to False
         True to rotate the result to perpendicular to coverslip.
 
@@ -174,7 +171,9 @@ def deskew(data, shift, spacing=None, rotate=False, resample=False):
     if not np.issubdtype(data.dtype, np.uint16):
         raise TypeError("only 16-bit unsigned integer is supported")
 
-    pixel_shift = shift / spacing[2]
+    angle = radians(angle)
+    pixel_shift = (spacing[0] * cos(angle)) / spacing[2]
+    logger.debug("pixel shift={}".format(pixel_shift))
     transform = DeskewTransform(pixel_shift, rotate, resample)
     result = transform(data)
 
