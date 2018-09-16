@@ -5,31 +5,11 @@ channels:
     - conda-forge
 
 dependencies:
+    # build tools
+    - conda-build
+
     # core
     - python=3.6
-    - cython
-    - ipykernel
 
-    # numerics and processing
-    - numpy
-    - scipy
+    # native libraries
     - clfft
-
-    # file I/O
-    - imageio
-    - tifffile
-
-    # gui
-    - pyqt
-
-    # parallel
-    - dask
-    - pyopencl
-
-    # utils
-    - click
-    - coloredlogs
-    - boltons
-
-    - pip:
-        - git+https://github.com/geggo/gpyfft.git@master

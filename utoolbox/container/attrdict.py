@@ -1,9 +1,6 @@
 import abc
 from collections import OrderedDict
-import logging
 import re
-
-logger = logging.getLogger(__name__)
 
 class AttrDict(OrderedDict):
     """
