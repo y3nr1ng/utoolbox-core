@@ -1,6 +1,5 @@
-from glob import glob
 from os import path
-from setuptools import setup, find_namespace_packages
+from setuptools import setup
 
 cwd = path.abspath(path.dirname(__file__))
 
@@ -12,7 +11,11 @@ setup(
     # published project name
     name="utoolbox",
 
-    version='1.2.0',
+    # from dev to release
+    #   bumpversion release
+    # to next version
+    #   bump patch/minor/major
+    version='0.0.5.dev',
 
     # one-line description for the summary field
     description="A Python image processing package for LLSM.",
@@ -28,8 +31,7 @@ setup(
 
     classifiers=[
         'Development Status :: 3 - Alpha',
-        'License :: OSI Approved :: Attribution Assurance License',
-        'Natural Language :: English',
+        'License :: OSI Approved :: Apache Software License',
         'Operating System :: MacOS',
         'Operating System :: Microsoft :: Windows',
         'Operating System :: POSIX :: Linux',
@@ -42,7 +44,21 @@ setup(
 
     keywords="microscopy",
 
-    packages=find_namespace_packages(include=['utoolbox.*']),
+    packages=[
+        'utoolbox'
+    ],
+
+    package_dir={
+        'utoolbox': 'utoolbox'
+    },
+
+    python_requires='>=3.6',
+
+    # other packages the project depends on to build
+    setup_requires=[
+        # pyopencl
+        'numpy'
+    ],
 
     # other packages the project depends on to run
     #   install_requires -> necessity
@@ -55,7 +71,7 @@ setup(
         # numeric and processing
         'numpy',
         'scipy',
-        'gpyfft',
+        #'gpyfft',
 
         # file io
         'imageio',
@@ -69,12 +85,13 @@ setup(
         'pyopencl',
 
         # utils
+        'mako',
         'click',
         'coloredlogs'
     ],
 
     dependency_links=[
-        "git+https://github.com/geggo/gpyfft.git@master#egg=gpyfft"
+        "git+https://github.com/geggo/gpyfft.git@master#egg=gpyfft-0.7.1"
     ],
 
     # additional groups of dependencies here for the "extras" syntax

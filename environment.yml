@@ -7,7 +7,8 @@ channels:
 dependencies:
     # build tools
     - conda-build
-
+    - bumpversion
+    
     # core
     - python=3.6
 
