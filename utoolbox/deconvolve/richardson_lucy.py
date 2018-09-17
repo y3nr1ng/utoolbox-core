@@ -16,6 +16,7 @@ from pyopencl.reduction import ReductionKernel
 import pyopencl.tools
 
 from utoolbox.container import AttrDict
+from utoolbox.parallel import parse_cq
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +40,11 @@ def find_optimal_size(target, prefer_add=True):
                     return candidate
 
 class RichardsonLucy(object):
-    def __init__(self, context, shape, prefer_add=False, n_iter=10):
-        self.context = context
+    def __init__(self, cq, shape, prefer_add=False, n_iter=10):
+        self.context, self.queue = parse_cq(cq)
 
         self._in_shape = tuple(shape)
+        self._conv_shape = None
         self._out_shape = tuple(
             [find_optimal_size(n, prefer_add=prefer_add) for n in self._in_shape]
         )
@@ -73,17 +75,22 @@ class RichardsonLucy(object):
         self._estimate_func = ElementwiseKernel(
             self.context,
             "float *out, float *ref, float eps",
-            "out[i] = ref[i] / ((out[i] > eps) ? out[i] : eps)",
+            "out[i] = ref[i] / ((out[i] > eps) ? out[i] : eps) + eps",
             "estimate_func"
+        )
+        self._pos_clip_func = ElementwiseKernel(
+            self.context,
+            "float *im",
+            "im[i] = (im[i] > 0) ? im[i] : 0",
+            "_pos_clip_func"
         )
 
     def __enter__(self):
-        self.queue = cl.CommandQueue(self.context)
-        self._allocate_workspace()
+        self.create_workspace()
         return self
 
     def __exit__(self, *args):
-        self._free_workspace()
+        self.destroy_workspace()
 
     def __call__(self, data):
         if data.shape != self._in_shape:
@@ -128,10 +135,26 @@ class RichardsonLucy(object):
 
     @psf.setter
     def psf(self, data):
-        if data.shape != self._in_shape:
-            warn("input size does not match the design specification")
+        if any([x % 2 == 0 for x in data.shape]):
+            logger.warning("dimension is not odd")
+        #TODO calculate convoluted shape
         self._psf = np.zeros(self._out_shape, dtype=np.float32)
         self._crop_func(self._psf, data)
+
+        #DEBUG swap quadrants
+        nz, ny, nx = self._psf.shape
+        # x
+        _tmp = self._psf.copy()
+        self._psf[..., :nx//2] = _tmp[..., nx//2:]
+        self._psf[..., nx//2:] = _tmp[..., :nx//2]
+        # y
+        _tmp = self._psf.copy()
+        self._psf[:, :ny//2, :] = _tmp[:, ny//2:, :]
+        self._psf[:, ny//2:, :] = _tmp[:, :ny//2, :]
+        # z
+        _tmp = self._psf.copy()
+        self._psf[:nz//2, ...] = _tmp[nz//2:, ...]
+        self._psf[nz//2:, ...] = _tmp[:nz//2, ...]
 
         # generate OTF
         try:
@@ -144,6 +167,20 @@ class RichardsonLucy(object):
             data=self.d_ref, result=self.d_otf,
             forward=True
         )
+
+#        #DEBUG remove k_f > f/2
+#        h_otf = self.d_otf.get()
+#        nz, ny, nx = h_otf.shape
+#        # x
+#        h_otf[..., nx//2:] = 0
+#        # y
+#        h_otf[:, ny//4:3*(ny//4), :] = 0
+#        # z
+#        h_otf[nz//4:3*(nz//4), ...] = 0
+#        self.d_otf.set(h_otf)
+#        import imageio
+#        imageio.volwrite("otf.tif", np.abs(h_otf))
+
         logger.debug("psf -> otf")
 
     @property
@@ -152,6 +189,16 @@ class RichardsonLucy(object):
 
     def run(self, dst_array, src_array):
         """
+        Using Andrew-Biggs acceleration algorithm, 2nd-order.
+
+        ... y_k = x_k + (a_k * h_k)
+            h_k = x_k - x_{k-1}
+        ... x_{k+1} = y_k + g_k
+            g_k = f(y_k) - y_k
+        ... a_k = \sum{g_{k-1} * g_{k-2}} / \sum{g_{k-2} * g_{k-2}}
+            a_k \in (0, 1)
+
+
         init
         ... x_{k+1} = ref
         ... a_k = 0.
@@ -184,14 +231,15 @@ class RichardsonLucy(object):
                 a_nom = cl.array.dot(self.d_acc_bufs.g1, self.d_acc_bufs.g0).get()
                 a_den = cl.array.dot(self.d_acc_bufs.g0, self.d_acc_bufs.g0).get()
                 logger.debug("... a_frac={:.5f}/{:.5f}".format(a_nom, a_den))
-                a = np.float32(max(min(a_nom/(a_den + eps), 1.), 0.))
+                a = max(min(a_nom/(a_den + eps), 1.), 0.)
                 logger.debug("[acc] a_k={:.5f}, updated".format(a))
 
             # x: iterated point
             # y: predicted point
 
             # y_k = (a_k + 1) * x_{k+1} - a_k * x_k
-            self.d_acc_bufs.y = np.float32(a+1) * self.d_acc_bufs.x1 - a * self.d_acc_bufs.x0
+            self.d_acc_bufs.y = np.float32(a+1) * self.d_acc_bufs.x1 - np.float32(a) * self.d_acc_bufs.x0
+            self._pos_clip_func(self.d_acc_bufs.y)
             logger.debug("[acc] y_k updated")
 
             # x_k = x_{k+1}
@@ -225,12 +273,18 @@ class RichardsonLucy(object):
             data=self.d_dec_bufs.fft, result=self.d_dec_bufs.tmp,
             forward=False
         )
-        logger.debug("[lr_core] step 0")
+        logger.debug("[lr_core] step 0, blur")
+
+#        import imageio
+#        debug = self.d_dec_bufs.tmp.get()
+#        imageio.volwrite("debug.tif", debug)
+#        logger.debug("debug.tif saved")
+#        raise RuntimeError
 
         # step 1
         #   estimate next iteration
         self._estimate_func(self.d_dec_bufs.tmp, self.d_ref, eps)
-        logger.debug("[lr_core] step 1")
+        logger.debug("[lr_core] step 1, estimate")
 
         # step 2
         #   re-blur
@@ -243,22 +297,16 @@ class RichardsonLucy(object):
             data=self.d_dec_bufs.fft, result=self.d_dec_bufs.tmp,
             forward=False
         )
-        logger.debug("[lr_core] step 2")
+        logger.debug("[lr_core] step 2, re-blur")
 
         # step 3
         #   multiply the factor
         dst_array[:] = src_array * self.d_dec_bufs.tmp
-        logger.debug("[lr_core] step 3")
+        self._pos_clip_func(dst_array)
+        logger.debug("[lr_core] step 3, multiply")
 
-    def _allocate_workspace(self):
+    def create_workspace(self):
         """
-        ... y_k = x_k + (a_k * h_k)
-            h_k = x_k - x_{k-1}
-        ... x_{k+1} = y_k + g_k
-            g_k = f(y_k) - y_k
-        ... a_k = \sum{g_{k-1} * g_{k-2}} / \sum{g_{k-2} * g_{k-2}}
-            a_k \in (0, 1)
-
         init
         ... x_{k+1} = ref
         ... a_k = 0.
@@ -319,7 +367,7 @@ class RichardsonLucy(object):
         )
         self._mem_pool = cl.tools.MemoryPool(allocator)
 
-        #TODO wrap this section in ExitStack, callback(_free_workspace)
+        #TODO wrap this section in ExitStack, callback(destroy_workspace)
 
         # reference image
         self.h_buf = np.empty(real_shape, dtype=np.float32)
@@ -378,7 +426,7 @@ class RichardsonLucy(object):
             )
         )
 
-    def _free_workspace(self):
+    def destroy_workspace(self):
         # free reference image
         self.d_ref.base_data.release()
 
