@@ -5,26 +5,12 @@ channels:
     - conda-forge
 
 dependencies:
+    # build tools
+    - conda-build
+    - bumpversion
+    
     # core
     - python=3.6
-    - cython
-    - ipykernel
 
-    # numerics and processing
-    - numpy
-    - scipy
-
-    # file I/O
-    - imageio
-    - tifffile
-
-    # gui
-    - pyqt
-
-    # parallel
-    - dask
-    - pyopencl
-
-    # utils
-    - click
-    - boltons
+    # native libraries
+    - clfft
