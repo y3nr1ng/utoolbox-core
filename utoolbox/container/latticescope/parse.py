@@ -1,9 +1,7 @@
-from collections import namedtuple
 import re
 
 __all__ = [
-    'Filename',
-    'parse_filename'
+    'Filename'
 ]
 
 class Filename(object):
@@ -31,12 +29,3 @@ class Filename(object):
     def __str__(self):
         return "{}_ch{}_stack{:04d}_{}nm_{:07d}msec_{:010d}msecAbs.tif" \
                .format(*[getattr(self, attr) for attr in self.__slots__])
-
-def parse_filename(filename):
-    return Filename(filename)
-
-if __name__ == '__main__':
-    result = parse_filename(
-        "clonea_ch0_stack0070_488nm_1401302msec_0006766706msecAbs.tif"
-    )
-    print(result)
