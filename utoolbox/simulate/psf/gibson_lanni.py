@@ -73,12 +73,6 @@ class FastGibsonLanni(PSF):
         self._parameters = parameters
         self._has_coverslip = has_coverslip
 
-    def __call__(self, shape, wavelength, dtype=np.float32, oversampling=2):
-        if len(shape) == 2:
-            shape = (1, ) + shape
-
-        return self._generate_zyx_profile(shape, wavelength, dtype, oversampling)
-
     @property
     def has_coverslip(self):
         return self._has_coverslip
@@ -87,8 +81,10 @@ class FastGibsonLanni(PSF):
     def parameters(self):
         return self._parameters
 
-    def _generate_zyx_profile(self, shape, wavelength, dtype, oversampling):
-        psf_zr, rv = self._generate_zr_profile(shape, wavelength, dtype, oversampling)
+    def _generate_cartesian_profile(self, shape, wavelength, dtype, oversampling):
+        psf_zr, rv = self._generate_cylindrical_profile(
+            shape, wavelength, dtype, oversampling
+        )
 
         nz, ny, nx = shape
         # find origin
@@ -113,7 +109,7 @@ class FastGibsonLanni(PSF):
 
         return psf_zyx
 
-    def _generate_zr_profile(self, shape, wavelength, dtype, oversampling):
+    def _generate_cylindrical_profile(self, shape, wavelength, dtype, oversampling):
         nz, ny, nx = shape
         # find origin
         x0, y0 = (nx-1)/2., (ny-1)/2.
