@@ -4,16 +4,16 @@ import os
 
 from pprint import pprint
 
-from . import parse_filename
+from . import Filename
 
 __all__ = [
-    'merge_split_filenames'
+    'refactor_split_filenames'
 ]
 
 logger = logging.getLogger(__name__)
 
 def concat_timestamps(filenames):
-    filenames[:] = [parse_filename(filename) for filename in filenames]
+    filenames[:] = [Filename(filename) for filename in filenames]
     filenames.sort(key=attrgetter('channel', 'name', 'stack'))
 
     ref_filename, name = None, None
