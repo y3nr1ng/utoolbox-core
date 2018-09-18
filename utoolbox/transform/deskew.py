@@ -1,33 +1,110 @@
 import logging
-logger = logging.getLogger(__name__)
-from math import ceil, hypot
+from math import radians, cos, ceil, hypot
 import os
 
 import numpy as np
 import pyopencl as cl
 
-from utoolbox.container import Raster
-from utoolbox.container.layouts import Volume
+from utoolbox.container import Resolution
+from utoolbox.parallel import parse_cq
+
+logger = logging.getLogger(__name__)
 
 class DeskewTransform(object):
-    def __init__(self, shift, rotate, resample):
-        #TODO auto prioritize
-        platform = None
-        try:
-            for _platform in cl.get_platforms():
-                for device in _platform.get_devices(device_type=cl.device_type.GPU):
-                    #if device.get_info(cl.device_info.VENDOR_ID) == 16918272:
-                    platform = _platform
-                    self.device = device
-                    raise StopIteration
-        except:
-            pass
-        logger.debug("Using '{}'".format(self.device.get_info(cl.device_info.NAME)))
-        self.context = cl.Context(
-            devices=[self.device],
-            properties=[(cl.context_properties.PLATFORM, _platform)]
+    """
+    TBA
+
+    Note
+    ----
+    Shearing **always** happened along the X-axis.
+    """
+    def __init__(self, cq, resolution, angle, rotate=True):
+        """
+        Parameters
+        ----------
+        cq : TBA
+            OpenCL context or command queue.
+        resolution : Resolution
+            TBA
+        angle : float
+            Angle between coverslip and detection objective.
+        rotate : bool
+            Rotate the result to perpendicular to coverslip, default to True.
+        """
+        self.context, self.queue = parse_cq(cq)
+
+        if type(resolution) is not Resolution:
+            try:
+                resolution = Resolution._make(resolution)
+            except TypeError:
+                raise TypeError("invalid resolution input")
+        angle = radians(angle)
+
+        self._in_res = resolution
+        self._angle = angle
+        self.rotate = rotate
+
+        self._px_shift = resolution.dz * cos(angle)
+        self._out_res = Resolution(resolution.dxy, resolution.dz * sin(angle))
+        logger.debug(
+            "dyx={:.4f}um, dz={:.4f}um, angle={:2.f}rad, shift={:.4f}px".format(
+                resolution.dxy, resolution.dz, angle, self.px_shift
+            )
         )
-        self.queue = cl.CommandQueue(self.context)
+
+        self._load_kernel()
+
+    def __enter__(self):
+        self.create_workspace()
+        return self
+
+    def __exit__(self, *args):
+        self.destroy_workspace()
+
+    def __call__(self, data):
+        """
+        Parameters
+        ----------
+        data : np.ndarray
+            SPIM data.
+        """
+        if not np.issubdtype(data.dtype, np.uint16):
+            raise TypeError("only 16-bit unsigned integer is supported")
+        pass
+    
+    @property
+    def angle(self):
+        return _angle
+
+    @property
+    def px_shift(self):
+        return self._px_shift
+
+    @property
+    def rotate(self):
+        return self._rotate
+
+    @property
+    def spacing(self):
+        return self._spacing
+
+    def create_workspace(self):
+        pass
+
+    def destroy_workspace(self):
+        pass
+
+    def _load_kernel(self):
+        fpath = os.path.join(os.path.dirname(__file__), "deskew.cl")
+        with open(fpath, 'r') as fd:
+            source = fd.read()
+            program = cl.Program(self.context, source).build()
+            #TODO load kerenl
+
+
+
+    def __init__(self, cq, shift, rotate, resample):
+        self.context, self.queue = parse_cq(cq)
 
         # load and compile
         fpath = os.path.join(os.path.dirname(__file__), "deskew.cl")
@@ -51,7 +128,7 @@ class DeskewTransform(object):
         # pixels to shift
         self.pixel_shift = shift
 
-    def __call__(self, volume):
+    def __call__(self, volume, spacing):
         # transpose zyx to yzx for 2D-layered texture
         volume = volume.swapaxes(0, 1).copy()
         self._upload_texture(volume)
@@ -61,13 +138,13 @@ class DeskewTransform(object):
         nw, nv0, nu0 = volume.shape
         offset = ceil(self.pixel_shift * (nv0-1))
         if self.rotate:
-            h = hypot(offset, nv0)
-            vsin = nv0/h
+            h = hypot(offset, nv0*spacing[1])
+            vsin = nv0/h * spacing[1]
             vcos = offset/h
 
             # rotated dimension and new origin
-            nu = ceil(nu0*vcos + h)
-            nv = ceil(nu0*vsin)
+            nu = ceil(nu0*vcos + h) / spacing[1]
+            nv = ceil(nu0*vsin) / spacing[1]
 
             # offset
             ov = ceil((nv0-nv)//2)
@@ -150,33 +227,3 @@ class DeskewTransform(object):
             hostbuf=array,
             is_array=True
         )
-
-def deskew(data, shift, rotate=False, resample=False):
-    """Deskew acquired SPIM volume of specified angle.
-
-    Parameters
-    ----------
-    volume : Raster
-        SPIM data.
-    shift : float
-        Sample stage shift range, in um.
-    angle : bool, default to False
-        True to rotate the result to perpendicular to coverslip.
-
-    Note
-    ----
-    Shearing **always** happened along the X-axis.
-    """
-    try:
-        spacing = data.metadata.spacing
-    except AttributeError:
-        spacing = (1, ) * data.ndim
-
-    if not np.issubdtype(data.dtype, np.uint16):
-        raise TypeError("only 16-bit unsigned integer is supported")
-
-    pixel_shift = shift / spacing[2]
-    transform = DeskewTransform(pixel_shift, rotate, resample)
-    result = transform(data)
-
-    return result

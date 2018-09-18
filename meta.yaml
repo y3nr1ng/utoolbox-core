@@ -1,0 +1,31 @@
+{% set data = load_setup_py_data(from_recipe_dir=True) %}
+
+package:
+    name: {{ data.get('name') }}
+    version: {{ data.get('version') }}
+
+source:
+    git_url: git@github.com:liuyenting/utoolbox.git
+    git_tag: deconv
+
+extra:
+  channels:
+    - ljbo3
+    - conda-forge
+
+build:
+    number: 0
+    string: 'py{{ PY_VER|replace(".", "") }}_{{ PKG_BUILDNUM }}'
+    script: python setup.py install
+
+requirements:
+    build:
+        - python
+        - setuptools
+        - pbr
+
+about:
+    home: {{ data.get('url') }}
+    license: {{ data.get('license') }}
+    license_file: LICENSE
+    summary: {{ data.get('description') }}
