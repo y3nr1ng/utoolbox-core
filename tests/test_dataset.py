@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 
 ##### LOAD FILE #####
-path = 'test_filenames'
-ds = llsm.Dataset(path)
+path = "/Volumes/Data/Shared/Andy/live_localization/09142018_HalotagEGFPc3Nup153+PmeI/clone2_zp4um_100ms_interval_13s"
+ds = llsm.Dataset(path, refactor=True)
 
 
 ##### DUMP INVENTORY #####
