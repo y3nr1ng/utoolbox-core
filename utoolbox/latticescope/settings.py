@@ -1,3 +1,4 @@
+import configparser
 from datetime import datetime
 from enum import Enum
 import logging
@@ -90,7 +91,7 @@ class Settings(AttrDict):
             'obj_piezo_step':
                 '^Z PZT .* Interval \(um\), .* :\t\d+\.*\d*\t(\d+\.*\d*)\t\d+$',
             'sample_piezo_step':
-                '^S PZT .* Interval \(um\), .* :\t\d+\.*\d*\t(\d+\.*\d*)\t\d+$'
+                '^S PZT .* Interval \(um\), .* :\t\d+\.*\d*\t(\d+\.*\d*)\t\d+$',
         }
 
         converter = {
@@ -99,6 +100,7 @@ class Settings(AttrDict):
 
         parsed = AttrDict()
         for field, pattern in patterns.items():
+            # NOTE exception here, multiple channels may exist
             value = re.findall(pattern, lines, re.MULTILINE)[0]
             try:
                 value = converter[field](value)
@@ -106,6 +108,14 @@ class Settings(AttrDict):
                 # no need to convert
                 pass
             parsed[field] = value
+
+        # NOTE exception, deal with multi-channel
+        values = re.findall(
+            '^Excitation Filter, Laser, Power \(%\), Exp\(ms\) \((?P<channel>\d+)\) :\t(?P<filter>\D+)\t(?P<wavelength>\d+)\t(?P<power>\d+)\t(?P<exposure>\d+.\d+)',
+            lines,
+            re.MULTILINE
+        )
+        parsed['channels'] = values
 
         return 'waveform', parsed
 
@@ -121,6 +131,7 @@ class Settings(AttrDict):
         converter = {
             'exposure': lambda x: float(x),
             'cycle': lambda x: float(x),
+            'roi': lambda x: tuple([int(i) for i in x])
         }
 
         parsed = AttrDict()
