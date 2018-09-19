@@ -20,7 +20,9 @@ class Filename(object):
     )
 
     def __init__(self, str_name):
-        parsed_name = Filename._pattern.search(str_name)
+        parsed_name = Filename._pattern.fullmatch(str_name)
+        if not parsed_name:
+            raise ValueError
         for attr in self.__slots__:
             value = parsed_name.group(attr)
             value = value if attr == 'name' else int(value)
