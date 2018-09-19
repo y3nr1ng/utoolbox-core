@@ -30,16 +30,15 @@ class Dataset(object):
             raise FileNotFoundError("invalid root folder")
         self._root = root
 
-        settings, data_filenames = self._list_files()
-        sort_timestamps(data_filenames)
+        data_files = self._list_data_files()
         if refactor:
-            old_data_filenames = copy.deepcopy(data_filenames)
-            merge_fragmented_timestamps(data_filenames)
-            rename_by_mapping(self.root, old_data_filenames, data_filenames)
+            data_files_orig = copy.deepcopy(data_files)
+            merge_fragmented_timestamps(data_files)
+            rename_by_mapping(self.root, data_files_orig, data_files)
 
-        if not os.path.commonprefix([settings, data_filenames[0].name]):
-            logger.warning("sample name mismatched, possibly mixed up")
-        with open(settings, 'r') as fd:
+        settings = self._find_settings_file(data_files)
+        # NOTE some files have corrupted timestamp causing utf-8 decode error
+        with open(settings, 'r', errors='ignore') as fd:
             lines = fd.read()
         self.settings = Settings(lines)
 
@@ -55,18 +54,32 @@ class Dataset(object):
     def root(self):
         return self._root
 
-    def _list_files(self):
-        settings_filename, data_filenames = None, []
+    def _list_data_files(self, sort=True):
+        data_files = []
         filenames = os.listdir(self.root)
         for filename in filenames:
-            if filename.endswith('_Settings.txt'):
-                if settings_filename is not None:
-                    raise FileExistsError("multiple settings found")
-                settings_filename = filename
-            else:
-                try:
-                    parsed = Filename(filename)
-                    data_filenames.append(parsed)
-                except:
-                    logger.warning("invalid format \"{}\", ignored".format(filename))
-        return settings_filename, data_filenames
+            _, extension = os.path.splitext(filename)
+            if extension != '.tif':
+                continue
+            try:
+                parsed = Filename(filename)
+                data_files.append(parsed)
+            except:
+                logger.warning("invalid format \"{}\", ignored".format(filename))
+        if sort:
+            sort_timestamps(data_files)
+        return data_files
+
+    def _find_settings_file(self, data_files):
+        # guess sample name
+        sample_name = set()
+        for filename in data_files:
+            sample_name.add(filename.name)
+        if len(sample_name) > 1:
+            logger.warning("diverged dataset, use first set as template")
+        sample_name = sample_name.pop()
+
+        path = os.path.join(self.root, "{}_Settings.txt".format(sample_name))
+        if not os.path.exists(path):
+            raise FileNotFoundError("unable to find settings")
+        return path
