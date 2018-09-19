@@ -1,5 +1,9 @@
 import re
 
+__all__ = [
+    'SPIMsettings'
+]
+
 class SPIMsettings(object):
     def __init__(self, fpath):
         self.path = fpath
