@@ -1,99 +1,162 @@
+from datetime import datetime
+from enum import Enum
+import logging
+import os
 import re
 
-__all__ = [
-    'SPIMsettings'
-]
+from utoolbox.container import AttrDict
 
-class SPIMsettings(object):
-    def __init__(self, fpath):
-        self.path = fpath
-        with open(fpath) as f:
-            self.sections = self.identify_sections(f.read())
+logger = logging.getLogger(__name__)
 
-        self.parse_general()
-        self.parse_waveform()
-        self.parse_timing()
+class AcquisitionMode(Enum):
+    Z_STACK = "Z stack"
 
-    def identify_sections(self, content):
-        section_pattern = re.compile(
-            '^(?:\*{5}\s{1}){3}\s*(?P<section>[^\*]+)(?:\s{1}\*{5}){3}',
-            re.MULTILINE
-        )
+class ScanType(Enum):
+    SAMPLE = "Sample piezo"
+    OBJECTIVE = "Z objective & galvo"
 
-        pos = [
-            (match.group('section').rstrip(), match.start())
-            for match in section_pattern.finditer(content)
+class TriggerMode(Enum):
+    SLM = "SLM -> Cam"
+    FPGA = "FPGA"
+
+class Settings(AttrDict):
+    section_pattern = re.compile(
+        '^(?:\*{5}\s{1}){3}\s*(?P<title>[^\*]+)(?:\s{1}\*{5}){3}',
+        re.MULTILINE
+    )
+
+    def __init__(self, lines):
+        super(Settings, self).__init__()
+
+        sections = Settings.identify_sections(lines)
+        for title, start, end in sections:
+            try:
+                section, parsed = {
+                    'General': Settings.parse_general,
+                    'Waveform': Settings.parse_waveform,
+                    'Camera': Settings.parse_camera,
+                    'Advanced Timing': Settings.parse_timing,
+                    '.ini File': None
+                }[title](lines[start:end])
+                self[section] = parsed
+            except:
+                logger.warning("unknown section \"{}\", ignored".format(title))
+
+    @property
+    def path(self):
+        return self._path
+
+    @staticmethod
+    def identify_sections(lines):
+        """Determine sections and their positions (line number) in file."""
+        titles, starts, ends = [], [], None
+        for match in Settings.section_pattern.finditer(lines):
+            titles.append(match.group('title').rstrip())
+            starts.append(match.start())
+        ends = starts[1:] + [len(lines)]
+
+        return [
+            (s, i0, i1) for s, i0, i1 in zip(titles, starts, ends)
         ]
-        n_sections = len(pos)
 
-        sections = {}
-        for index in range(n_sections):
-            start = pos[index][1]
-            end = pos[index+1][1] if index < n_sections-1 else len(content)
-            sections[pos[index][0]] = content[start:end]
-        return sections
-
-    def parse_general(self):
-        if 'General' not in self.sections:
-            #TODO raise error
-            raise ValueError
-
-        general_patterns = {
-            'timestamp': 'Date :\t(\d+/\d+/\d+ \d+:\d+:\d+ [A|P]M)',
-            'acq_mode': 'Acq Mode :\t(.*)'
+    @staticmethod
+    def parse_general(lines):
+        patterns = {
+            'timestamp': '^Date :\t(\d+/\d+/\d+ \d+:\d+:\d+ [A|P]M)',
+            'mode': '^Acq Mode :\t(.*)'
         }
 
-        content = self.sections['General']
-        self.sections['General'] = {
-            k: re.findall(v, content, re.MULTILINE)[0]
-            for k, v in general_patterns.items()
+        converter = {
+            'timestamp': lambda x: datetime.strptime(x, '%m/%d/%Y %I:%M:%S %p'),
+            'mode': AcquisitionMode
         }
 
-    def parse_waveform(self):
-        if 'Waveform' not in self.sections:
-            #TODO raise error
-            raise ValueError
+        parsed = AttrDict()
+        for field, pattern in patterns.items():
+            value = re.findall(pattern, lines, re.MULTILINE)[0]
+            try:
+                value = converter[field](value)
+            except:
+                # no need to convert
+                pass
+            parsed[field] = value
 
-        waveform_patterns = {
-            'scan_mode': 'Z motion :\t(.*)',
-            'sample_piezo_step':
-                '^S PZT .* Interval \(um\), .* :\t\d+\.*\d*\t(\d+\.*\d*)\t\d+$',
+        return 'general', parsed
+
+    @staticmethod
+    def parse_waveform(lines):
+        patterns = {
+            'type': '^Z motion :\t(.*)',
             'obj_piezo_step':
-                '^Z PZT .* Interval \(um\), .* :\t\d+\.*\d*\t(\d+\.*\d*)\t\d+$'
+                '^Z PZT .* Interval \(um\), .* :\t\d+\.*\d*\t(\d+\.*\d*)\t\d+$',
+            'sample_piezo_step':
+                '^S PZT .* Interval \(um\), .* :\t\d+\.*\d*\t(\d+\.*\d*)\t\d+$'
         }
 
-        content = self.sections['Waveform']
-        self.sections['Waveform'] = {
-            k: re.findall(v, content, re.MULTILINE)[0]
-            for k, v in waveform_patterns.items()
+        converter = {
+            'type': ScanType
         }
 
-    def parse_camera(self):
-        if 'Camera' not in self.sections:
-            #TODO raise error
-            raise ValueError
+        parsed = AttrDict()
+        for field, pattern in patterns.items():
+            value = re.findall(pattern, lines, re.MULTILINE)[0]
+            try:
+                value = converter[field](value)
+            except:
+                # no need to convert
+                pass
+            parsed[field] = value
 
-        camera_patterns = {
-            'model': 'Model :\t(.*)',
-            'exposure': 'Exp(s) :\t(\d+\.\d+)',
-            'roi': (),
-            'binning': (),
+        return 'waveform', parsed
+
+    @staticmethod
+    def parse_camera(lines):
+        patterns = {
+            'model': '^Model :\t(.*)',
+            'exposure': '^Exp\(s\)\D+([\d\.]+)',
+            'cycle': '^Cycle\(s\)\D+([\d\.]+)',
+            'roi': '^ROI :\tLeft=(\d+) Top=(\d+) Right=(\d+) Bot=(\d+)'
         }
 
-    def parse_timing(self):
-        if 'Advanced Timing' not in self.sections:
-            #TODO raise error
-            raise ValueError
-
-        timing_patterns = {
-            'mode': 'Trigger Mode :\t(.*)'
+        converter = {
+            'exposure': lambda x: float(x),
+            'cycle': lambda x: float(x),
         }
 
-        content = self.sections['Advanced Timing']
-        self.sections['Advanced Timing'] = {
-            k: re.findall(v, content, re.MULTILINE)[0]
-            for k, v in timing_patterns.items()
+        parsed = AttrDict()
+        for field, pattern in patterns.items():
+            value = re.findall(pattern, lines, re.MULTILINE)[0]
+            try:
+                value = converter[field](value)
+            except:
+                # no need to convert
+                pass
+            parsed[field] = value
+
+        return 'camera', parsed
+
+    @staticmethod
+    def parse_timing(lines):
+        patterns = {
+            'mode': '^Trigger Mode :\t(.*)'
         }
 
-class SPIMini(object):
-    pass
+        converter = {
+            'mode': TriggerMode
+        }
+
+        parsed = AttrDict()
+        for field, pattern in patterns.items():
+            value = re.findall(pattern, lines, re.MULTILINE)[0]
+            try:
+                value = converter[field](value)
+            except:
+                # no need to convert
+                pass
+            parsed[field] = value
+
+        return 'timing', parsed
+
+class HardwareSettings(object):
+    def __init__(self, lines):
+        pass
