@@ -11,7 +11,7 @@ __all__ = [
 ]
 
 class Datastore(object, metaclass=ABCMeta):
-    def __init__(self, location, sub_dir=False, extensions=None):
+    def __init__(self, location, sub_dir=False, pattern='*', extensions=None):
         """
         Parameters
         ----------
@@ -26,9 +26,9 @@ class Datastore(object, metaclass=ABCMeta):
             location = os.path.join(location, "**")
 
         if extensions is None:
-            extensions = ["*"]
+            extensions = [pattern]
         else:
-            extensions[:] = ["*.{}".format(ext) for ext in extensions]
+            extensions[:] = ["{}.{}".format(pattern, ext) for ext in extensions]
 
         files = []
         for ext in extensions:
