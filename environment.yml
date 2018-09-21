@@ -1,4 +1,4 @@
-name: utoolbox
+name: utoolbox-dev
 
 channels:
     - defaults
@@ -8,9 +8,8 @@ dependencies:
     # build tools
     - conda-build
     - bumpversion
-    
+
     # core
     - python=3.6
 
     # native libraries
-    - clfft
