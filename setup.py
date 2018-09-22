@@ -1,4 +1,6 @@
 from os import path
+import sys
+
 from setuptools import setup
 
 cwd = path.abspath(path.dirname(__file__))
@@ -56,8 +58,6 @@ setup(
 
     # other packages the project depends on to build
     setup_requires=[
-        # pyopencl
-        'numpy'
     ],
 
     # other packages the project depends on to run
@@ -71,7 +71,6 @@ setup(
         # numeric and processing
         'numpy',
         'scipy',
-        #'gpyfft',
 
         # file io
         'imageio',
@@ -82,7 +81,7 @@ setup(
 
         # parallel
         'dask',
-        'pyopencl',
+        #'pycuda', # defer to extras_require
 
         # utils
         'mako',
@@ -91,16 +90,18 @@ setup(
     ],
 
     dependency_links=[
-        "git+https://github.com/geggo/gpyfft.git@master#egg=gpyfft-0.7.1"
     ],
 
     # additional groups of dependencies here for the "extras" syntax
     extras_require={
+        'gpu': [
+            'pycuda'
+        ]
     },
 
     # data files included in packages
     package_data={
-        '': ['*.cl']
+        '': ['*.cu']
     },
     # include all package data found implicitly
     #include_package_data=True,
