@@ -50,13 +50,15 @@ def create_some_context():
             except:
                 logger.error("invalid choice, use default choice [0]")
                 selected_devices = devices[0]
-    if isinstance(selected_devices, cuda.driver.Device):
-        return selected_devices.make_context()
+    def _make_context(device):
+        """Create context but pop it out immediately."""
+        context = device.make_context()
+        cuda.Context.pop()
+        return context
+    if isinstance(selected_devices, cuda.Device):
+        return _make_context(selected_devices)
     else:
         logger.debug("{} devices selected, "
                      "multiple context returned".format(len(selected_devices)))
-        contex = list(device.make_context() for device in selected_devices)
-        # make the first one default context
-        cuda.driver.Context.pop()
-        context[0].push()
+        contex = list(_make_context(device) for device in selected_devices)
         return contex
