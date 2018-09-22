@@ -1,3 +1,6 @@
-# images
-*.txt
-*.tif
+# Ignore everything...
+*
+
+# ... but not these files
+!.gitignore
+!*.py
