@@ -48,7 +48,7 @@ class FileDatastore(Datastore):
         return self
 
     def __next__(self):
-        if self.has_data():
+        if self.has_data:
             return self.read()
         else:
             raise StopIteration

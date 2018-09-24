@@ -15,9 +15,9 @@ logger = logging.getLogger(__name__)
 
 
 ##### LOAD FILE #####
-path = "/Volumes/Data/Shared/Andy/live_localization/09202018_HalotagEGFPc3Nup153_Hela_Blinking/cell2_CP550_Nup153_Higher_zp4um_50ms_a6p1s_r1p4s"
+path = "test_filenames"
 #path = "test_filenames"
-ds = llsm.Dataset(path, refactor=True)
+ds = llsm.Dataset(path, refactor=False)
 
 
 ##### DUMP INVENTORY #####
