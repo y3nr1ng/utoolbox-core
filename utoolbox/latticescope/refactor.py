@@ -2,6 +2,8 @@ import logging
 from operator import attrgetter
 import os
 
+import tqdm
+
 from .parse import Filename
 
 __all__ = [
@@ -34,8 +36,7 @@ def merge_fragmented_timestamps(filenames):
             ref_filename = filename
 
 def rename_by_mapping(root, old_filenames, new_filenames):
-    #TODO add progress indicator
-    for old_fnobj, new_fnobj in zip(old_filenames, new_filenames):
+    for old_fnobj, new_fnobj in tqdm(zip(old_filenames, new_filenames), total=len(new_filenames)):
         old_fnstr = os.path.join(root, str(old_fnobj))
         new_fnstr = os.path.join(root, str(new_fnobj))
         if old_fnstr != new_fnstr:
