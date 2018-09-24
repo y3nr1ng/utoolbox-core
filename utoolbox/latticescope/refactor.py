@@ -6,7 +6,8 @@ from .parse import Filename
 
 __all__ = [
     'sort_timestamps',
-    'merge_fragmented_timestamps'
+    'merge_fragmented_timestamps',
+    'rename_by_mapping'
 ]
 
 logger = logging.getLogger(__name__)
@@ -33,8 +34,9 @@ def merge_fragmented_timestamps(filenames):
             ref_filename = filename
 
 def rename_by_mapping(root, old_filenames, new_filenames):
-    for old_filename, new_filename in zip(old_filenames, new_filenames):
-        old_filename = os.path.join(root, str(old_filename))
-        new_filename = os.path.join(root, str(new_filename))
-        if old_filename != new_filename:
-            os.rename(old_filename, new_filename)
+    #TODO add progress indicator
+    for old_fnobj, new_fnobj in zip(old_filenames, new_filenames):
+        old_fnstr = os.path.join(root, str(old_fnobj))
+        new_fnstr = os.path.join(root, str(new_fnobj))
+        if old_fnstr != new_fnstr:
+            os.rename(old_fnstr, new_fnstr)
