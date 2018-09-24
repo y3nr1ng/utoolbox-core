@@ -27,13 +27,20 @@ For the time being, these are the tested version combination during development 
 
 
 ### Installing
-A step-by-step example demonstrate how to get a development environment running.
+Following step-by-step instructions will demonstrate how to get a development environment running.
 
 Clone this repository to somewhere convenient.
 ```
 git clone https://github.com/liuyenting/utoolbox.git
 cd utoolbox
 ```
+
+Install the conda environment by
+```
+conda env create -f environment.yml
+conda activate utoolbox-dev
+```
+this will prepare an environment with required development tools under the name `utoolbox-dev`.
 
 Since pip does not honor the `setup_requires` description, we have to install basic requirements first.
 ```
@@ -48,7 +55,17 @@ pip install -e ".[gpu]"
 
 
 ## Deployment
-Add additional notes about how to deploy this on a live system.
+These steps will deploy this package on a live system for general use.
+
+After ensuring the prerequisites are satisfied, first
+```
+pip install utoolbox
+```
+then
+```
+pip install utoolbox[gpu]
+```
+
 
 ## Contributing
 
