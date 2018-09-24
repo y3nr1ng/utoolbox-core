@@ -2,10 +2,12 @@ import logging
 from math import radians, sin, cos, ceil, hypot
 import os
 
+from jinja2 import Template
 import numpy as np
 from pycuda.compiler import SourceModule
 import pycuda.driver as cuda
 import pycuda.gpuarray as gpuarray
+from pycuda.tools import dtype_to_ctype
 import tqdm
 
 from utoolbox.container import AttrDict, Resolution
@@ -54,14 +56,6 @@ class DeskewTransform(object):
         self._iw_origin = 0
         self._upload_texture = None
 
-        try:
-            self._load_kernel()
-        except cuda.CompileError:
-            logger.error("compile error")
-            raise
-
-        cuda.memcpy_htod(self._d_px_shift, np.float32(self.px_shift))
-
     def __call__(self, data, run_once=False, copy=False):
         """
         Parameters
@@ -74,6 +68,15 @@ class DeskewTransform(object):
             if self._in_shape is not None:
                 self.destroy_workspace()
             self._in_shape, self._dtype = data.shape, data.dtype
+
+            try:
+                self._load_kernel()
+            except cuda.CompileError:
+                logger.error("compile error")
+                raise
+
+            cuda.memcpy_htod(self._d_px_shift, np.float32(self.px_shift))
+
             self.create_workspace()
 
         # upload reference volume
@@ -85,6 +88,8 @@ class DeskewTransform(object):
         n_grids = (ceil(float(nu)/n_blocks[0]), ceil(float(nw)/n_blocks[1]), 1)
 
         nz, _, nx = self._in_shape
+        dxy, dz = self._in_res
+        duv, dw = self._out_res
 
         # execute
         for iv in tqdm.trange(nv):
@@ -98,17 +103,19 @@ class DeskewTransform(object):
             h_slice = self._d_slice.get()
             self._h_vol[:, iv, :] = h_slice
 
-        # transpose
-        result = self._h_vol if not copy else self._h_vol.copy()
-
         # free resource
         ref_vol.free()
 
+        result = self._h_vol if not copy else self._h_vol.copy()
         return result
 
     @property
     def angle(self):
         return self._angle
+
+    @property
+    def out_res(self):
+        return self._out_res
 
     @property
     def px_shift(self):
@@ -122,42 +129,33 @@ class DeskewTransform(object):
         nz, ny, nx = self._in_shape # [px]
         total_shift = self.px_shift * (nz-1) # [px]
 
-        self._iw_origin = 0
-
         if self.rotate:
-            dxy, dz = self._in_res # [um]
-            rz, rx = nz*dz, nx*dxy # [um]
+            h = hypot(total_shift, nz) # [px]
+            vsin, vcos = nz/h, total_shift/h # from [px]
 
-            h = hypot(total_shift*dxy, rz) # [um]
-            vsin, vcos = rz/h, rx/h
-
-            # rotated dimension, resampled to be square voxel (almost)
-#            nw = ceil((rx * vsin) / dxy)
-            nw = ceil((rx * vsin) / dz)
-            nv = ny
-            nu = ceil((h + (rx * vcos)) / dxy)
+            nw, nv, nu = ceil(nx*vsin), ny, ceil(h + nx*vcos)
 
             # update output resolution
-            self._out_res = (dxy, dxy)
-
-            # rotation center locates at center of the volume, requires z offset
-            self._iw_origin = (nz-nw)//2
+            dxy, dz = self._in_res # [um]
+            self._out_res = Resolution(
+                hypot(total_shift*dxy, nz*dz) / nu,
+                nx*dxy / nw
+            )
+            #TODO need to findout whether resample is required
         else:
-            nw, nv, nu = nz, ny, ceil(nx+total_shift)
             vsin, vcos = 0., 1.
+            nw, nv, nu = nz, ny, ceil(nx+total_shift)
         self._out_shape = (nw, nv, nu)
+        logger.debug("duv={:.3f}um, dw={:.3f}um".format(self._out_res.dxy, self._out_res.dz))
 
         cuda.memcpy_htod(self._d_vsin, np.float32(vsin))
         cuda.memcpy_htod(self._d_vcos, np.float32(vcos))
         logger.debug("vsin={:.4f}, vcos={:.4f}".format(vsin, vcos))
 
-        cuda.memcpy_htod(self._d_iw_ori, np.int32(self._iw_origin))
-        logger.debug("iw_origin={}".format(self._iw_origin))
-
-#        self._h_vol = np.empty(self._out_shape, dtype=self._dtype)
-        self._h_vol = np.empty(self._out_shape, dtype=np.float32)
-#        self._d_slice = gpuarray.empty((nw, nu), dtype=self._dtype, order='C')
-        self._d_slice = gpuarray.empty((nw, nu), dtype=np.float32, order='C')
+        self._h_vol = np.empty(self._out_shape, dtype=self._dtype)
+#        self._h_vol = np.empty(self._out_shape, dtype=np.float32)
+        self._d_slice = gpuarray.empty((nw, nu), dtype=self._dtype, order='C')
+#        self._d_slice = gpuarray.empty((nw, nu), dtype=np.float32, order='C')
         logger.info("workspace allocated, {}, {}".format(self._out_shape, self._dtype))
 
     def destroy_workspace(self):
@@ -166,7 +164,8 @@ class DeskewTransform(object):
     def _load_kernel(self):
         path = os.path.join(os.path.dirname(__file__), "deskew.cu")
         with open(path, 'r') as fd:
-            source = fd.read()
+            tpl = Template(fd.read())
+            source = tpl.render(dst_type=dtype_to_ctype(self._dtype))
             module = SourceModule(source)
 
         self._kernel = module.get_function("deskew_kernel")
@@ -174,7 +173,6 @@ class DeskewTransform(object):
         self._d_px_shift, _ = module.get_global('px_shift')
         self._d_vsin, _ = module.get_global('vsin')
         self._d_vcos, _ = module.get_global('vcos')
-        self._d_iw_ori, _ = module.get_global('iw_ori')
 
         self._texture = module.get_texref("ref_vol")
         self._texture.set_address_mode(0, cuda.address_mode.BORDER)
