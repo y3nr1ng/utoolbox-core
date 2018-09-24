@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 ##### FETCH DATA #####
-path = "deskew_input.tif"
+path = "deskew_input_2.tif"
 I_in = imageio.volread(path)
 logger.info("I_in.shape={}".format(I_in.shape))
 

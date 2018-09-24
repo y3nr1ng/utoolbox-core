@@ -1,7 +1,7 @@
 from os import path
 import sys
 
-from setuptools import setup
+from setuptools import setup, find_namespace_packages
 
 cwd = path.abspath(path.dirname(__file__))
 
@@ -17,7 +17,7 @@ setup(
     #   bumpversion release
     # to next version
     #   bump patch/minor/major
-    version='0.0.5.dev',
+    version='0.1.2',
 
     # one-line description for the summary field
     description="A Python image processing package for LLSM.",
@@ -46,13 +46,7 @@ setup(
 
     keywords="microscopy",
 
-    packages=[
-        'utoolbox'
-    ],
-
-    package_dir={
-        'utoolbox': 'utoolbox'
-    },
+    packages=find_namespace_packages(include=['utoolbox.*']),
 
     python_requires='>=3.6',
 

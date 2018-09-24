@@ -1,6 +1,5 @@
 __constant__ float px_shift;
-__constant__ float vsin;
-__constant__ float vcos;
+__constant__ float vsin, vcos;
 
 texture<float, cudaTextureType3D, cudaReadModeElementType> ref_vol;
 
@@ -26,7 +25,7 @@ void deskew_kernel(
 
     // round off to avoid over using interpolation
     x = roundf(x); z = roundf(z);
-    
+
     // shear
     x -= px_shift*(z-cz);
 
