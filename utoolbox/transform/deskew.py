@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class DeskewTransform(object):
     """
-    TBA
+    Perform standard deskew operation on sample scanned data.
 
     Note
     ----
@@ -26,8 +26,8 @@ class DeskewTransform(object):
         """
         Parameters
         ----------
-        resolution : Resolution
-            TBA
+        resolution : utoolbox.container.Resolution
+            Resolution object that specifies the lateral and axial resolution.
         angle : float
             Angle between coverslip and detection objective.
         rotate : bool
@@ -56,12 +56,15 @@ class DeskewTransform(object):
         self._iw_origin = 0
         self._upload_texture = None
 
-    def __call__(self, data, run_once=False, copy=False):
+    def __call__(self, data, copy=False):
         """
         Parameters
         ----------
         data : np.ndarray
             SPIM data.
+        copy : bool
+            Determine whether output should be a duplicate of internal buffer,
+            default to False.
         """
         if (data.shape != self._in_shape) or (data.dtype != self._dtype):
             logger.info("resizing workspace")
@@ -80,7 +83,7 @@ class DeskewTransform(object):
             self.create_workspace()
 
         # upload reference volume
-        ref_vol = self._upload_ref_vol(data)
+        ref_vol = self._upload_ref_vol(data.astype(np.float32))
 
         # determine grid & block size
         n_blocks = (32, 32, 1)
@@ -181,6 +184,8 @@ class DeskewTransform(object):
         self._kernel.prepare('Piiiii',texrefs=[self._texture])
 
     def _upload_ref_vol(self, data):
-        ref_vol = cuda.np_to_array(data.astype(np.float32), 'C')
+        """Upload the reference volume into texture memory."""
+        assert data.dtype == np.float32, "np.float32 is required"
+        ref_vol = cuda.np_to_array(data, 'C')
         self._texture.set_array(ref_vol)
         return ref_vol
