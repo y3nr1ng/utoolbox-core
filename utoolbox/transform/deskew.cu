@@ -1,61 +1,39 @@
-__kernel void shear(
-    read_only image2d_array_t src,
-    const float factor,
-    const int iw,
-    const int nu, const int nv, // output size
-    __global unsigned short *dst
+__constant__ float px_shift;
+__constant__ float vsin;
+__constant__ float vcos;
+
+texture<float, cudaTextureType3D, cudaReadModeElementType> ref_vol;
+
+__global__
+void deskew_kernel(
+    {{ dst_type }} *dst,
+    const int iv,
+    const int nu, const int nw, // output size
+    const int nx, const int nz // input size
 ) {
-    const int iu = get_global_id(1);
-    const int iv = get_global_id(0);
-    if ((iu >= nu) || (iv >= nv)) {
+    int iu = blockIdx.x*blockDim.x + threadIdx.x;
+    int iw = blockIdx.y*blockDim.y + threadIdx.y;
+    if ((iu >= nu) || (iw >= nw)) {
         return;
     }
 
-    const sampler_t sampler =
-        CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP | CLK_FILTER_LINEAR;
+    const float cu = nu/2, cw = nw/2;
+    const float cx = nx/2, cz = nz/2;
 
-    float ix = (iu - factor*iv) + 0.5f;
-    float iy = iv + 0.5f;
-    float iz = iw;
+    // rotate
+    float x = (iu-cu)*vcos - (iw-cw)*vsin + cx;
+    float z = (iu-cu)*vsin + (iw-cw)*vcos + cz;
 
-    const int i = iv*nu + iu;
-    dst[i] =
-        (unsigned short)read_imagef(src, sampler, (float4)(ix, iy, iz, 1.0f)).x;
-}
+    // round off to avoid over using interpolation
+    x = roundf(x); z = roundf(z);
+    
+    // shear
+    x -= px_shift*(z-cz);
 
-__kernel void shear_and_rotate(
-    read_only image2d_array_t src,
-    const float vsin, const float vcos,
-    const float factor,
-    const int iw,
-    const int nu, const int nv, // output size
-    const int ov,
-    __global unsigned short *dst
-) {
-    const int iu = get_global_id(1);
-    const int iv = get_global_id(0);
-    if ((iu >= nu) || (iv >= nv)) {
-        return;
-    }
+    float ix = x + .5f;
+    float iy = iv + .5f;
+    float iz = z + .5f;
 
-    const sampler_t sampler =
-        CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP | CLK_FILTER_LINEAR;
-
-    // center of the image
-    const float uc = nu/2.0f;
-    const float vc = nv/2.0f;
-    //NOTE int or float for intermediate coordinate?
-    //const float iu0 = (iu-uc)*vcos - (iv+ov-vc)*vsin + uc;
-    //const float iv0 = (iu-uc)*vsin + (iv+ov-vc)*vcos + vc;
-    const int iu0 = (int)((iu-uc)*vcos - (iv+ov-vc)*vsin + uc);
-    const int iv0 = (int)((iu-uc)*vsin + (iv+ov-vc)*vcos + vc);
-
-    // skewed
-    float ix = (iu0 - factor*iv0) + 0.5f;
-    float iy = (iv0) + 0.5f;
-    float iz = iw;
-
-    const int i = iv*nu + iu;
-    dst[i] =
-        (unsigned short)read_imagef(src, sampler, (float4)(ix, iy, iz, 1.0f)).x;
+    const int i = iw*nu + iu;
+    dst[i] = ({{ dst_type }})tex3D(ref_vol, ix, iy, iz);
 }
