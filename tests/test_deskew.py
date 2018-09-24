@@ -4,9 +4,10 @@ import os
 import coloredlogs
 import imageio
 import numpy as np
+import pycuda.driver as cuda
 
-import utoolbox.utils.files as fileutils
-from utoolbox.transform import deskew
+from utoolbox.parallel.gpu import create_some_context
+from utoolbox.transform import DeskewTransform
 
 coloredlogs.install(
     level='DEBUG',
@@ -18,18 +19,22 @@ logger = logging.getLogger(__name__)
 
 
 ##### FETCH DATA #####
-#path = os.path.join("data", "sample1_zp6um_561.tif")
-path = "result.tif"
+path = "deskew_input.tif"
 I_in = imageio.volread(path)
+logger.info("I_in.shape={}".format(I_in.shape))
 
 spacing = (0.102, 0.5)
 
 
 ##### EXCEUTE DESKEW #####
-ctx = utoolbox.parallel.create_some_context(dev_type='gpu', vendor='NVIDIA')
-with DeskewTransform(ctx, spacing, 32.8, rotate=True) as transform:
-    I_out = transform(I_in)
+ctx = create_some_context()
+ctx.push()
+
+transform = DeskewTransform(spacing, 32.8, rotate=True)
+I_out = transform(I_in)
+
+cuda.Context.pop()
 
 
 ##### RESULT #####
-imageio.volwrite("result_deskew.tif", I_out)
+imageio.volwrite("deskew_output.tif", I_out)
