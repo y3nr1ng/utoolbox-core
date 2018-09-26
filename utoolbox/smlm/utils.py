@@ -23,22 +23,21 @@ def roll_by_frame(data, wnd_size=40, col_name='frame'):
     Frame number should start from 1.
     """
     # sort on the columns for efficient retrieval
-    logger.debug("sorting by frames")
+    logger.debug("start sorting by frames")
     data.sort_values(col_name, ascending=True, inplace=True)
 
     frames = data[col_name].values
+    n_frames = frames.max()
+    logger.debug("{} frames provided".format(n_frames))
+
     indices = np.where(frames[:-1] != frames[1:])[0]
     indices += 1
+    indices = np.concatenate(([0], indices, [n_frames]))
 
     def _iter_func():
-        start = 0
-        for end in indices[wnd_size-1::wnd_size]:
+        for start, end in zip(indices[:-wnd_size], indices[wnd_size:]):
             yield data.iloc[start:end]
-            start = end
-        # last segment
-        yield data.iloc[start:]
 
-    max_frames = frames.max()
-    n_rolled = max_frames-wnd_size+1
-    logger.info("{} frames provided, rolled result contains {} frames".format(max_frames, n_rolled))
+    n_rolled = n_frames-wnd_size+1
+    logger.debug("rolled result contains {} frames".format(n_rolled))
     return _iter_func(), n_rolled

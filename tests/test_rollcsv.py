@@ -16,7 +16,7 @@ coloredlogs.install(
 
 ##### LOAD DATA #####
 df = pd.read_csv('part1_corrected.csv')
-wnd_size = 100
+wnd_size = 300
 
 
 ##### START ROLLING #####
