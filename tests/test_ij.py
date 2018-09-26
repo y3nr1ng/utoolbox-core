@@ -3,24 +3,30 @@ import os
 
 import jnius_config
 
-jnius_config.add_options('-Djava.awt.headless=true')
+jnius_config.add_options(
+    '-Djava.awt.headless=true',
+    '-Dapple.awt.UIElement=true'
+)
 
-def discover_jars(root, recursive=True):
-    return glob.glob(os.path.join(root, "*.jar"), recursive=recursive)
+ij_path = 'ImageJ/ij.jar'
+ij_path = os.path.abspath(ij_path)
+print(ij_path)
 
-def set_ij_classpath(ij_root):
-    jars = []
-    jars.extend(discover_jars(os.path.join(ij_root, 'jars')))
-    jars.extend(discover_jars(os.path.join(ij_root, 'plugins')))
-
-    classpath = ':'.join(jars)
-    print(classpath)
-    jnius_config.set_classpath(classpath)
-
-set_ij_classpath('/Applications/Fiji.app')
+#jnius_config.set_classpath(ij_path)
+os.environ['CLASSPATH'] = ij_path
 
 import jnius
-ij = jnius.autoclass('net.imagej.ImageJ')
+Opener = jnius.autoclass('ij.io.Opener')
 
-im = ij().io().Opener().open("deskew_input_2.tif")
-print(im)
+im_path = 'deskew_output_mip.tif'
+im_path = os.path.abspath(im_path)
+print(im_path)
+
+String = jnius.autoclass('java.lang.String')
+im_path = String(im_path)
+
+MacroRunner = jnius.autoclass('ij.macro.MacroRunner')
+
+macro_path = String('macro.ijm')
+macro = MacroRunner(macro_path, im_path)
+macro.run()
