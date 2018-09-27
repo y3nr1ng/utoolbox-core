@@ -26,12 +26,9 @@ im_path = String(im_path)
 from utoolbox.util.decorator.macos import prelaunch_cocoa
 
 @prelaunch_cocoa
-def run_ij():
+def run_ij(im_path):
     String = jnius.autoclass('java.lang.String')
 
-    im_path = 'deskew_output.tif'
-    im_path = os.path.abspath(im_path)
-    print(im_path)
     im_path = String(im_path)
 
     with open('macro.ijm', 'r') as fd:
@@ -44,4 +41,6 @@ def run_ij():
 
     print('finish running')
 
-run_ij()
+im_path = 'deskew_output.tif'
+im_path = os.path.abspath(im_path)
+run_ij(im_path)

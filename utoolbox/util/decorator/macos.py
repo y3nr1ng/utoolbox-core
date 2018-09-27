@@ -16,44 +16,32 @@ __all__ = [
 ]
 
 class AppDelegate(NSObject):
-    def init(self):
+    def initWrappedFunc_(self, wrapped_func):
         self = objc.super(AppDelegate, self).init()
         if self is None:
             return None
 
-        self.wrapped_func = None
-        self.args, self.kwargs = None, None
+        self.wrapped_func = wrapped_func
 
         # NOTE initializers must return self by pyobjc doc
         return self
 
     def applicationDidFinishLaunching_(self, notification):
-        self.performSelectorInBackground_withObject_("runWrappedFunc:", 0)
+        self.performSelectorInBackground_withObject_("runWrappedFunc:", None)
 
-    def runWrappedFunc_(self, arg):
+    def runWrappedFunc_(self, args):
         self.wrapped_func()
         # terminate explicitly, or it hangs when the wrapped code exits
         NSApp().terminate_(self)
-
-class ConcreteAppDelegate(AppDelegate):
-    def initWrappedFunc_(self, wrapped_func):
-        self = objc.super(ConcreteAppDelegate, self).init()
-        if self is None:
-            return None
-
-        self.wrapped_func = wrapped_func
-        # NOTE these are not expanded
-#        self.args = args
-#        self.kwargs = kwargs
-
-        return self
 
 def prelaunch_cocoa(func):
     def _launcher(*args, **kwargs):
         app = NSApplication.sharedApplication()
 
         # wrap the function in a delegate
-        delegate = ConcreteAppDelegate.alloc().initWrappedFunc_(func)
+        def _func():
+            func(*args, **kwargs)
+        delegate = AppDelegate.alloc().initWrappedFunc_(_func)
         NSApp().setDelegate_(delegate)
 
         # sent keyboard events to the UI
