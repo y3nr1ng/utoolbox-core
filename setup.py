@@ -17,7 +17,7 @@ setup(
     #   bumpversion release
     # to next version
     #   bump patch/minor/major
-    version='0.1.2',
+    version='0.1.3.dev',
 
     # one-line description for the summary field
     description="A Python image processing package for LLSM.",
