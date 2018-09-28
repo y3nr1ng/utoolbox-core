@@ -3,6 +3,11 @@ import sys
 
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    'prelaunch_cocoa'
+]
+
+#TODO wrap with stub
 if not sys.platform.startswith('darwin'):
     raise RuntimeError("unable to import on non-macOS system")
 
@@ -10,10 +15,6 @@ import objc
 from Foundation import *
 from AppKit import *
 from PyObjCTools import AppHelper
-
-__all__ = [
-    'prelaunch_cocoa'
-]
 
 class AppDelegate(NSObject):
     def initWrappedFunc_(self, wrapped_func):
