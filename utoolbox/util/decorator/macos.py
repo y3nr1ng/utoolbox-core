@@ -1,3 +1,13 @@
+"""
+The Cocoa event loop needs to be started before the JVM is loaded, in order for
+Java's AWT to run properly.
+
+Reference
+---------
+[1] kivy/pyjnius, importing AWT classes hangs the script on OSX #15
+    https://github.com/kivy/pyjnius/issues/151
+[2] https://github.com/imglib/imglyb/blob/master/imglyb/OSXAWTwrapper.py
+"""
 import logging
 import sys
 

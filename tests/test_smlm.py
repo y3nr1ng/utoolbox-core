@@ -21,7 +21,8 @@ logger = logging.getLogger(__name__)
 ##### EXCEUTE THUNDERSTORM #####
 
 # ThunderSTORM(ndim, cal_file=None, tmp_dir=None)
-worker = ThunderSTORM(2, tmp_dir='/home2/scratch')
-
+#worker = ThunderSTORM(2, tmp_dir='/home2/scratch')
+worker = ThunderSTORM(2)
+worker.run('src_dir', 'dst_dir')
 
 ##### RESULT #####
