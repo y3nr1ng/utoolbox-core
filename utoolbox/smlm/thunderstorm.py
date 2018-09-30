@@ -1,7 +1,9 @@
 import logging
 import os
-from tempfile import TemporaryDirectory
+from tempfile import TemporaryDirectory, NamedTemporaryFile
 from typing import NamedTuple
+
+from mako.template import Template
 
 from utoolbox.imagej import run_macro
 
@@ -31,13 +33,13 @@ class ThunderSTORM(object):
 
     def __init__(self, ndim, cal_file=None, tmp_dir=None):
         self._ndim, self._cal_file = ndim, cal_file
-        self._parameters = ThunderSTORM.Parameters()._asdict()
+        self._parameters = ThunderSTORM.DefaultParameters()._asdict()
 
         self._tmp_dir = tmp_dir
 
-    def __call__(self, src):
+    def __call__(self, src, dst_dir):
         """Convenient function for run()."""
-        self.run(src)
+        self.run(src, dst_dir)
 
     @property
     def ndim(self):
@@ -54,7 +56,7 @@ class ThunderSTORM(object):
     def set_export_options(self, precision=1):
         self._parameters['precision'] = int(precision)
 
-    def run(self, src):
+    def run(self, src, dst_dir):
         if isinstance(src, str):
             if os.path.isdir(src):
                 file_list = [os.path.join(src, fn) for fn in os.listdir(src)]
@@ -66,6 +68,8 @@ class ThunderSTORM(object):
         else:
             raise ValueError("unknown source")
 
+        self._parameters['path'] = dst_dir
+
         with TemporaryDirectory(dir=self._tmp_dir) as workspace:
             # create file list
             file_list_path = os.path.join(workspace, 'files.txt')
@@ -73,13 +77,18 @@ class ThunderSTORM(object):
                 for file in file_list:
                     fd.write('{}\n'.format(os.path.abspath(file)))
 
-            # create macro
-            macro_path = os.path.join(workspace, 'macro.ijm')
-            # TODO set export path
-            # TODO build macro from parts
-
-            # run macro
-            run_macro(macro_path, file_list_path, ij_path=None)
+            # build and run macro
+            cwd = os.path.dirname(os.path.abspath(__file__))
+            template_path = os.path.join(cwd, 'template.ijm')
+            template = Template(filename=template_path)
+            macro = template.render(
+                camera_setup=self._build_camera_setup(),
+                run_analysis=self._build_run_analysis(),
+                export_results=self._build_export_results()
+            )
+            print("=====\n{}\n=====\n{}=====".format(file_list_path, macro))
+            raise RuntimeError("DEBUG")
+            run_macro(macro, file_list_path, ij_path=None)
 
     def _build_camera_setup(self):
         return self._build_command_str(
@@ -189,4 +198,4 @@ class ThunderSTORM(object):
             "{}={}".format(k, v) for k, v in parameters.items()
         ]
         merged_parameters = ' '.join(merged_parameters)
-        return "run(\"{}\", \"{}\")").format(command, merged_parameters)
+        return 'run("{}", "{}");'.format(command, merged_parameters)
