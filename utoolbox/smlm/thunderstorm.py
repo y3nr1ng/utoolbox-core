@@ -29,9 +29,11 @@ class ThunderSTORM(object):
         # output floating precision
         precision: int = 1
 
-    def __init__(self, ndim, cal_file=None):
+    def __init__(self, ndim, cal_file=None, tmp_dir=None):
         self._ndim, self._cal_file = ndim, cal_file
         self._parameters = ThunderSTORM.Parameters()._asdict()
+
+        self._tmp_dir = tmp_dir
 
     def __call__(self, src):
         """Convenient function for run()."""
@@ -64,7 +66,7 @@ class ThunderSTORM(object):
         else:
             raise ValueError("unknown source")
 
-        with TemporaryDirectory() as workspace:
+        with TemporaryDirectory(dir=self._tmp_dir) as workspace:
             # create file list
             file_list_path = os.path.join(workspace, 'files.txt')
             with open(file_list_path, 'w') as fd:

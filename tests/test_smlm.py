@@ -4,6 +4,8 @@ import os
 import coloredlogs
 import imageio
 
+from utoolbox.smlm.thunderstorm import ThunderSTORM
+
 coloredlogs.install(
     level='DEBUG',
     fmt='%(asctime)s %(module)s[%(process)d] %(levelname)s %(message)s',
@@ -16,7 +18,10 @@ logger = logging.getLogger(__name__)
 ##### FETCH DATA #####
 
 
-##### EXCEUTE DESKEW #####
+##### EXCEUTE THUNDERSTORM #####
+
+# ThunderSTORM(ndim, cal_file=None, tmp_dir=None)
+worker = ThunderSTORM(2, tmp_dir='/home2/scratch')
 
 
 ##### RESULT #####
