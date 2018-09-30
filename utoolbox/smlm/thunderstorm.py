@@ -1,0 +1,190 @@
+import logging
+import os
+from tempfile import TemporaryDirectory
+from typing import NamedTuple
+
+from utoolbox.imagej import run_macro
+
+__all__ = [
+    'ThunderSTORM'
+]
+
+logger = logging.getLogger(__name__)
+
+
+class ThunderSTORM(object):
+    class DefaultParameters(NamedTuple):
+        # camera pixel size [nm]
+        px_size: int = 102
+        # quantum efficiency
+        qe: float = .85
+        # background offset
+        offset: int = 100
+
+        # wavelet S.D. level
+        level: float = 1.
+
+        # export path
+        path: str = ''
+        # output floating precision
+        precision: int = 1
+
+    def __init__(self, ndim, cal_file=None):
+        self._ndim, self._cal_file = ndim, cal_file
+        self._parameters = ThunderSTORM.Parameters()._asdict()
+
+    def __call__(self, src):
+        """Convenient function for run()."""
+        self.run(src)
+
+    @property
+    def ndim(self):
+        return self._ndim
+
+    def set_camera_options(self, px_size=102, qe=0.85, offset=100.0):
+        self._parameters['px_size'] = int(px_size)
+        self._parameters['qe'] = qe
+        self._parameters['offset'] = int(offset)
+
+    def set_analysis_options(self, level):
+        self._parameters['level'] = float(level)
+
+    def set_export_options(self, precision=1):
+        self._parameters['precision'] = int(precision)
+
+    def run(self, src):
+        if isinstance(src, str):
+            if os.path.isdir(src):
+                file_list = [os.path.join(src, fn) for fn in os.listdir(src)]
+            else:
+                # file
+                file_list = [src]
+        elif isinstance(src, list):
+            file_list = src
+        else:
+            raise ValueError("unknown source")
+
+        with TemporaryDirectory() as workspace:
+            # create file list
+            file_list_path = os.path.join(workspace, 'files.txt')
+            with open(file_list_path, 'w') as fd:
+                for file in file_list:
+                    fd.write('{}\n'.format(os.path.abspath(file)))
+
+            # create macro
+            macro_path = os.path.join(workspace, 'macro.ijm')
+            # TODO set export path
+            # TODO build macro from parts
+
+            # run macro
+            run_macro(macro_path, file_list_path, ij_path=None)
+
+    def _build_camera_setup(self):
+        return self._build_command_str(
+            'Camera setup',
+            {
+                'readoutnoise': 1.64,
+                'offset': self._parameters['offset'],
+                'quantumefficiency': self._parameters['qe'],
+                'isemgain': 'false',
+                'photons2adu': 0.47,
+                'pixelsize': self._parameters['px_size']
+            }
+        )
+
+    def _build_run_analysis(self):
+        filter_parameters = {
+            'filter': '[Wavelet filter (B-Spline)]',
+            'scale': 2.0,
+            'order': 3
+        }
+
+        threshold = '{:.1f}*std(Wave.F1)'.format(self._parameters['level'])
+        detector_parameters = {
+            'detector': '[Local maximum]',
+            'connectivity': '8-neighbourhood',
+            'threshold': threshold
+        }
+
+        if self.ndim == 2:
+            estimator = '[PSF: Integrated Gaussian]'
+        else:
+            estimator = '[PSF: Elliptical Gaussian (3D astigmatism)]'
+        estimator_parameters = {
+            'estimator': estimator,
+            'sigma': 1.6,
+            'fitradius': 4
+        }
+
+        method_parameters = {
+            'method': '[Maximum likelihood]',
+            'full_image_fitting': 'false',
+            'mfaenabled': 'false'
+        }
+        if self.ndim == 3:
+            if self._cal_file is None:
+                raise ValueError("invalid calibration file path")
+            method_parameters = {
+                'calibrationpath': '[{}]'.format(self._cal_file),
+                **method_parameters
+            }
+
+        renderer_parameters = {
+            'renderer': '[Averaged shifted histograms]',
+            'magnification': 5.0,
+            'colorize': 'false',
+            'threed': 'false',
+            'shifts': 2,
+            'repaint': 50
+        }
+
+        return self._build_command_str(
+            'Run analysis',
+            {
+                **filter_parameters,
+                **detector_parameters,
+                **estimator_parameters,
+                **method_parameters,
+                **renderer_parameters
+            }
+        )
+
+    def _build_export_results(self):
+        common_parameters = {
+            'filepath': self._parameters['path'],
+            'fileformat': '[CSV (comma separated)]',
+            'floatprecision': self._parameters['precision'],
+            'saveprotocol': 'false',
+            'id': 'false',
+            'frame': 'true',
+            'x': 'true',
+            'y': 'true',
+            'intensity': 'true',
+            'uncertainty_xy': 'true',
+            'bkgstd': 'true',
+            'offset': 'true'
+        }
+
+        # append dimension dependend parameters
+        if self.ndim == 2:
+            parameters = {
+                'sigma': 'true',
+                **common_parameters
+            }
+        else:
+            parameters = {
+                'z': 'true',
+                'uncertainty_z': 'true',
+                'sigma1': 'true',
+                'sigma2': 'true',
+                **common_parameters
+            }
+
+        return self._build_command_str('Export results', parameters)
+
+    def _build_command_str(self, command, parameters):
+        merged_parameters = [
+            "{}={}".format(k, v) for k, v in parameters.items()
+        ]
+        merged_parameters = ' '.join(merged_parameters)
+        return "run(\"{}\", \"{}\")").format(command, merged_parameters)
