@@ -17,7 +17,7 @@ setup(
     #   bumpversion release
     # to next version
     #   bump patch/minor/major
-    version='0.1.3.dev',
+    version='0.1.4.dev',
 
     # one-line description for the summary field
     description="A Python image processing package for LLSM.",
@@ -75,13 +75,13 @@ setup(
 
         # parallel
         'dask',
-        #'pycuda', # defer to extras_require
         'pycuda',
 
         # utils
         'mako',
         'click',
-        'coloredlogs'
+        'coloredlogs',
+        'tqdm'
     ],
 
     dependency_links=[
