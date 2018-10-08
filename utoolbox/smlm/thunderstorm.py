@@ -1,11 +1,12 @@
 import logging
 import os
+import subprocess as sp
 from tempfile import TemporaryDirectory, NamedTemporaryFile
 from typing import NamedTuple
 
 from mako.template import Template
 
-from utoolbox.imagej import run_macro
+from utoolbox.imagej import run_macro_file
 
 __all__ = [
     'ThunderSTORM'
@@ -31,7 +32,7 @@ class ThunderSTORM(object):
         # output floating precision
         precision: int = 1
 
-    def __init__(self, ndim, cal_file=None, tmp_dir=None):
+    def __init__(self, ndim, ij_root=None, cal_file=None, tmp_dir=None):
         self._ndim, self._cal_file = ndim, cal_file
         self._parameters = ThunderSTORM.DefaultParameters()._asdict()
 
@@ -68,7 +69,8 @@ class ThunderSTORM(object):
         else:
             raise ValueError("unknown source")
 
-        self._parameters['path'] = dst_dir
+        #self._parameters['path'] = dst_dir
+        self._parameters['path'] = '\" + path + \"'
 
         with TemporaryDirectory(dir=self._tmp_dir) as workspace:
             # create file list
@@ -76,19 +78,29 @@ class ThunderSTORM(object):
             with open(file_list_path, 'w') as fd:
                 for file in file_list:
                     fd.write('{}\n'.format(os.path.abspath(file)))
+            print(file_list)
 
-            # build and run macro
+            # build macro
             cwd = os.path.dirname(os.path.abspath(__file__))
             template_path = os.path.join(cwd, 'template.ijm')
             template = Template(filename=template_path)
             macro = template.render(
+                file_list=file_list_path,
                 camera_setup=self._build_camera_setup(),
                 run_analysis=self._build_run_analysis(),
                 export_results=self._build_export_results()
             )
-            print("=====\n{}\n=====\n{}=====".format(file_list_path, macro))
-            raise RuntimeError("DEBUG")
-            run_macro(macro, file_list_path, ij_path=None)
+            macro_path = os.path.join(workspace, 'macro.ijm')
+            with open(macro_path, 'w') as fd:
+                fd.write(macro)
+            print(macro)
+
+            cwd = os.path.dirname(__file__)
+            plugins_dir = os.path.join(cwd, 'ij_plugins')
+
+            run_macro_file(macro_path, plugins_dir=plugins_dir)
+
+        logger.warning("WORKSPACE WIPED")
 
     def _build_camera_setup(self):
         return self._build_command_str(
@@ -142,11 +154,11 @@ class ThunderSTORM(object):
 
         renderer_parameters = {
             'renderer': '[Averaged shifted histograms]',
-            'magnification': 5.0,
+            'magnification': 1.0,
             'colorize': 'false',
             'threed': 'false',
             'shifts': 2,
-            'repaint': 50
+            'repaint': 100
         }
 
         return self._build_command_str(
