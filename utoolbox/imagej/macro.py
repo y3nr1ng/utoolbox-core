@@ -22,6 +22,11 @@ def run_macro(macro, *args, ij_path=None):
         ij_path = os.path.join(cwd, 'ImageJ', 'ij.jar')
         if not os.path.exists(ij_path):
             raise RuntimeError("unable to locate built-in ImageJ distribution")
+
+    ij_root = os.path.dirname(ij_path)
+    plugins_dir = os.path.join(ij_root, 'plugins')
+    jnius_config.set_options('-Dplugins.dir={}'.format(plugins_dir))
+
     jnius_config.set_classpath(ij_path)
 
     # NOTE use jnius_config before import jnius

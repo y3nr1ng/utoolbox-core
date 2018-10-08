@@ -2,7 +2,8 @@ import os
 import subprocess as sp
 import sys
 
-from .macro import *
+#TODO use subprocess solution for now (instead of pyjnius integration)
+from .process import *
 
 if 'JAVA_HOME' not in os.environ:
     if sys.platform == 'win32':
