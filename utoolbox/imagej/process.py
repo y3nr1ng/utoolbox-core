@@ -12,7 +12,7 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-def run_macro_file(path, *args, ij_root=None, plugins_dir=None):
+def run_macro_file(path, *args, headless=False, ij_root=None, plugins_dir=None):
     if not ij_root:
         logger.info("using built-in ImageJ distribution")
         cwd = os.path.dirname(__file__)
@@ -35,13 +35,22 @@ def run_macro_file(path, *args, ij_root=None, plugins_dir=None):
         raise RuntimeError("unknown os")
     bin_path = os.path.join(ij_root, bin_path)
 
-    command = [
+    # part 1
+    bin = [
         bin_path,
         '--plugins', plugins_dir,
-        '--headless',
-        '--console',
+    ]
+    # part 2
+    flags = []
+    if headless:
+        flags += ['--headless', '--console']
+    # part 3
+    args = [
         '--run', path,
         ','.join([str(arg) for arg in args])
     ]
+    # merge
+    command = bin + flags + args
     logger.debug(' '.join(command))
+    
     ret = sp.check_output(command)
