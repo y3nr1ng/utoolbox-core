@@ -7,7 +7,7 @@ from vispy.color import BaseColormap
 
 import numpy as np
 
-from utoolbox.utils.decorators import timeit
+from utoolbox.util.decorator.benchmark import timeit
 from utoolbox.viewers.vispy.volume import MultiVolume
 
 membrane_path = 'data/membrane_000.tif'
