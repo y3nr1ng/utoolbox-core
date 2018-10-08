@@ -6,9 +6,13 @@ import os
 import numpy
 import pandas
 
-def merge_csv():
-    pass
+class Merger(object):
+    def __init__(self):
+        pass
 
-# DEBUG trials
-if __name__ == '__main__':
-    pass
+    def __enter__(self):
+        pass
+
+    def __exit__(self, *exc):
+        pass
+        
