@@ -98,7 +98,8 @@ class ThunderSTORM(object):
             cwd = os.path.dirname(__file__)
             plugins_dir = os.path.join(cwd, 'ij_plugins')
 
-            run_macro_file(macro_path, plugins_dir=plugins_dir)
+            # NOTE ThunderSTORM cannot run under headless mode
+            run_macro_file(macro_path, plugins_dir=plugins_dir, headless=False)
 
         logger.warning("WORKSPACE WIPED")
 

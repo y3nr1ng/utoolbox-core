@@ -1,18 +1,20 @@
 
-_file_list = File.openAsString(${file_list});
+_file_list = File.openAsString("${file_list}");
 file_list = split(_file_list, '\n');
 
 ${camera_setup}
 
 setBatchMode(true);
 for(i = 0; i < file_list.length; i++) {
-    path = split(file_list[i]);
+    path = file_list[i];
+    print(path);
 
     open(path);
     ${run_analysis}
 
-    root = split(path, ".tif");
-    path = root[0] + ".csv";
+    ext_pos = indexOf(path, ".tif");
+    path = substring(path, 0, ext_pos) + ".csv";
+    print(path);
 
     ${export_results}
 
