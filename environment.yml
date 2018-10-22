@@ -1,30 +1,21 @@
-name: utoolbox
+name: utoolbox-dev
 
 channels:
     - defaults
     - conda-forge
 
 dependencies:
+    # build tools
+    - conda-build
+    - bumpversion
+    - twine
+
     # core
     - python=3.6
-    - cython
-    - ipykernel
 
-    # numerics and processing
+    # numpy dependency
+    # NOTE Pre-install numpy until upstream pycuda can incorporate
+    # https://stackoverflow.com/q/27021270/ in its aksetup_helper.py
     - numpy
-    - scipy
-
-    # file I/O
-    - imageio
-    - tifffile
-
-    # gui
-    - pyqt
-
-    # parallel
-    - dask
-    - pyopencl
-
-    # utils
-    - click
-    - boltons
+    
+    # native libraries
