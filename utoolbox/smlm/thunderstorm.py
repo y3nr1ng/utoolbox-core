@@ -69,8 +69,13 @@ class ThunderSTORM(object):
         else:
             raise ValueError("unknown source")
 
+        # NOTE delayed configuration
         #self._parameters['path'] = dst_dir
+        # TODO use temporary folder
         self._parameters['path'] = '\" + path + \"'
+        if not os.path.exists(dst_dir):
+            os.makedirs(dst_dir, exist_ok=True)
+            logger.debug('"{}" created'.format(dst_dir))
 
         with TemporaryDirectory(dir=self._tmp_dir) as workspace:
             # create file list
@@ -88,7 +93,8 @@ class ThunderSTORM(object):
                 file_list=file_list_path,
                 camera_setup=self._build_camera_setup(),
                 run_analysis=self._build_run_analysis(),
-                export_results=self._build_export_results()
+                export_results=self._build_export_results(),
+                dst_dir=dst_dir
             )
             macro_path = os.path.join(workspace, 'macro.ijm')
             with open(macro_path, 'w') as fd:
@@ -101,7 +107,8 @@ class ThunderSTORM(object):
             # NOTE ThunderSTORM cannot run under headless mode
             run_macro_file(macro_path, plugins_dir=plugins_dir, headless=False)
 
-        logger.warning("WORKSPACE WIPED")
+            # TODO merge the result using DataFrame
+        logger.warning("workspace wiped")
 
     def _build_camera_setup(self):
         return self._build_command_str(
