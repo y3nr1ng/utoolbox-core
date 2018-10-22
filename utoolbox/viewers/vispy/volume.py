@@ -19,7 +19,7 @@ from vispy.scene.visuals import create_visual_node
 
 import numpy as np
 
-from utoolbox.utils.defaults import DefaultFormat
+from utoolbox.util.defaults import DefaultFormat
 
 # Vertex shader
 VERT_SHADER = """

@@ -3,6 +3,7 @@ Create datastore for large collections of data.
 """
 from abc import ABCMeta, abstractmethod
 import glob
+import logging
 import os
 
 __all__ = [
@@ -10,8 +11,10 @@ __all__ = [
     'ImageDatastore'
 ]
 
+logger = logging.getLogger(__name__)
+
 class Datastore(object, metaclass=ABCMeta):
-    def __init__(self, location, sub_dir=False, extensions=None):
+    def __init__(self, location, sub_dir=False, pattern='*', extensions=None):
         """
         Parameters
         ----------
@@ -25,15 +28,12 @@ class Datastore(object, metaclass=ABCMeta):
         if sub_dir:
             location = os.path.join(location, "**")
 
-        if extensions is None:
-            extensions = ["*"]
-        else:
-            extensions[:] = ["*.{}".format(ext) for ext in extensions]
+        extensions = [pattern if extensions is None else extensions]
+        extensions = ["{}.{}".format(pattern, ext) for ext in extensions]
 
         files = []
         for ext in extensions:
             pathname = os.path.join(location, ext)
-            print(pathname)
             files.extend(glob.glob(pathname, recursive=sub_dir))
         self.files = files
 
@@ -48,7 +48,7 @@ class FileDatastore(Datastore):
         return self
 
     def __next__(self):
-        if self.has_data():
+        if self.has_data:
             return self.read()
         else:
             raise StopIteration

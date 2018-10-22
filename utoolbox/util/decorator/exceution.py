@@ -1,4 +1,10 @@
-from timeit import default_timer as timer
+"""
+Decorators related to reshaping program execution flows.
+"""
+__all__ = [
+    'lazy_property',
+    'run_once'
+]
 
 class lazy_property(object):
     """Monkey patch the wrapped function after evaluation."""
@@ -60,13 +66,3 @@ class run_once(object):
 
     def __hash__(self):
         return hash(self._func)
-
-def timeit(func):
-    """Benchmark the execution time of the wrapped function."""
-    def timed(*args, **kwargs):
-        t_start = timer()
-        result = func(*args, **kwargs)
-        t_end = timer()
-        print("{} {:2.2f} ms".format(func.__name__, (t_end-t_start) * 1e3))
-        return result
-    return timed
