@@ -12,9 +12,9 @@ for(i = 0; i < file_list.length; i++) {
     open(path);
     ${run_analysis}
 
-    ext_pos = indexOf(path, ".tif");
-    path = substring(path, 0, ext_pos) + ".csv";
-    print(path);
+    name = File.getName(path);
+    name = substring(name, 0, lastIndexOf(name, ".")) + ".csv";
+    path = "${dst_dir}" + File.separator + name;
 
     ${export_results}
 
