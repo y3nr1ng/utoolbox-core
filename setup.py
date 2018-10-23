@@ -105,7 +105,8 @@ setup(
     # executable scripts
     entry_points={
         'console_scripts': [
-            'zpatch=utoolbox.cli.zpatch:main',
+            'deskew=utoolbox.cli.deskew:main',
+            'zpatch=utoolbox.cli.zpatch:main'
         ]
     }
 )
