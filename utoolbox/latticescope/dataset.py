@@ -17,12 +17,14 @@ class Dataset(object):
     Representation of an acquisition result from LatticeScope, containing
     software setup and collected data.
     """
-    def __init__(self, root, refactor=True):
+    def __init__(self, root, show_uri=False, refactor=True):
         """
         Parameters
         ----------
         root : str
             Source directory of the dataset, flat layout.
+        show_uri: bool
+            Return image URI when requested, default is False.
         refactor : bool
             Refactor filenames, default is True.
         """
@@ -46,13 +48,35 @@ class Dataset(object):
         n_channels = len(self.settings.waveform.channels)
         logger.info("{} channel(s) in settings".format(n_channels))
 
-        self.datastore = ImageDatastore(root, imageio.volread, sub_dir=False)
+        self._show_uri = show_uri
+        self._datastore = None
 
         #TODO generate inventory file
 
     @property
+    def datastore(self):
+        if self._datastore is None:
+            if self.show_uri:
+                def read_func(x):
+                    return (x, imageio.volread(x))
+            else:
+                read_func = imageio.volread
+            self._datastore = ImageDatastore(self.root, read_func, sub_dir=False)
+        return self._datastore
+
+    @property
     def root(self):
         return self._root
+
+    @property
+    def show_uri(self):
+        return self._show_uri
+
+    @show_uri.setter
+    def show_uri(self, state):
+        if state != self.show_uri:
+            self.show_uri = state
+            self._datastore = None
 
     def _list_data_files(self, sort=True):
         data_files = []
@@ -77,8 +101,10 @@ class Dataset(object):
             sample_name.add(filename.name)
         if len(sample_name) > 1:
             logger.warning("diverged dataset, use first set as template")
-        sample_name = sample_name.pop()
-
+        try:
+            sample_name = sample_name.pop()
+        except:
+            raise FileNotFoundError("no known LatticeScope filename pattern")
         path = os.path.join(self.root, "{}_Settings.txt".format(sample_name))
         if not os.path.exists(path):
             raise FileNotFoundError("unable to find settings")
