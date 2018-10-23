@@ -42,13 +42,11 @@ conda activate utoolbox-dev
 ```
 this will prepare an environment with required development tools under the name `utoolbox-dev`.
 
-Since pip does not honor the `setup_requires` description, we have to install basic requirements first.
+Since pip does not honor the `setup_requires` description, basic requirements and native libraries are installed using conda in preivous step.
+
+Next, we install this toolbox using editable mode
 ```
 pip install -e .
-```
-Then proceed with GPU related packages using `extras_require` flag.
-```
-pip install -e ".[gpu]"
 ```
 
 **TODO** execute tests
@@ -57,13 +55,9 @@ pip install -e ".[gpu]"
 ## Deployment
 These steps will deploy this package on a live system for general use.
 
-After ensuring the prerequisites are satisfied, first
+Please ensure `numpy` is pre-installed in your environment before install through pip.
 ```
 pip install utoolbox
-```
-then
-```
-pip install utoolbox[gpu]
 ```
 
 
