@@ -8,7 +8,6 @@ import re
 import click
 import coloredlogs
 import imageio
-import pandas as pd
 import pycuda.driver as cuda
 
 import utoolbox.latticescope as llsm
