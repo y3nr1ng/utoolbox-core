@@ -17,7 +17,7 @@ setup(
     #   bumpversion release
     # to next version
     #   bump patch/minor/major
-    version='0.1.2',
+    version='0.1.6',
 
     # one-line description for the summary field
     description="A Python image processing package for LLSM.",
@@ -50,7 +50,7 @@ setup(
 
     python_requires='>=3.6',
 
-    # other packages the project depends on to build
+    # other packages the build system would require during compilation
     setup_requires=[
     ],
 
@@ -65,6 +65,7 @@ setup(
         # numeric and processing
         'numpy',
         'scipy',
+        'pandas',
 
         # file io
         'imageio',
@@ -75,12 +76,14 @@ setup(
 
         # parallel
         'dask',
-        #'pycuda', # defer to extras_require
+        'pycuda',
 
         # utils
         'mako',
         'click',
-        'coloredlogs'
+        'coloredlogs',
+        'tqdm',
+        'jinja2' # template engine used by pycuda
     ],
 
     dependency_links=[
@@ -88,9 +91,6 @@ setup(
 
     # additional groups of dependencies here for the "extras" syntax
     extras_require={
-        'gpu': [
-            'pycuda'
-        ]
     },
 
     # data files included in packages
@@ -107,7 +107,8 @@ setup(
     # executable scripts
     entry_points={
         'console_scripts': [
-            'zpatch=utoolbox.cli.zpatch:main',
+            'deskew=utoolbox.cli.deskew:main',
+            'zpatch=utoolbox.cli.zpatch:main'
         ]
     }
 )

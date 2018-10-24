@@ -7,7 +7,7 @@ import numpy as np
 import pycuda.driver as cuda
 import tqdm
 
-from utoolbox.utils.decorators import timeit
+from utoolbox.util.decorator.benchmark import timeit
 from utoolbox.parallel.gpu import create_some_context
 from utoolbox.transform import MIPTransform
 
