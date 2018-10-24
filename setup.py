@@ -65,6 +65,7 @@ setup(
         # numeric and processing
         'numpy',
         'scipy',
+        'pandas',
 
         # file io
         'imageio',
@@ -81,7 +82,8 @@ setup(
         'mako',
         'click',
         'coloredlogs',
-        'tqdm'
+        'tqdm',
+        'jinja2' # template engine used by pycuda
     ],
 
     dependency_links=[
