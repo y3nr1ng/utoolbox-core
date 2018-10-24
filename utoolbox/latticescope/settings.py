@@ -110,6 +110,7 @@ class Settings(AttrDict):
             parsed[field] = value
 
         # NOTE exception, deal with multi-channel
+        #TODO allow N/A filter 
         values = re.findall(
             '^Excitation Filter, Laser, Power \(%\), Exp\(ms\) \((?P<channel>\d+)\) :\t(?P<filter>\D+)\t(?P<wavelength>\d+)\t(?P<power>\d+)\t(?P<exposure>\d+.\d+)',
             lines,
