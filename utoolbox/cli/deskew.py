@@ -48,8 +48,10 @@ def main(src_dir, dst_dir, angle, spacing, rotate):
     try:
         ds = llsm.Dataset(src_dir, show_uri=True, refactor=False)
         for fname, I_in in ds.datastore:
+            logger.debug("deskew \"{}\"".format(fname))
             I_out = transform(I_in)
-            imageio.volwrite(os.path.join(dst_dir, fname), I_out)
+            basename = os.path.basename(fname)
+            imageio.volwrite(os.path.join(dst_dir, basename), I_out)
     except Exception as e:
         logger.error(e)
 
