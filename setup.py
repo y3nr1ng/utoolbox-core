@@ -17,7 +17,7 @@ setup(
     #   bumpversion release
     # to next version
     #   bump patch/minor/major
-    version='0.1.4.dev',
+    version='0.1.6',
 
     # one-line description for the summary field
     description="A Python image processing package for LLSM.",
@@ -65,6 +65,7 @@ setup(
         # numeric and processing
         'numpy',
         'scipy',
+        'pandas',
 
         # file io
         'imageio',
@@ -81,7 +82,8 @@ setup(
         'mako',
         'click',
         'coloredlogs',
-        'tqdm'
+        'tqdm',
+        'jinja2' # template engine used by pycuda
     ],
 
     dependency_links=[
@@ -105,7 +107,8 @@ setup(
     # executable scripts
     entry_points={
         'console_scripts': [
-            'zpatch=utoolbox.cli.zpatch:main',
+            'deskew=utoolbox.cli.deskew:main',
+            'zpatch=utoolbox.cli.zpatch:main'
         ]
     }
 )
