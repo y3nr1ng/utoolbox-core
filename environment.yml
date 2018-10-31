@@ -8,8 +8,14 @@ dependencies:
     # build tools
     - conda-build
     - bumpversion
+    - twine
 
     # core
     - python=3.6
 
+    # numpy dependency
+    # NOTE Pre-install numpy until upstream pycuda can incorporate
+    # https://stackoverflow.com/q/27021270/ in its aksetup_helper.py
+    - numpy
+    
     # native libraries

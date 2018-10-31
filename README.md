@@ -27,7 +27,7 @@ For the time being, these are the tested version combination during development 
 
 
 ### Installing
-A step-by-step example demonstrate how to get a development environment running.
+Following step-by-step instructions will demonstrate how to get a development environment running.
 
 Clone this repository to somewhere convenient.
 ```
@@ -35,20 +35,31 @@ git clone https://github.com/liuyenting/utoolbox.git
 cd utoolbox
 ```
 
-Since pip does not honor the `setup_requires` description, we have to install basic requirements first.
+Install the conda environment by
+```
+conda env create -f environment.yml
+conda activate utoolbox-dev
+```
+this will prepare an environment with required development tools under the name `utoolbox-dev`.
+
+Since pip does not honor the `setup_requires` description, basic requirements and native libraries are installed using conda in preivous step.
+
+Next, we install this toolbox using editable mode
 ```
 pip install -e .
-```
-Then proceed with GPU related packages using `extras_require` flag.
-```
-pip install -e ".[gpu]"
 ```
 
 **TODO** execute tests
 
 
 ## Deployment
-Add additional notes about how to deploy this on a live system.
+These steps will deploy this package on a live system for general use.
+
+Please ensure `numpy` is pre-installed in your environment before install through pip.
+```
+pip install utoolbox
+```
+
 
 ## Contributing
 

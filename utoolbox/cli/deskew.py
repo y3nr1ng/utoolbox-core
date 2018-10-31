@@ -1,10 +1,14 @@
+"""
+Driver program for deskew transform.
+"""
 import logging
 import os
 import re
 
 import click
 import coloredlogs
-import pandas as pd
+import imageio
+import pycuda.driver as cuda
 
 import utoolbox.latticescope as llsm
 from utoolbox.parallel.gpu import create_some_context
@@ -18,47 +22,38 @@ coloredlogs.install(
 
 logger = logging.getLogger(__name__)
 
-def deskew(src, zint, inplace=True, pattern="layer_(\d+)", z_col_header="z [nm]"):
-    match = re.search(pattern, src)
-    if not match:
-        raise ValueError("unknown filename '{}'".format(src))
-    z = match.group(1)
-    try:
-        z = int(z)
-    except ValueError:
-        fname = os.path.basename(src)
-        raise ValueError("unable to extract Z index from filename '{}'".format(fname))
-
-    df = pd.read_csv(src, header=0)
-    df[z_col_header] = (z-1) * zint
-
-    if not inplace:
-        os.rename(src, "{}.old".format(src))
-    df.to_csv(src, float_format='%g', index=False)
 
 @click.command()
 @click.argument('src_dir', type=click.Path(exists=True))
-@click.option('--rotate', 'rotate', is_flag=True, default=False)
-@click.option('--dst_dir', 'dst_dir', type=click.Path(exists=False))
-def main(src_dir, rotate):
-    """
-    TBA
-    """
-    #TODO wrap imageio.volread
-    def _zpatch(*args, **kwargs):
-        try:
-            zpatch(*args, **kwargs)
-        except Exception as e:
-            logger.error(e)
-
+@click.argument('angle', type=float)
+@click.option('--spacing', '-s', nargs=2, type=float, default=(0.102, 0.3),
+              help='Lateral and axial resolution in sequence.')
+@click.option('--rotate', '-r', is_flag=True, default=False,
+              help='Rotate the data to coverslip orientation.')
+@click.option('--dst_dir', type=click.Path(file_okay=False, exists=False),
+              help='Alternative output directory.')
+def main(src_dir, dst_dir, angle, spacing, rotate):
     ctx = create_some_context()
     ctx.push()
 
-    transform = DeskewTransform(spacing, 32.8, rotate=True)
+    transform = DeskewTransform(spacing, angle, rotate=rotate)
 
-    ds = llsm.Dataset(src_dir, refactor=False)
-    for I_in in ds.datastore:
-        I_out = transform(I_in)
+    if not dst_dir:
+        suffix = '_deskew' if rotate else '_shear'
+        dst_dir = os.path.abspath(src_dir) + suffix
+    if not os.path.exists(dst_dir):
+        os.makedirs(dst_dir)
+        logger.info("\"{}\" created".format(dst_dir))
+
+    try:
+        ds = llsm.Dataset(src_dir, show_uri=True, refactor=False)
+        for fname, I_in in ds.datastore:
+            logger.debug("deskew \"{}\"".format(fname))
+            I_out = transform(I_in)
+            basename = os.path.basename(fname)
+            imageio.volwrite(os.path.join(dst_dir, basename), I_out)
+    except Exception as e:
+        logger.error(e)
 
     cuda.Context.pop()
 
