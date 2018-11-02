@@ -14,7 +14,7 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
-def run_macro(macro, *args, ij_path=None):
+def run_macro(macro, *args, ij_path=None, plugins_dir=None):
     import jnius_config
     if not ij_path:
         logger.info("using built-in ImageJ distribution")
@@ -23,8 +23,9 @@ def run_macro(macro, *args, ij_path=None):
         if not os.path.exists(ij_path):
             raise RuntimeError("unable to locate built-in ImageJ distribution")
 
-    ij_root = os.path.dirname(ij_path)
-    plugins_dir = os.path.join(ij_root, 'plugins')
+    if not plugins_dir:
+        ij_root = os.path.dirname(ij_path)
+        plugins_dir = os.path.join(ij_root, 'plugins')
     jnius_config.set_options('-Dplugins.dir={}'.format(plugins_dir))
 
     jnius_config.set_classpath(ij_path)
@@ -47,13 +48,16 @@ def run_macro(macro, *args, ij_path=None):
     macro = MacroRunner(macro, args)
     macro.run()
 
-def run_macro_file(path, *args, ij_path=None):
+def run_macro_file(path, *args, **kwargs):
     with open(macro_path, 'r') as fd:
         macro = fd.read()
         logger.info("{} bytes read".format(len(macro)))
-    run_macro(macro, *args, ij_path=ij_path)
+    run_macro(macro, *args, **kwargs)
 
 class Macro(object):
+    """
+    Describes an ImageJ macro file as an object.
+    """
     def __init__(self):
         cwd = os.path.dirname(os.path.abspath(__file__))
         tpl_dir = os.path.join(cwd, 'macro_template')
@@ -123,7 +127,7 @@ class Macro(object):
             rbody = body.render(body=rbody)
         return rbody
 
-        # merge design
+        #TODO merge design
 
         return self._parse_args()
 
