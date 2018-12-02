@@ -1,4 +1,3 @@
-from abc import abstractmethod
 import logging
 from pprint import pprint
 
@@ -38,22 +37,24 @@ class BarAlgo_GPU(BarAlgo):
     _strategy = ImplTypes.GPU
 
     def run(self):
-        print("run from GPU")
+        logger.info("run from GPU")
 
 class BarAlgo_Dist(BarAlgo):
     _strategy = ImplTypes.DISTRIBUTED
 
     def run(self):
-        print("run from DISTRIBUTED")
+        logger.info("run from DISTRIBUTED")
 
 
-foo = FooAlgo()
-bar = BarAlgo()
+foo = FooAlgo(ImplTypes.CPU_ONLY)
+bar = BarAlgo(ImplTypes.GPU)
 
 print("[foo]")
 pprint(foo._impl)
+print(foo.run())
 
 print()
 
 print("[bar]")
 pprint(bar._impl)
+print(bar.run())
