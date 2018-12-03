@@ -1,4 +1,4 @@
-# pylint: disable=W0612
+# pylint: disable=W0612,E1101
 
 import logging
 from pprint import pprint
@@ -63,58 +63,29 @@ def test_multiple_implementation(algo):
     assert len(algo._impl) == 2
     assert (ImplTypes.CPU_ONLY in algo._impl) and (ImplTypes.GPU in algo._impl)
 
-"""
-class FooAlgo(metaclass=AbstractAlgorithm):
-    pass
+def test_multiple_algorithms(algo):
+    class Bar(metaclass=AbstractAlgorithm):
+        @interface
+        def run(self):
+            pass
 
-class FooAlgo_CPU(FooAlgo):
-    _strategy = ImplTypes.CPU_ONLY
+    class Foo_CPU(algo):
+        _strategy = ImplTypes.CPU_ONLY
 
-    def __init__(self):
-        logger.debug("FooAlgo_CPU.__init__")
+        def run(self):
+            print("Foo, CPU")
 
-    def run(self):
-        logger.info("run from CPU")
+    class Bar_CPU(Bar):
+        _strategy = ImplTypes.CPU_ONLY
 
-class BarAlgo(metaclass=AbstractAlgorithm):
-    def __init__(self):
-        logger.debug("BarAlgo.__init__")
-        self.hello = 42
+        def run(self):
+            print("Bar, CPU")
+    
+    class Bar_GPU(Bar):
+        _strategy = ImplTypes.GPU
 
-    @interface
-    def run(self):
-        logger.info("ERROR")
-
-class BarAlgo_GPU(BarAlgo):
-    _strategy = ImplTypes.GPU
-
-    def run(self):
-        logger.info("run from GPU")
-
-def test():
-    class BarAlgo_Dist(BarAlgo):
-        _strategy = ImplTypes.DISTRIBUTED
-
-        def _run(self):
-            logger.info("run from DISTRIBUTED")
-
-
-foo = FooAlgo(ImplTypes.CPU_ONLY)
-bar = BarAlgo(ImplTypes.GPU)
-
-print("[foo]")
-pprint(foo._impl)
-print(foo.run())
-
-print()
-
-print("[bar]")
-pprint(bar._impl)
-print(bar.run())
-
-class Test(TestCase):
-    pass
-
-if __name__ == '__main__':
-    unittest.main()
-"""
+        def run(self):
+            print("Bar, GPU")
+    
+    assert (len(algo._impl) == 1) and (len(Bar._impl) == 2)
+    assert (ImplTypes.GPU not in algo._impl)
