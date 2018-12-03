@@ -1,5 +1,7 @@
 import logging
 from pprint import pprint
+import unittest
+from unittest import TestCase
 
 import coloredlogs
 
@@ -28,6 +30,7 @@ class FooAlgo_CPU(FooAlgo):
 class BarAlgo(metaclass=AbstractAlgorithm):
     def __init__(self):
         logger.debug("BarAlgo.__init__")
+        self.hello = 42
 
     @interface
     def run(self):
@@ -39,11 +42,12 @@ class BarAlgo_GPU(BarAlgo):
     def run(self):
         logger.info("run from GPU")
 
-class BarAlgo_Dist(BarAlgo):
-    _strategy = ImplTypes.DISTRIBUTED
+def test():
+    class BarAlgo_Dist(BarAlgo):
+        _strategy = ImplTypes.DISTRIBUTED
 
-    def run(self):
-        logger.info("run from DISTRIBUTED")
+        def _run(self):
+            logger.info("run from DISTRIBUTED")
 
 
 foo = FooAlgo(ImplTypes.CPU_ONLY)
@@ -58,3 +62,11 @@ print()
 print("[bar]")
 pprint(bar._impl)
 print(bar.run())
+
+"""
+class Test(TestCase):
+    pass
+
+if __name__ == '__main__':
+    unittest.main()
+"""
