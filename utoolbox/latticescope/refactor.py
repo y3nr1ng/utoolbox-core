@@ -4,18 +4,21 @@ import os
 
 import tqdm
 
-from .parse import Filename
+from .utils import Filename
 
 __all__ = [
-    'sort_timestamps',
     'merge_fragmented_timestamps',
     'rename_by_mapping'
 ]
 
 logger = logging.getLogger(__name__)
 
-def sort_timestamps(filenames):
-    filenames.sort(key=attrgetter('channel', 'name', 'stack'))
+"""
+if refactor:
+    data_files_orig = copy.deepcopy(data_files)
+    merge_fragmented_timestamps(data_files)
+    rename_by_mapping(self.root, data_files_orig, data_files)
+"""
 
 def merge_fragmented_timestamps(filenames):
     ref_filename, name = None, None
