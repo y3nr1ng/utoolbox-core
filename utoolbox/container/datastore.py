@@ -1,12 +1,15 @@
 """
 Create datastore for large collections of data.
 """
+# pylint: disable=E1102
+
 from abc import ABCMeta, abstractmethod
 import glob
 import logging
 import os
 
 __all__ = [
+    'Datastore',
     'FileDatastore',
     'ImageDatastore'
 ]

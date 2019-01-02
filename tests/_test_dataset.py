@@ -1,19 +1,31 @@
-import logging
-from pprint import pprint
+# pylint: disable=W0612
 
-import coloredlogs
 import pytest
+from pytest import fixture
 
 import utoolbox.latticescope as llsm
+from utoolbox.latticescope import sort_by_timestamp
 
-coloredlogs.install(
-    level='DEBUG',
-    fmt='%(asctime)s %(module)s[%(process)d] %(levelname)s %(message)s',
-    datefmt='%H:%M:%S'
-)
+@fixture
+def path():
+    return "mock_dataset"
 
-logger = logging.getLogger(__name__)
+@fixture
+def ds(path):
+    return llsm.Dataset(path, refactor=False)
 
+def test_invalid_root():
+    with pytest.raises(FileNotFoundError) as _:
+        ds = llsm.Dataset('INVALID')
+
+def test_correct_read(path):
+    ds = llsm.Dataset(path, refactor=False)
+
+def test_correct_partitions(ds):
+    pass
+
+
+from pprint import pprint
 
 ##### LOAD FILE #####
 path = "mock_dataset"
@@ -23,6 +35,14 @@ ds = llsm.Dataset(path, refactor=False)
 ##### DUMP INVENTORY #####
 pprint(ds.settings)
 
+pprint(ds.datastore)
+for k, v in ds.datastore.items():
+    print(" << {} >>".format(k))
+    pprint(v.files)
+
+
+##### SORT #####
+sort_by_timestamp(ds)
 pprint(ds.datastore)
 for k, v in ds.datastore.items():
     print(" << {} >>".format(k))
