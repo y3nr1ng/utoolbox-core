@@ -2,12 +2,15 @@ import copy
 import glob
 import logging
 import os
+import re
 
 import imageio
 
 from utoolbox.container import ImageDatastore
 from .parse import Filename
-from .refactor import sort_timestamps, merge_fragmented_timestamps, rename_by_mapping
+from .refactor import (sort_timestamps, \
+                       merge_fragmented_timestamps, \
+                       rename_by_mapping)
 from .settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -17,6 +20,8 @@ class Dataset(object):
     Representation of an acquisition result from LatticeScope, containing
     software setup and collected data.
     """
+    SETTINGS_PATTERN = '(?P<ds_name>.+)_Settings.txt$'
+
     def __init__(self, root, show_uri=False, refactor=True):
         """
         Parameters
@@ -32,22 +37,26 @@ class Dataset(object):
             raise FileNotFoundError("invalid root folder")
         self._root = root
 
+        settings_file = self._find_settings_file()
+        # NOTE some files have corrupted timestamp causing utf-8 decode error
+        with open(settings_file, 'r', errors='ignore') as fd:
+            lines = fd.read()
+        self.settings = Settings(lines)
+
+        n_channels = len(self.settings.waveform.channels)
+        logger.info("{} channel(s) in settings".format(n_channels))
+
+
+
+
         data_files = self._list_data_files()
         if refactor:
             data_files_orig = copy.deepcopy(data_files)
             merge_fragmented_timestamps(data_files)
             rename_by_mapping(self.root, data_files_orig, data_files)
 
-        settings = self._find_settings_file(data_files)
-        # NOTE some files have corrupted timestamp causing utf-8 decode error
-        with open(settings, 'r', errors='ignore') as fd:
-            lines = fd.read()
-        self.settings = Settings(lines)
-
         #TODO partition the datastore by channels
-        n_channels = len(self.settings.waveform.channels)
-        logger.info("{} channel(s) in settings".format(n_channels))
-
+        
         self._show_uri = show_uri
         self._datastore = None
 
@@ -78,6 +87,37 @@ class Dataset(object):
             self.show_uri = state
             self._datastore = None
 
+    def _find_settings_file(self, extension='txt'):
+        # settings are .txt files
+        pattern = os.path.join(self.root, "*.{}".format(extension))
+        filenames = [os.path.basename(fn) for fn in glob.glob(pattern)]
+
+        ds_names = []
+        for filename in filenames:
+            matches = re.match(Dataset.SETTINGS_PATTERN, filename)
+            if matches is None:
+                continue
+            ds_names.append(matches.group('ds_name'))
+        
+        if not ds_names:
+            raise FileNotFoundError("no known settings file")
+        elif len(ds_names) > 1:
+            logger.warning("diverged dataset, attempting to resolve it")
+
+            ds_names.sort()
+            
+            # use the longest common prefix to resolve it
+            prefix = os.path.commonprefix(ds_names)
+            if not prefix:
+                raise RuntimeError(
+                    "unable to determine which settings file to use"
+                )
+            ds_name = prefix
+        else:
+            ds_name = ds_names[0]
+
+        return os.path.join(self.root, ds_name)
+
     def _list_data_files(self, sort=True):
         data_files = []
         filenames = os.listdir(self.root)
@@ -93,19 +133,3 @@ class Dataset(object):
         if sort:
             sort_timestamps(data_files)
         return data_files
-
-    def _find_settings_file(self, data_files):
-        # guess sample name
-        sample_name = set()
-        for filename in data_files:
-            sample_name.add(filename.name)
-        if len(sample_name) > 1:
-            logger.warning("diverged dataset, use first set as template")
-        try:
-            sample_name = sample_name.pop()
-        except:
-            raise FileNotFoundError("no known LatticeScope filename pattern")
-        path = os.path.join(self.root, "{}_Settings.txt".format(sample_name))
-        if not os.path.exists(path):
-            raise FileNotFoundError("unable to find settings")
-        return path
