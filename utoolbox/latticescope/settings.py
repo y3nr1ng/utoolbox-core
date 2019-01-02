@@ -1,3 +1,4 @@
+from collections import namedtuple
 import configparser
 from datetime import datetime
 from enum import Enum
@@ -19,6 +20,11 @@ class ScanType(Enum):
 class TriggerMode(Enum):
     SLM = "SLM -> Cam"
     FPGA = "FPGA"
+
+Channel = namedtuple(
+    "Channel", 
+    ["id", "filter", "wavelength", "power", "exposure"]
+)
 
 class Settings(AttrDict):
     section_pattern = re.compile(
@@ -112,11 +118,11 @@ class Settings(AttrDict):
         # NOTE exception, deal with multi-channel
         #TODO allow N/A filter 
         values = re.findall(
-            '^Excitation Filter, Laser, Power \(%\), Exp\(ms\) \((?P<channel>\d+)\) :\t(?P<filter>\D+)\t(?P<wavelength>\d+)\t(?P<power>\d+)\t(?P<exposure>\d+(?:\.\d+)?)',
+            '^Excitation Filter, Laser, Power \(%\), Exp\(ms\) \((?P<id>\d+)\) :\t(?P<filter>\D+)\t(?P<wavelength>\d+)\t(?P<power>\d+)\t(?P<exposure>\d+(?:\.\d+)?)',
             lines,
             re.MULTILINE
         )
-        parsed['channels'] = values
+        parsed['channels'] = [Channel(*value) for value in values]
 
         return 'waveform', parsed
 
