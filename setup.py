@@ -73,6 +73,7 @@ setup(
 
         # gui
         'pyqt5',
+        'plotly',
 
         # parallel
         'dask',
