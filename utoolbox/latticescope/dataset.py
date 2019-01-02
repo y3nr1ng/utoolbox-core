@@ -38,6 +38,7 @@ class Dataset(object):
         self._root = root
 
         settings_file = self._find_settings_file()
+        logger.debug("settings file \"{}\"".format(settings_file))
         # NOTE some files have corrupted timestamp causing utf-8 decode error
         with open(settings_file, 'r', errors='ignore') as fd:
             lines = fd.read()
@@ -46,77 +47,76 @@ class Dataset(object):
         n_channels = len(self.settings.waveform.channels)
         logger.info("{} channel(s) in settings".format(n_channels))
 
+        # if requested, wrap the reader before creating datastores
+        if show_uri:
+            def read_func(x):
+                return (x, imageio.volread(x))
+        else:
+            read_func = imageio.volread
 
+        # partition the dataset to different datastore by channels 
+        self._datastore = dict()
+        for channel in self.settings.waveform.channels:
+            if channel.wavelength in self._datastore:
+                logger.warning("duplicated wavelength, ignore")
+                continue
+            self._datastore[channel.wavelength] = ImageDatastore(
+                self.root,
+                read_func,
+                sub_dir=False,
+                pattern="*_ch{}_*".format(channel.id)
+            )
 
-
-        data_files = self._list_data_files()
+        """
         if refactor:
             data_files_orig = copy.deepcopy(data_files)
             merge_fragmented_timestamps(data_files)
             rename_by_mapping(self.root, data_files_orig, data_files)
-
-        #TODO partition the datastore by channels
-        
-        self._show_uri = show_uri
-        self._datastore = None
+        """
 
         #TODO generate inventory file
 
     @property
     def datastore(self):
-        if self._datastore is None:
-            if self.show_uri:
-                def read_func(x):
-                    return (x, imageio.volread(x))
-            else:
-                read_func = imageio.volread
-            self._datastore = ImageDatastore(self.root, read_func, sub_dir=False)
         return self._datastore
 
     @property
     def root(self):
         return self._root
 
-    @property
-    def show_uri(self):
-        return self._show_uri
-
-    @show_uri.setter
-    def show_uri(self, state):
-        if state != self.show_uri:
-            self.show_uri = state
-            self._datastore = None
-
     def _find_settings_file(self, extension='txt'):
         # settings are .txt files
-        pattern = os.path.join(self.root, "*.{}".format(extension))
-        filenames = [os.path.basename(fn) for fn in glob.glob(pattern)]
+        search_pattern = os.path.join(self.root, "*.{}".format(extension))
+        filenames = glob.glob(search_pattern)
 
         ds_names = []
         for filename in filenames:
-            matches = re.match(Dataset.SETTINGS_PATTERN, filename)
+            basename = os.path.basename(filename)
+            matches = re.match(Dataset.SETTINGS_PATTERN, basename)
             if matches is None:
                 continue
-            ds_names.append(matches.group('ds_name'))
+            ds_names.append((matches.group('ds_name'), filename))
         
         if not ds_names:
             raise FileNotFoundError("no known settings file")
         elif len(ds_names) > 1:
             logger.warning("diverged dataset, attempting to resolve it")
 
-            ds_names.sort()
+            # sort by name of dataset instead of actual path
+            ds_names.sort(key=lambda t: t[0])
             
             # use the longest common prefix to resolve it
-            prefix = os.path.commonprefix(ds_names)
-            if not prefix:
+            ds_names_tr = list(zip(*ds_names))
+            prefix = os.path.commonprefix(ds_names_tr[0])
+            try:
+                index = ds_names_tr[0].index(prefix)
+            except ValueError:
                 raise RuntimeError(
                     "unable to determine which settings file to use"
                 )
-            ds_name = prefix
+            return ds_names[index][1]
         else:
-            ds_name = ds_names[0]
-
-        return os.path.join(self.root, ds_name)
+            return ds_names[0][1]
 
     def _list_data_files(self, sort=True):
         data_files = []

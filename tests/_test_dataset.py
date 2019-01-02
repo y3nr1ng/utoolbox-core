@@ -2,6 +2,7 @@ import logging
 from pprint import pprint
 
 import coloredlogs
+import pytest
 
 import utoolbox.latticescope as llsm
 
@@ -15,10 +16,14 @@ logger = logging.getLogger(__name__)
 
 
 ##### LOAD FILE #####
-path = "test_filenames"
-#path = "test_filenames"
+path = "mock_dataset"
 ds = llsm.Dataset(path, refactor=False)
 
 
 ##### DUMP INVENTORY #####
 pprint(ds.settings)
+
+pprint(ds.datastore)
+for k, v in ds.datastore.items():
+    print(" << {} >>".format(k))
+    pprint(v.files)
