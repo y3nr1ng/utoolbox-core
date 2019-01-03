@@ -25,25 +25,26 @@ def test_correct_partitions(ds):
     pass
 
 
-from pprint import pprint
+if __name__ == '__main__':
+    from pprint import pprint
 
-##### LOAD FILE #####
-path = "mock_dataset"
-ds = llsm.Dataset(path, refactor=False)
-
-
-##### DUMP INVENTORY #####
-pprint(ds.settings)
-
-pprint(ds.datastore)
-for k, v in ds.datastore.items():
-    print(" << {} >>".format(k))
-    pprint(v.files)
+    ##### LOAD FILE #####
+    path = "mock_dataset"
+    ds = llsm.Dataset(path, refactor=False)
 
 
-##### SORT #####
-sort_by_timestamp(ds)
-pprint(ds.datastore)
-for k, v in ds.datastore.items():
-    print(" << {} >>".format(k))
-    pprint(v.files)
+    ##### DUMP INVENTORY #####
+    pprint(ds.settings)
+
+    pprint(ds.datastore)
+    for k, v in ds.datastore.items():
+        print(" << {} >>".format(k))
+        pprint(v.files)
+
+
+    ##### SORT #####
+    sort_by_timestamp(ds)
+    pprint(ds.datastore)
+    for k, v in ds.datastore.items():
+        print(" << {} >>".format(k))
+        pprint(v.files)
