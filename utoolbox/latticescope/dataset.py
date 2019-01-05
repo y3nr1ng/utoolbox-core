@@ -16,7 +16,7 @@ class Dataset(object):
     Representation of an acquisition result from LatticeScope, containing
     software setup and collected data.
     """
-    SETTINGS_PATTERN = '(?P<ds_name>.+)_Settings.txt$'
+    SETTINGS_PATTERN = r"(?P<ds_name>.+)_Settings.txt$"
 
     def __init__(self, root, show_uri=False, refactor=True):
         """
@@ -62,7 +62,7 @@ class Dataset(object):
                 sub_dir=False,
                 pattern="*_ch{}_*".format(channel.id)
             )
-            
+
         #TODO generate inventory file
 
     @property

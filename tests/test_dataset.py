@@ -1,5 +1,7 @@
 # pylint: disable=W0612
 
+import os
+
 import pytest
 from pytest import fixture
 
@@ -8,7 +10,8 @@ from utoolbox.latticescope import sort_by_timestamp
 
 @fixture
 def path():
-    return "mock_dataset"
+    test_dir = os.path.dirname(os.path.realpath(__file__))
+    return os.path.join(test_dir, "mock_dataset")
 
 @fixture
 def ds(path):
@@ -22,6 +25,9 @@ def test_correct_read(path):
     ds = llsm.Dataset(path, refactor=False)
 
 def test_correct_partitions(ds):
+    pass
+
+def test_generate_preview(ds):
     pass
 
 
