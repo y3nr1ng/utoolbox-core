@@ -1,7 +1,6 @@
 # pylint: disable=W1401
 
 import logging
-from operator import attrgetter
 import os
 import re
 
@@ -21,13 +20,13 @@ class Filename(object):
     )
 
     _pattern = re.compile(
-        "(?P<name>\w+)_"
-        "ch(?P<channel>\d+)_"
-        "stack(?P<stack>\d{4})_"
-        "(?P<wavelength>\d+)nm_"
-        "(?P<timestamp_rel>\d{7})msec_"
-        "(?P<timestamp_abs>\d+)msecAbs"
-        ".tif{1,2}$"
+        r"(?P<name>\w+)_"
+        r"ch(?P<channel>\d+)_"
+        r"stack(?P<stack>\d{4})_"
+        r"(?P<wavelength>\d+)nm_"
+        r"(?P<timestamp_rel>\d{7})msec_"
+        r"(?P<timestamp_abs>\d+)msecAbs"
+        r".tif{1,2}$"
     )
 
     def __init__(self, str_name):
@@ -63,10 +62,10 @@ def _to_filename_objs(ds):
     return filenames
 
 def _sort_datastore_by_timestamp(ds):
-    fo = _to_filename_objs(ds)
+    filename_objs = _to_filename_objs(ds)
     ds.files = [
         path for _, path in sorted(
-            zip(fo, ds.files), 
+            zip(filename_objs, ds.files), 
             key=lambda t: (t[0].channel, t[0].name, t[0].stack)
         )
     ]
