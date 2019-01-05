@@ -1,12 +1,15 @@
 """
 Create datastore for large collections of data.
 """
+# pylint: disable=E1102
+
 from abc import ABCMeta, abstractmethod
 import glob
 import logging
 import os
 
 __all__ = [
+    'Datastore',
     'FileDatastore',
     'ImageDatastore'
 ]
@@ -22,6 +25,8 @@ class Datastore(object, metaclass=ABCMeta):
             Files or folders to include in the datastore.
         sub_dir : bool, default to False
             Include subfolders within folder.
+        pattern : str
+            Patterns in the filename, default to '*'.
         extensions : None or list of str
             Extensions of files, select all if 'None'.
         """

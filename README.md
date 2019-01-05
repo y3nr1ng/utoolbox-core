@@ -49,7 +49,10 @@ Next, we install this toolbox using editable mode
 pip install -e .
 ```
 
-**TODO** execute tests
+To test the toolbox, run
+```
+pytest
+```
 
 
 ## Deployment
@@ -60,10 +63,6 @@ Please ensure `numpy` is pre-installed in your environment before install throug
 pip install utoolbox
 ```
 
-
-## Contributing
-
-## Versioning
 
 ## Authors
 - Liu, Yen-Ting

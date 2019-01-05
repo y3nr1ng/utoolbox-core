@@ -1,3 +1,4 @@
+from collections import namedtuple
 import configparser
 from datetime import datetime
 from enum import Enum
@@ -10,19 +11,25 @@ from utoolbox.container import AttrDict
 logger = logging.getLogger(__name__)
 
 class AcquisitionMode(Enum):
-    Z_STACK = "Z stack"
+    Z_STACK = 'Z stack'
+    SIM = 'SI Scan SLM comb'
 
 class ScanType(Enum):
-    SAMPLE = "Sample piezo"
-    OBJECTIVE = "Z objective & galvo"
+    SAMPLE = 'Sample piezo'
+    OBJECTIVE = 'Z objective & galvo'
 
 class TriggerMode(Enum):
-    SLM = "SLM -> Cam"
-    FPGA = "FPGA"
+    SLM = 'SLM -> Cam'
+    FPGA = 'FPGA'
+
+Channel = namedtuple(
+    'Channel', 
+    ['id', 'filter', 'wavelength', 'power', 'exposure']
+)
 
 class Settings(AttrDict):
     section_pattern = re.compile(
-        '^(?:\*{5}\s{1}){3}\s*(?P<title>[^\*]+)(?:\s{1}\*{5}){3}',
+        r"^(?:\*{5}\s{1}){3}\s*(?P<title>[^\*]+)(?:\s{1}\*{5}){3}",
         re.MULTILINE
     )
 
@@ -63,8 +70,8 @@ class Settings(AttrDict):
     @staticmethod
     def parse_general(lines):
         patterns = {
-            'timestamp': '^Date :\t(\d+/\d+/\d+ \d+:\d+:\d+ [A|P]M)',
-            'mode': '^Acq Mode :\t(.*)'
+            'timestamp': r"^Date :\t(\d+/\d+/\d+ \d+:\d+:\d+ [A|P]M)",
+            'mode': r"^Acq Mode :\t(.*)"
         }
 
         converter = {
@@ -87,11 +94,11 @@ class Settings(AttrDict):
     @staticmethod
     def parse_waveform(lines):
         patterns = {
-            'type': '^Z motion :\t(.*)',
+            'type': r"^Z motion :\t(.*)",
             'obj_piezo_step':
-                '^Z PZT .* Interval \(um\), .* :\t\d+\.*\d*\t(\d+\.*\d*)\t\d+$',
+                r"^Z PZT .* Interval \(um\), .* :\t\d+\.*\d*\t(\d+\.*\d*)\t\d+$",
             'sample_piezo_step':
-                '^S PZT .* Interval \(um\), .* :\t\d+\.*\d*\t(\d+\.*\d*)\t\d+$',
+                r"^S PZT .* Interval \(um\), .* :\t\d+\.*\d*\t(\d+\.*\d*)\t\d+$",
         }
 
         converter = {
@@ -112,21 +119,21 @@ class Settings(AttrDict):
         # NOTE exception, deal with multi-channel
         #TODO allow N/A filter 
         values = re.findall(
-            '^Excitation Filter, Laser, Power \(%\), Exp\(ms\) \((?P<channel>\d+)\) :\t(?P<filter>\D+)\t(?P<wavelength>\d+)\t(?P<power>\d+)\t(?P<exposure>\d+.\d+)',
+            r"^Excitation Filter, Laser, Power \(%\), Exp\(ms\) \((\d+)\) :\t(\D+)\t(\d+)\t(\d+)\t(\d+(?:\.\d+)?)",
             lines,
             re.MULTILINE
         )
-        parsed['channels'] = values
+        parsed['channels'] = [Channel(*value) for value in values]
 
         return 'waveform', parsed
 
     @staticmethod
     def parse_camera(lines):
         patterns = {
-            'model': '^Model :\t(.*)',
-            'exposure': '^Exp\(s\)\D+([\d\.]+)',
-            'cycle': '^Cycle\(s\)\D+([\d\.]+)',
-            'roi': '^ROI :\tLeft=(\d+) Top=(\d+) Right=(\d+) Bot=(\d+)'
+            'model': r"^Model :\t(.*)",
+            'exposure': r"^Exp\(s\)\D+([\d\.]+)",
+            'cycle': r"^Cycle\(s\)\D+([\d\.]+)",
+            'roi': r"^ROI :\tLeft=(\d+) Top=(\d+) Right=(\d+) Bot=(\d+)"
         }
 
         converter = {
@@ -150,7 +157,7 @@ class Settings(AttrDict):
     @staticmethod
     def parse_timing(lines):
         patterns = {
-            'mode': '^Trigger Mode :\t(.*)'
+            'mode': r"^Trigger Mode :\t(.*)"
         }
 
         converter = {

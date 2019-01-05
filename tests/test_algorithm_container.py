@@ -1,21 +1,9 @@
 # pylint: disable=W0612,E1101
 
-import logging
-from pprint import pprint
-
-import coloredlogs
 import pytest
 from pytest import fixture
 
 from utoolbox.container import AbstractAlgorithm, ImplTypes, interface
-
-coloredlogs.install(
-    level='DEBUG',
-    fmt='%(asctime)s %(module)s[%(process)d] %(levelname)s %(message)s',
-    datefmt='%H:%M:%S'
-)
-
-logger = logging.getLogger(__name__)
 
 @fixture
 def algo():
@@ -28,7 +16,6 @@ def algo():
 def test_correct_implementation(algo):
     class Foo_CPU(algo): 
         _strategy = ImplTypes.CPU_ONLY
-
         def run(self):
             print("Foo, CPU")
 
@@ -40,7 +27,6 @@ def test_incomplete_interface(algo):
 def test_undefined_implementation(algo):
     class Foo_CPU(algo):
         _strategy = ImplTypes.CPU_ONLY
-
         def run(self):
             print("Foo, CPU")
     
@@ -50,13 +36,11 @@ def test_undefined_implementation(algo):
 def test_multiple_implementation(algo):
     class Foo_CPU(algo):
         _strategy = ImplTypes.CPU_ONLY
-
         def run(self):
             print("Foo, CPU")
     
     class Foo_GPU(algo):
         _strategy = ImplTypes.GPU
-
         def run(self):
             print("Foo, GPU")
     
@@ -71,19 +55,16 @@ def test_multiple_algorithms(algo):
 
     class Foo_CPU(algo):
         _strategy = ImplTypes.CPU_ONLY
-
         def run(self):
             print("Foo, CPU")
 
     class Bar_CPU(Bar):
         _strategy = ImplTypes.CPU_ONLY
-
         def run(self):
             print("Bar, CPU")
     
     class Bar_GPU(Bar):
         _strategy = ImplTypes.GPU
-
         def run(self):
             print("Bar, GPU")
     
