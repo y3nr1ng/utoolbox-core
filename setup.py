@@ -111,5 +111,8 @@ setup(
             'deskew=utoolbox.cli.deskew:main',
             'zpatch=utoolbox.cli.zpatch:main'
         ]
-    }
+    }, 
+
+    # cannot safely run in compressed form
+    zip_safe=False
 )
