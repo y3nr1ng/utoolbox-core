@@ -1,7 +1,12 @@
 import logging
+from math import log, ceil
 
+from numba import jit
 import numpy as np
+import numpy.ma as ma
 from scipy import ndimage as ndi
+
+from imageio import volwrite
 
 __all__ = [
     'rmlp'
@@ -10,7 +15,14 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 def _smooth(data, sigma, mode, cval):
-    pass
+    """Return image with each channel smoothed by the Gaussian filter."""
+    smoothed = np.empty_like(data)
+
+    # apply Gaussian filter to all channels independently
+    ndi.gaussian_filter(data, sigma, output=smoothed,
+                        mode=mode, cval=cval)
+    return smoothed
+
 
 def _pyramid_laplacian(I, max_layer=-1, downscale=2, sigma=None, mode='reflect', cval=0):
     """
@@ -28,13 +40,58 @@ def _pyramid_laplacian(I, max_layer=-1, downscale=2, sigma=None, mode='reflect',
         Sigma for the smooth filter. 
     """
     assert(downscale > 1)
+
+    if max_layer < 0:
+        # TODO estimate max_layer
+        max_layer = ceil(log(max(I.shape)) / log(downscale))
     
     if sigma is None:
         # determine sigma that covers 99% of distribution
         sigma = 2*downscale/6. 
     
+    # TODO refactor LP
+    LP0, Gk0, Gk1 = np.empty_like(I), np.empty_like(I), np.empty_like(I)
+
+
+    for i_layer in range(max_layer):
+        ndi.zoom(
+            Is, 1./downscale, output=Ir, 
+            order=1, mode=mode, cval=cval, prefilter=False
+        )
+        Is = _smooth(Ir, sigma, mode, cval)
+
+        if i_layer == max_layer-1:
+            yield Ir
+        else:
+            yield Ir - Is
+    
+    ### 
+
     layer = 0
-    curr_shape = 
+    current_shape = I.shape
+    out_shape = tuple([d//downscale for d in current_shape])
+
+    Is = _smooth(I, sigma, mode, cval)
+    yield I - Is
+
+    # build downsampled images until max_layer is reached or downscale process
+    # does not change image size
+    while layer != max_layer:
+        layer += 1
+
+        Ir = resize(Is, out_shape, order=order,
+                    mode=mode, cval=cval, anti_aliasing=False)
+        Is = _smooth(Ir, sigma, mode, cval)
+
+        current_shape = np.asarray(Ir.shape)
+        out_shape = tuple([d//downscale for d in current_shape])
+
+        last_layer = np.all(current_shape == out_shape) or layer == max_layer-1
+        if last_layer:
+            yield Ir
+            break
+        else:
+            yield Ir - Is
 
 def pyramid_fusion(ds, M, K, sigma=None):
     """
@@ -53,10 +110,57 @@ def pyramid_fusion(ds, M, K, sigma=None):
     """
     if sigma is None:
         downscale = 2
+        # determine sigma that covers 99% of distribution
         sigma = 2*downscale / 6.
+
+    LPs = zip(*[_pyramid_laplacian(I, max_layer=K, sigma=sigma) for I in ds])
+    Fs = []
+
+    # cherry pick LP regions by DBRG mask
+    for LPn in LPs:
+        Fk = np.full_like(LPn[0], np.NINF)
+        # iterate over different LP
+        #   \hat{n} = argmax_n \vert LP_k^n (x, y) \vert
+        #   n \in \lbrace 1, N \rbrace
+        for i, LP in enumerate(LPn):
+            flag = (M == i+1)
+            Fk[flag] = LP[flag]
+        Fs.append(Fk)  
     
-    LP = zip(*[])
+    # fuse different layers
+    Ff = F[-1] # top most layer is G, rest of the layers are L
+    for F in reversed(F[:-1]):
+        # upsample and sum
+        #   G_{K-1} (i, j) = LP_{K-1}
+        #   G_k (i, j) = LP_k + G^\ast_{k+1}, k \in \lbrace 0, K-1)
+        pass
+
+    ###
+    
+    LP = zip(*[
+        list(_pyramid_laplacian(I, max_layer=K, sigma=sigma)) for I in ds
+    ])
     F = []
+
+    for lp in LP:
+        fused = np.zeros_like(lp[0])
+        M = resize(
+            M, lp[0].shape, preserve_range=True, order=0, mode='edge', anti_aliasing=False
+        )
+        for i, l in enumerate(lp):
+            fused[M == i+1] == l[M == i+1]
+        F.append(fused)
+    
+    fused_F = F[-1]
+    for f in reversed(F[:-1]):
+        assert(all(i <= j for i, j in zip(fused_F.shape, f.shape)))
+        resized_F = resize(
+            fused_F, f.shape, order=1, mode='edge', anti_aliasing=False
+        )
+        smoothed_F = _smooth(resized_F, sigma=sigma, mode='reflect', cval=0)
+        fused_F = smoothed_F + f
+
+    return fused_F
 
 def _generate_seeds(D, t=.5):
     """
@@ -90,24 +194,26 @@ def _density_distribution(n, M, r):
         Radius of circle that counted as spatial neighborhood.
     """
     D = []
-    selem = _sphere(r)
+    selem = _sphere(r, dtype=np.float32)
     
     Ar = np.ones_like(M)
-    c = ndi.convolve(Ar, selem, mode='constant', cval=0) # normalization
+    logger.debug("calculate sphere factor")
+    c = ndi.filters.convolve(Ar, selem, mode='constant', cval=0) # normalization
     for _n in range(1, n+1):
-        logger.debug("density @ level={}".format(_n))
+        logger.debug("density, n={}".format(_n))
         # delta function
-        Mp = (M == _n).astype(int)
-        v = ndi.convolve(Mp, selem, mode='constant', cval=0)
-        Dp = v / c 
+        Mp = (M == _n).astype(np.float32)
+        v = ndi.filters.convolve(Mp, selem, mode='constant', cval=0)
+        Dp = (v / c).astype(np.float32) 
         D.append(Dp)
     return D
 
+@jit("f4[:,:,:](f4[:,:,:])", nopython=True)
 def _modified_laplacian(I):
     J = np.empty_like(I)
     n, m, l = I.shape
     for z in range(0, n):
-        logger.debug("modified L @ z={}".format(z))
+        #logger.debug("modified L @ z={}".format(z))
         for y in range(0, m):
             for x in range(0, l):
                 pc = I[z, y, x]
@@ -122,21 +228,9 @@ def _modified_laplacian(I):
                 J[z, y, x] = abs(2*pc-pu-pd) + abs(2*pc-pl-pr) + abs(2*pc-pt-pb)
     return J
 
-def sml(I, T):
-    """
-    Summed-modified-Laplacian (SML) measurement.
-
-    Parameters
-    ----------
-    I : np.ndarray
-        Image to estimate.
-    T : float
-        The discrimination threshold, optimal value ranges in [0, 10].
-    """
-    G = _modified_laplacian(I)
-    Gp = np.zeros((3, 3, 3)) # buffer
-
-    S = np.empty_like(I)
+@jit("f4[:,:,:](f4[:,:,:])", nopython=True)
+def _sml_jit_loop(G):
+    S = np.empty_like(G)
     n, m, l = S.shape
     for z in range(0, n):
         for y in range(0, m):
@@ -149,7 +243,47 @@ def sml(I, T):
                 pb = max(z-1, 0)
                 Gp = G[pb:pt+1, pl:pr+1, pd:pu+1]
 
-                S[z, y, x] = np.sum(Gp[Gp >= T])
+                #S[z, y, x] = np.sum(Gp[Gp >= T])
+                S[z, y, x] = np.sum(Gp)
+    return S
+
+def sml(I, T):
+    """
+    Summed-modified-Laplacian (SML) measurement.
+
+    Parameters
+    ----------
+    I : np.ndarray
+        Image to estimate.
+    T : float
+        The discrimination threshold, optimal value ranges in [0, 10].
+    """
+    G = _modified_laplacian(I)
+    #Gp = np.zeros((3, 3, 3)) # buffer
+
+    logger.debug("sml start summing")
+    #G = ma.masked_less(G, T)
+    G[G < T] = 0
+
+    """
+    S = np.empty_like(I)
+    n, m, l = S.shape
+    for z in range(0, n):
+        logger.debug("sml, z={}".format(z))
+        for y in range(0, m):
+            for x in range(0, l):
+                pu = min(x+1, l-1)
+                pd = max(x-1, 0)
+                pr = min(y+1, m-1)
+                pl = max(y-1, 0)
+                pt = min(z+1, n-1)
+                pb = max(z-1, 0)
+                Gp = G[pb:pt+1, pl:pr+1, pd:pu+1]
+
+                #S[z, y, x] = np.sum(Gp[Gp >= T])
+                S[z, y, x] = np.sum(Gp)
+    """
+    S = _sml_jit_loop(G)
     return S
 
 def _generate_init_mask(ds, T):
@@ -163,13 +297,24 @@ def _generate_init_mask(ds, T):
     T : float
         Blur level criteria.
     """
-    S = [sml(I, T) for I in ds] # TODO: merge in the loop
-
+    #S = [sml(I, T) for I in ds] # TODO: merge in the loop
+    
+    """
     M = np.zeros_like(ds[0], dtype=np.uint32)
     V = np.full_like(M, np.NINF)
     for i, s in enumerate(S):
         M[abs(s) > V] = i+1
         V[abs(s) > V] = s[abs(s) > V]
+    """
+
+    M = np.zeros_like(ds[0], dtype=np.uint32)
+    V = np.full_like(M, np.NINF)
+    for i, I in enumerate(ds):
+        S = sml(I, T)
+        flag = abs(S) > V
+        M[flag] = i+1
+        V[flag] = S[flag]
+
     return M
 
 def dbrg(ds, T, r):
@@ -196,11 +341,13 @@ def dbrg(ds, T, r):
     R = np.zeros_like(M, dtype=np.uint32)
     V = np.full_like(M, np.NINF, dtype=np.float32)
 
+    logger.debug("initial labeling by density")
     # label by density map
     for i, d in enumerate(D):
         R[(d > V) & S] = i+1
         V[(d > V) & S] = d[(d > V) & S]
 
+    logger.debug("density conncetivity")
     # label by density connectivity
     n, m, l = M.shape
     v = np.empty(len(D)+1, dtype=np.float32)
@@ -227,6 +374,7 @@ def dbrg(ds, T, r):
                 if R[z, y, x] == 0:
                     ps.append((z, y, x))
     
+    logger.debug("nearest neighbor")
     # label by nearest neighbor
     psv = [] # filled result
     for z, y, x in ps:
@@ -269,12 +417,13 @@ def rmlp(ds, T=1/255., r=4, K=None):
     r : int
         Density connectivity search radius.
     K : int
-        Level of the pyramids, default to `floor(log_2(dim(ds)))`
+        Level of the pyramids.
     """
-    # determine K based on data dimension
-    if not K:
-        pass
-        logger.debug("estimate K={}".format(K))
+    logger.debug("dbrg started")
     R = dbrg(ds, T, r)
+    logger.debug("dbrg completed")
+    volwrite("R.tif", R)
+    raise RuntimeError("DEBUG")
+    return R
     F = pyramid_fusion(ds, R, K)
     return F
