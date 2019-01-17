@@ -12,7 +12,7 @@ from utoolbox.container import AbstractAlgorithm, ImplTypes, interface
 logger = logging.getLogger(__name__)
 
 class Rotate2(metaclass=AbstractAlgorithm):
-    def __call__(self, I, deg, ratio=(1., 1.), out=None):
+    def __call__(self, I, deg, scale=(1., 1.), out=None):
         """
         Parameters
         ----------
@@ -20,7 +20,7 @@ class Rotate2(metaclass=AbstractAlgorithm):
             Input image.
         deg : float
             Rotation angle in degrees.
-        ratio : tuple of float
+        scale : tuple of float
             Scaling ratio of (X, Y) axis, default is (1., 1.)
         out : np.ndarray, optional
             Output buffer. If defined, output size is cropped to its size.
@@ -29,20 +29,19 @@ class Rotate2(metaclass=AbstractAlgorithm):
         if out is None:
             out_sz = I.shape
             # TODO recalculate output size
-            #out_sz = (out_sz[0]*ratio[1], out_sz[1]*ratio[0])
+            #out_sz = (out_sz[0]*scale[1], out_sz[1]*scale[0])
             out_buf = np.empty(out_sz, dtype=I.dtype)
         else:
-            out_sz = out.shape
             out_buf = out
 
         rad = radians(deg)
 
-        self._run(I, rad, ratio, out_buf)
+        self._run(I, rad, scale, out_buf)
 
         return out_buf
     
     @interface
-    def _run(self, I, rad, ratio, out):
+    def _run(self, I, rad, scale, out):
         """
         Parameters
         ----------
@@ -50,7 +49,7 @@ class Rotate2(metaclass=AbstractAlgorithm):
             Input image.
         rad : float
             Rotation angle in radians.
-        ratio : tuple of float
+        scale : tuple of float
             Scaling ratio of (X, Y) axis, default is (1., 1.)
         out : np.ndarray
             Output buffer. Output sampling grid is determined by size of this 
@@ -74,44 +73,46 @@ class Rotate2_GPU(Rotate2):
         
         # preset texture
         texture = module.get_texref('rot2_tex')
+        #texture.set_flags(cuda.TRSF_NORMALIZED_COORDINATES)
         texture.set_address_mode(0, cuda.address_mode.BORDER)
         texture.set_address_mode(1, cuda.address_mode.BORDER)
         texture.set_filter_mode(cuda.filter_mode.LINEAR)
-        texture.set_flags(cuda.TRSF_NORMALIZED_COORDINATES)
         logger.debug("texture flags: {}".format(texture.get_flags()))
         self._texture = texture
 
         # preset kernel launch parameters
-        self._kernel.prepare('PfIIff', texrefs=[texture])
+        self._kernel.prepare('PfIIffII', texrefs=[texture])
 
         # output staging buffer
         self._out_buf = None
 
-    def _run(self, I, rad, ratio, out):
+    def _run(self, I, rad, scale, out):
         # bind input image to texture
         _in_buf = cuda.np_to_array(I, 'C')
         self._texture.set_array(_in_buf)
 
         if (self._out_buf is None) or (self._out_buf.shape != out.shape):
-            logger.debug("refresh out_buf")
+            logger.debug("resize buffer to {}".format(out.shape))
             self._out_buf = gpuarray.empty(out.shape, dtype=np.float32, order='C')
-            logger.debug("out_buf type: {}".format(type(self._out_buf)))
-
+            
         # determine grid and block size
         nv, nu = out.shape
-        block_sz = (32, 32, 1)
-        grid_sz = (ceil(float(nu)/block_sz[0]), ceil(float(nv)/block_sz[1]), 1)
-        logger.debug("grid size {}".format(grid_sz))
+        logger.debug("out.shape={}".format(out.shape))
+        block_sz = (16, 16, 1)
+        grid_sz = (ceil(float(nu)/block_sz[0]), ceil(float(nv)/block_sz[1]))
+        logger.debug("grid_sz={}".format(grid_sz))
 
         # execute
-        rx, ry = ratio
+        ny, nx = I.shape
+        sx, sy = scale
         logger.debug(self._out_buf.dtype)
         self._kernel.prepared_call(
             grid_sz, block_sz,
             self._out_buf.gpudata,
             np.float32(rad),
             np.uint32(nu), np.uint32(nv),
-            np.float32(rx), np.float32(ry)
+            np.float32(sx), np.float32(sy),
+            np.uint32(nx), np.uint32(ny)
         )
         self._out_buf.get(out)
         logger.debug("out: {}".format(out))
