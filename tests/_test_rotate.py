@@ -25,7 +25,8 @@ ctx.push()
 rotate = Rotate2(ImplTypes.GPU)
 
 I = imageio.imread('lena512.bmp')
-J = rotate(I, 45, (1., 1.))
-imageio.imwrite('output.bmp', I)
+J = np.empty((1024, 512), dtype=np.float32)
+rotate(I.astype(np.float32), 0., (1., .5), J)
+imageio.imwrite('output.tif', J)
 
 cuda.Context.pop()
