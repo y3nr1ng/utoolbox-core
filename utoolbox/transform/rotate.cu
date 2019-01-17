@@ -20,8 +20,8 @@ void rot2_kernel(
     float v = iv/(float)nv - .5f;
 
     // reverse rotate
-    float x =  u*cosf(theta) + v*sinf(theta) + .5f;
-    float y = -u*sinf(theta) + v*cosf(theta) + .5f;
+    float x = u*cosf(theta) - v*sinf(theta) + .5f;
+    float y = u*sinf(theta) + v*cosf(theta) + .5f;
 
     // rescale
     x *= rx; y *= ry;

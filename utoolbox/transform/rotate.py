@@ -1,5 +1,5 @@
 import logging
-from math import sin, cos, radians
+from math import sin, cos, radians, ceil
 import os
 
 import numpy as np
@@ -25,20 +25,21 @@ class Rotate2(metaclass=AbstractAlgorithm):
         out : np.ndarray, optional
             Output buffer. If defined, output size is cropped to its size.
         """
-        if out: 
-            out_sz = out.shape
-            self._out_buf = out
-        else:
+        logger.debug("out.shape: {}".format(out.shape))
+        if out is None:
             out_sz = I.shape
             # TODO recalculate output size
             #out_sz = (out_sz[0]*ratio[1], out_sz[1]*ratio[0])
-            self._out_buf = np.empty(out_sz, dtype=I.dtype)
+            out_buf = np.empty(out_sz, dtype=I.dtype)
+        else:
+            out_sz = out.shape
+            out_buf = out
 
         rad = radians(deg)
 
-        self._run(I, rad, ratio, self._out_buf)
+        self._run(I, rad, ratio, out_buf)
 
-        return self._out_buf
+        return out_buf
     
     @interface
     def _run(self, I, rad, ratio, out):
@@ -76,6 +77,8 @@ class Rotate2_GPU(Rotate2):
         texture.set_address_mode(0, cuda.address_mode.BORDER)
         texture.set_address_mode(1, cuda.address_mode.BORDER)
         texture.set_filter_mode(cuda.filter_mode.LINEAR)
+        texture.set_flags(cuda.TRSF_NORMALIZED_COORDINATES)
+        logger.debug("texture flags: {}".format(texture.get_flags()))
         self._texture = texture
 
         # preset kernel launch parameters
@@ -90,23 +93,28 @@ class Rotate2_GPU(Rotate2):
         self._texture.set_array(_in_buf)
 
         if (self._out_buf is None) or (self._out_buf.shape != out.shape):
-            self._out_buf = gpuarray.empty_like(out)
+            logger.debug("refresh out_buf")
+            self._out_buf = gpuarray.empty(out.shape, dtype=np.float32, order='C')
+            logger.debug("out_buf type: {}".format(type(self._out_buf)))
 
         # determine grid and block size
         nv, nu = out.shape
         block_sz = (32, 32, 1)
-        grid_sz = (nu//block_sz[0], nv//block_sz[1])
+        grid_sz = (ceil(float(nu)/block_sz[0]), ceil(float(nv)/block_sz[1]), 1)
+        logger.debug("grid size {}".format(grid_sz))
 
         # execute
         rx, ry = ratio
+        logger.debug(self._out_buf.dtype)
         self._kernel.prepared_call(
             grid_sz, block_sz,
-            self._out_buf,
+            self._out_buf.gpudata,
             np.float32(rad),
             np.uint32(nu), np.uint32(nv),
             np.float32(rx), np.float32(ry)
         )
-        out = self._out_buf.get()
+        self._out_buf.get(out)
+        logger.debug("out: {}".format(out))
 
         # unbind texture
         _in_buf.free()
