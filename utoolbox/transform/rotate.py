@@ -1,5 +1,3 @@
-#TODO NOT FINISHED
-
 import logging
 from math import sin, cos, radians, ceil
 import os
@@ -13,38 +11,32 @@ from utoolbox.container import AbstractAlgorithm, ImplTypes, interface
 
 logger = logging.getLogger(__name__)
 
-class Deskew(metaclass=AbstractAlgorithm):
-    def __call__(self, I, deg, scale=(1., 1.), rotate=True, shape=None):
+class Rotate2(metaclass=AbstractAlgorithm):
+    def __call__(self, I, deg, scale=(1., 1.), shape=None):
         """
         Parameters
         ----------
         I : np.ndarray
             Input image.
-        deg : tuple of float
+        deg : float
             Rotation angle in degrees.
         scale : tuple of float
-            Scaling ratio of (lateral, axial) axis, default is (1., 1.)
-        rotate : boolean
-            Rotate the output volume after shearing, default is True.
+            Scaling ratio of (X, Y) axis, default is (1., 1.)
         shape : tuple of int, optional
             Output shape, default to maximize entire shape.
-
-        Note
-        ----
-        Volume is sampled to isotropic scale.
         """
-        If = I.astype(np.float32)
+        If = I.astype(np.float32)   
+        rad = radians(deg)
         if shape is None:
-            shape = self._estimate_out_shape(I, deg, scale, rotate)
+            shape = self._estimate_out_shape(I, rad, scale)
             logger.debug("estimated output shape {}".format(shape))
         out_buf = np.empty(shape, dtype=np.float32)
 
-        self._run(If, shift, scale, out_buf)
+        self._run(If, rad, scale, out_buf)
 
         return out_buf.astype(I.dtype)
 
-    def _estimate_out_shape(self, I, shift, scale):
-        #TODO
+    def _estimate_out_shape(self, I, rad, scale):
         ny, nx = I.shape
         
         # actual scale of the image
@@ -53,9 +45,8 @@ class Deskew(metaclass=AbstractAlgorithm):
         ny *= sy
         
         # transform matrix
-        dx, dy = shift
-        fx = lambda x, y: x*nx/2. + dx * y*ny/2.
-        fy = lambda x, y: y*ny/2. + dy * x*nx/2.
+        fx = lambda x, y: x*nx/2. * cos(rad) - y*ny/2. * sin(rad)   
+        fy = lambda x, y: x*nx/2. * sin(rad) - y*ny/2. * cos(rad)
 
         # result corners
         corners = [(1., 1.), (-1., 1.), (-1., -1.), (1., -1.)]
@@ -65,14 +56,14 @@ class Deskew(metaclass=AbstractAlgorithm):
         return (int(ceil(max(nv)-min(nv))), int(ceil(max(nu)-min(nu))))
     
     @interface
-    def _run(self, I, shift, scale, out):
+    def _run(self, I, rad, scale, out):
         """
         Parameters
         ----------
         I : np.ndarray, dtype=np.float32
             Input image.
-        shift : tuple of float
-            Shift factor in (X, Y) axis.
+        rad : float
+            Rotation angle in radians.
         scale : tuple of float
             Scaling ratio of (X, Y) axis, default is (1., 1.)
         out : np.ndarray, dtype=np.float32
@@ -81,42 +72,34 @@ class Deskew(metaclass=AbstractAlgorithm):
         """
         pass
 
-class Deskew_GPU(Deskew):
+class Rotate2_GPU(Rotate2):
     _strategy = ImplTypes.GPU
 
     def __init__(self):
         # load kernel from file
-        path = os.path.join(os.path.dirname(__file__), 'shear.cu')
+        path = os.path.join(os.path.dirname(__file__), 'rotate.cu')
         with open(path, 'r') as fd:
             try:
                 module = SourceModule(fd.read())
             except cuda.CompileError as err:
                 logger.error("compile error: " + str(err))
                 raise
-        self._shear_kernel = module.get_function('shear_kernel')
-        self._rotate_kernel = module.get_function('rotate_kernel')
+        self._kernel = module.get_function('rot2_kernel')
         
         # preset texture
-        shear_texture = module.get_texref('shear_tex')
-        shear_texture.set_address_mode(0, cuda.address_mode.BORDER)
-        shear_texture.set_address_mode(1, cuda.address_mode.BORDER)
-        shear_texture.set_address_mode(2, cuda.address_mode.BORDER)
-        shear_texture.set_filter_mode(cuda.filter_mode.LINEAR)
-        self._shear_texture = shear_texture
-        rotate_texture = module.get_texref('rotate_tex')
-        rotate_texture.set_address_mode(0, cuda.address_mode.BORDER)
-        rotate_texture.set_address_mode(1, cuda.address_mode.BORDER)
-        rotate_texture.set_filter_mode(cuda.filter_mode.LINEAR)
-        self._rotate_texture = rotate_texture
+        texture = module.get_texref('rot2_tex')
+        texture.set_address_mode(0, cuda.address_mode.BORDER)
+        texture.set_address_mode(1, cuda.address_mode.BORDER)
+        texture.set_filter_mode(cuda.filter_mode.LINEAR)
+        self._texture = texture
 
         # preset kernel launch parameters
-        self._shear_kernel.prepare('PffIIffIII', texrefs=[shear_texture])
-        self._rotate_texture.prepare('PfIIffII', texrefs=[rotate_texture])
+        self._kernel.prepare('PfIIffII', texrefs=[texture])
 
         # output staging buffer
         self._out_buf = None
 
-    def _run(self, I, shift, scale, out):
+    def _run(self, I, rad, scale, out):
         # bind input image to texture
         _in_buf = cuda.np_to_array(I, 'C')
         self._texture.set_array(_in_buf)
@@ -132,12 +115,11 @@ class Deskew_GPU(Deskew):
 
         # execute
         ny, nx = I.shape
-        dx, dy = shift
         sx, sy = scale
         self._kernel.prepared_call(
             grid_sz, block_sz,
             self._out_buf.gpudata,
-            np.float32(dx), np.float32(dy),
+            np.float32(rad),
             np.uint32(nu), np.uint32(nv),
             np.float32(sx), np.float32(sy),
             np.uint32(nx), np.uint32(ny)
