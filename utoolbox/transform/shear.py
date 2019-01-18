@@ -1,7 +1,5 @@
-#TODO NOT FINISHED
-
 import logging
-from math import sin, cos, radians, ceil
+from math import ceil
 import os
 
 import numpy as np
@@ -13,29 +11,23 @@ from utoolbox.container import AbstractAlgorithm, ImplTypes, interface
 
 logger = logging.getLogger(__name__)
 
-class Deskew(metaclass=AbstractAlgorithm):
-    def __call__(self, I, deg, scale=(1., 1.), rotate=True, shape=None):
+class Shear2(metaclass=AbstractAlgorithm):
+    def __call__(self, I, shift, scale=(1., 1.), shape=None):
         """
         Parameters
         ----------
         I : np.ndarray
             Input image.
-        deg : tuple of float
-            Rotation angle in degrees.
+        shift : tuple of float
+            Shift factor in (X, Y) axis.
         scale : tuple of float
-            Scaling ratio of (lateral, axial) axis, default is (1., 1.)
-        rotate : boolean
-            Rotate the output volume after shearing, default is True.
+            Scaling ratio of (X, Y) axis, default is (1., 1.)
         shape : tuple of int, optional
             Output shape, default to maximize entire shape.
-
-        Note
-        ----
-        Volume is sampled to isotropic scale.
         """
         If = I.astype(np.float32)
         if shape is None:
-            shape = self._estimate_out_shape(I, deg, scale, rotate)
+            shape = self._estimate_out_shape(I, shift, scale)
             logger.debug("estimated output shape {}".format(shape))
         out_buf = np.empty(shape, dtype=np.float32)
 
@@ -81,7 +73,7 @@ class Deskew(metaclass=AbstractAlgorithm):
         """
         pass
 
-class Deskew_GPU(Deskew):
+class Shear2_GPU(Shear2):
     _strategy = ImplTypes.GPU
 
     def __init__(self):
@@ -93,25 +85,17 @@ class Deskew_GPU(Deskew):
             except cuda.CompileError as err:
                 logger.error("compile error: " + str(err))
                 raise
-        self._shear_kernel = module.get_function('shear_kernel')
-        self._rotate_kernel = module.get_function('rotate_kernel')
+        self._kernel = module.get_function('shear2_kernel')
         
         # preset texture
-        shear_texture = module.get_texref('shear_tex')
-        shear_texture.set_address_mode(0, cuda.address_mode.BORDER)
-        shear_texture.set_address_mode(1, cuda.address_mode.BORDER)
-        shear_texture.set_address_mode(2, cuda.address_mode.BORDER)
-        shear_texture.set_filter_mode(cuda.filter_mode.LINEAR)
-        self._shear_texture = shear_texture
-        rotate_texture = module.get_texref('rotate_tex')
-        rotate_texture.set_address_mode(0, cuda.address_mode.BORDER)
-        rotate_texture.set_address_mode(1, cuda.address_mode.BORDER)
-        rotate_texture.set_filter_mode(cuda.filter_mode.LINEAR)
-        self._rotate_texture = rotate_texture
+        texture = module.get_texref('shear2_tex')
+        texture.set_address_mode(0, cuda.address_mode.BORDER)
+        texture.set_address_mode(1, cuda.address_mode.BORDER)
+        texture.set_filter_mode(cuda.filter_mode.LINEAR)
+        self._texture = texture
 
         # preset kernel launch parameters
-        self._shear_kernel.prepare('PffIIffIII', texrefs=[shear_texture])
-        self._rotate_texture.prepare('PfIIffII', texrefs=[rotate_texture])
+        self._kernel.prepare('PffIIffII', texrefs=[texture])
 
         # output staging buffer
         self._out_buf = None
