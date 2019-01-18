@@ -12,7 +12,7 @@ from utoolbox.container import AbstractAlgorithm, ImplTypes, interface
 logger = logging.getLogger(__name__)
 
 class Rotate2(metaclass=AbstractAlgorithm):
-    def __call__(self, I, deg, scale=(1., 1.), out=None):
+    def __call__(self, I, deg, scale=(1., 1.), shape=None):
         """
         Parameters
         ----------
@@ -22,36 +22,51 @@ class Rotate2(metaclass=AbstractAlgorithm):
             Rotation angle in degrees.
         scale : tuple of float
             Scaling ratio of (X, Y) axis, default is (1., 1.)
-        out : np.ndarray, optional
-            Output buffer. If defined, output size is cropped to its size.
+        shape : tuple of int, optional
+            Output shape, default to maximize entire shape.
         """
-        logger.debug("out.shape: {}".format(out.shape))
-        if out is None:
-            out_sz = I.shape
-            # TODO recalculate output size
-            #out_sz = (out_sz[0]*scale[1], out_sz[1]*scale[0])
-            out_buf = np.empty(out_sz, dtype=I.dtype)
-        else:
-            out_buf = out
-
+        If = I.astype(np.float32)   
         rad = radians(deg)
+        if shape is None:
+            shape = self._estimate_out_shape(I, rad, scale)
+            logger.debug("estimated output shape {}".format(shape))
+        out_buf = np.empty(shape, dtype=np.float32)
 
-        self._run(I, rad, scale, out_buf)
+        self._run(If, rad, scale, out_buf)
 
-        return out_buf
+        return out_buf.astype(I.dtype)
+
+    def _estimate_out_shape(self, I, rad, scale):
+        ny, nx = I.shape
+        
+        # actual scale of the image
+        sx, sy = scale
+        nx *= sx
+        ny *= sy
+        
+        # transform matrix
+        fx = lambda x, y: x*nx/2. * cos(rad) - y*ny/2. * sin(rad)   
+        fy = lambda x, y: x*nx/2. * sin(rad) - y*ny/2. * cos(rad)
+
+        # result corners
+        corners = [(1., 1.), (-1., 1.), (-1., -1.), (1., -1.)]
+        nu = [fx(*p) for p in corners]
+        nv = [fy(*p) for p in corners]
+
+        return (int(ceil(max(nv)-min(nv))), int(ceil(max(nu)-min(nu))))
     
     @interface
     def _run(self, I, rad, scale, out):
         """
         Parameters
         ----------
-        I : np.ndarray
+        I : np.ndarray, dtype=np.float32
             Input image.
         rad : float
             Rotation angle in radians.
         scale : tuple of float
             Scaling ratio of (X, Y) axis, default is (1., 1.)
-        out : np.ndarray
+        out : np.ndarray, dtype=np.float32
             Output buffer. Output sampling grid is determined by size of this 
             buffer.
         """
@@ -73,11 +88,9 @@ class Rotate2_GPU(Rotate2):
         
         # preset texture
         texture = module.get_texref('rot2_tex')
-        #texture.set_flags(cuda.TRSF_NORMALIZED_COORDINATES)
         texture.set_address_mode(0, cuda.address_mode.BORDER)
         texture.set_address_mode(1, cuda.address_mode.BORDER)
         texture.set_filter_mode(cuda.filter_mode.LINEAR)
-        logger.debug("texture flags: {}".format(texture.get_flags()))
         self._texture = texture
 
         # preset kernel launch parameters
@@ -97,15 +110,12 @@ class Rotate2_GPU(Rotate2):
             
         # determine grid and block size
         nv, nu = out.shape
-        logger.debug("out.shape={}".format(out.shape))
-        block_sz = (16, 16, 1)
+        block_sz = (32, 32, 1)
         grid_sz = (ceil(float(nu)/block_sz[0]), ceil(float(nv)/block_sz[1]))
-        logger.debug("grid_sz={}".format(grid_sz))
 
         # execute
         ny, nx = I.shape
         sx, sy = scale
-        logger.debug(self._out_buf.dtype)
         self._kernel.prepared_call(
             grid_sz, block_sz,
             self._out_buf.gpudata,
@@ -114,8 +124,10 @@ class Rotate2_GPU(Rotate2):
             np.float32(sx), np.float32(sy),
             np.uint32(nx), np.uint32(ny)
         )
-        self._out_buf.get(out)
-        logger.debug("out: {}".format(out))
+        if self.keep:
+            out = self._out_buf
+        else:
+            self._out_buf.get(out)
 
         # unbind texture
         _in_buf.free()
