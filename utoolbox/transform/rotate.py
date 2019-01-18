@@ -124,10 +124,7 @@ class Rotate2_GPU(Rotate2):
             np.float32(sx), np.float32(sy),
             np.uint32(nx), np.uint32(ny)
         )
-        if self.keep:
-            out = self._out_buf
-        else:
-            self._out_buf.get(out)
+        self._out_buf.get(out)
 
         # unbind texture
         _in_buf.free()
