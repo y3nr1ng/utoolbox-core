@@ -4,9 +4,9 @@ texture<float, cudaTextureType2D, cudaReadModeElementType> rotate_tex;
 __global__
 void shear_kernel(
     float *dst,
-    const float dx, const float dy,               // unit shifts
+    const float shift,                            // unit shifts
     const unsigned int nu, const unsigned int nv, // output size
-    const float sx, const float sy,               // scale 
+    const float ratio,                            // scale 
     const unsigned int nx, const unsigned int ny, // input size
     const unsigned int nz                         // layers
 ) {
@@ -21,11 +21,11 @@ void shear_kernel(
     float v0 = iv - nv/2.;
 
     // shear
-    float x0 = u0 - dx*v0;
-    float y0 = v0 - dy*u0;
+    float x0 = u0 - shift*v0;
+    float y0 = v0;
 
     // rescale
-    x0 /= sx; y0 /= sy;
+    y0 /= ratio;
 
     // move origin to corner
     float x = x0 + nx/2.;
@@ -41,7 +41,7 @@ void shear_kernel(
 __global__
 void rotate_kernel(
     float *dst,
-    const float theta,
+    const float vsin, const float vcos,           // rotation matrix
     const unsigned int nu, const unsigned int nv, // output size
     const float sx, const float sy,               // scale 
     const unsigned int nx, const unsigned int ny  // input size
