@@ -46,7 +46,7 @@ class Rotate2(metaclass=AbstractAlgorithm):
         
         # transform matrix
         fx = lambda x, y: x*nx/2. * cos(rad) - y*ny/2. * sin(rad)   
-        fy = lambda x, y: x*nx/2. * sin(rad) - y*ny/2. * cos(rad)
+        fy = lambda x, y: x*nx/2. * sin(rad) + y*ny/2. * cos(rad)
 
         # result corners
         corners = [(1., 1.), (-1., 1.), (-1., -1.), (1., -1.)]
