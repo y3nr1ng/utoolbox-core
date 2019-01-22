@@ -40,8 +40,34 @@ class TqdmToLogger(io.StringIO):
 
 tqdm_log = TqdmToLogger(logger, level=logging.INFO)
 
-"""
+def colored_by_depth_spl(I, lut, lateral, axial, rad):
+    imin, imax = np.amin(I).astype(np.float32), np.amax(I).astype(np.float32)
+    logger.info("input range [{}, {}]".format(imin, imax))
+
+    nz, ny, nx = I.shape
+    Dx = np.arange(nx, dtype=np.float32)
+    J = np.empty((nz, ny, nx, 3), dtype=lut.dtype)
+    for iz, Iz in tqdm(enumerate(I), total=nz, file=tqdm_log):
+        # current shifts
+        D = np.repeat(Dx[None, :], ny, axis=0)
+        D -= np.float32(axial*cos(rad)) * iz
+
+        # projected z
+        D *= np.float32(sin(rad))
+
+        Dp = lut(D)
+        Iz = (Iz.astype(np.float32)-imin)/(imax-imin)
+        for ic in range(3):
+            J[iz, :, :, ic] = Dp[..., ic] * Iz
+    
+    return J
+
 def colored_by_depth_obj(I, lut):
+    imin, imax = np.amin(I).astype(np.float32), np.amax(I).astype(np.float32)
+    logger.info("input range [{}, {}]".format(imin, imax))
+
+    
+
     I = I.astype(np.float32)
     imin, imax = np.min(I), np.max(I)
     In = (I-imin)/(imax-imin)
@@ -53,29 +79,9 @@ def colored_by_depth_obj(I, lut):
         for i in range(3):
             J[iz, :, :, i] = (lut[iz, i] * _I).astype(J.dtype)
     return J
-"""
 
-def colored_by_depth_spl(I, lookup, lateral, axial, rad):
-    imin, imax = np.amin(I).astype(np.float32), np.amax(I).astype(np.float32)
-    logger.info("input range [{}, {}]".format(imin, imax))
-
-    nz, ny, nx = I.shape
-    Dx = np.arange(nx, dtype=np.float32)
-    J = np.empty((nz, ny, nx, 3), dtype=lookup.dtype)
-    for iz, Iz in tqdm(enumerate(I), total=nz, file=tqdm_log):
-        # current shifts
-        D = np.repeat(Dx[None, :], ny, axis=0)
-        D -= np.float32(axial*cos(rad)) * iz
-
-        # projected z
-        D *= np.float32(sin(rad))
-
-        Dp = lookup(D)
-        Iz = (Iz.astype(np.float32)-imin)/(imax-imin)
-        for ic in range(3):
-            J[iz, :, :, ic] = Dp[..., ic] * Iz
-    
-    return J
+def colored_by_ortho(I, lut):
+    pass
         
 def colored_by_intensity(I, lut):
     J = np.empty(I.shape + (3, ), dtype=lut.dtype)
@@ -104,17 +110,17 @@ def create_lookup_function(cm, scale):
     return lookup
 
 @click.command()
-@click.option('-t', '--type', 'scan_type', type=click.Choice(['spl', 'obj']), 
-              default='obj', 
-              help="Scan type, either sample scan (spl) or objective scan (obj), default is obj.")
+@click.option('-t', '--type', 'scan_type', 
+              type=click.Choice(['spl', 'obj', 'ortho']), default='obj', 
+              help="Provided scan type, sample scan (spl), objective scan (obj) or orthogonal view (ortho), default is obj.")
 @click.option('-l', '--lateral', type=float, default=.102,
               help='Lateral resolution in um, default is 0.102')
 @click.option('-a', '--axial', type=float, default=.15, 
               help='Axial resolution in um, default is 0.15')
 @click.option('--angle', type=float, default=32.8,
               help='Coverslip rotation angle in degrees, default is 32.8')
-@click.option('-s', '--suffix', type=str, default='_colored', 
-              help="Suffix for output file name, default is '_colored'")
+@click.option('-s', '--suffix', type=str, default='colored', 
+              help="Suffix for output file name, default is 'colored'")
 @click.argument('image', type=click.Path(exists=True))
 @click.argument('colormap', type=click.Path(exists=True))
 def main(image, colormap, scan_type, lateral, axial, angle, suffix):
@@ -130,21 +136,24 @@ def main(image, colormap, scan_type, lateral, axial, angle, suffix):
 
     nz, ny, nx = I.shape
     rad = radians(angle)
-    if scan_type == 'obj':
-        #scale = (0, nz)
-        #convert = colored_by_depth_obj
-        raise NotImplementedError
-    elif scan_type == 'spl':
+    if scan_type == 'spl':
         scale = (np.float32(0.), np.float32(nx*sin(rad)))
         convert = lambda x, y: colored_by_depth_spl(x, y, lateral, axial, rad)
+    elif scan_type == 'obj':
+        raise NotImplementedError
+    elif scan_type == 'ortho':
+        raise NotImplementedError
     lookup = create_lookup_function(cm, scale)
 
     J = convert(I, lookup)
 
     # apply suffix
     fn, ext = os.path.splitext(image)
-    for ij, j in enumerate(J):
-        imageio.imwrite('{}_{}{}.{}'.format(fn, ij, suffix, ext), j)
+    for iz in tqdm(range(nz), total=nz, file=tqdm_log):
+        imageio.imwrite(
+            '{}_{:03d}_{}{}'.format(fn, iz, suffix, ext), 
+            J[iz, ...]
+        )
 
 if __name__ == '__main__':
     try:
