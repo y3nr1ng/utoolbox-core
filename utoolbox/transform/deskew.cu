@@ -57,8 +57,8 @@ void rotate_kernel(
     float v0 = iv - nv/2.;
 
     // rotate
-    float x0 =  u0*cosf(theta) + v0*sinf(theta);
-    float y0 = -u0*sinf(theta) + v0*cosf(theta);
+    float x0 =  u0*vcos + v0*vsin;
+    float y0 = -u0*vsin + v0*vcos;
 
     // rescale
     x0 /= sx; y0 /= sy;
