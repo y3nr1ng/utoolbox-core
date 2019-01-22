@@ -1,7 +1,10 @@
+# pylint: disable=E1120
 import io
 import logging
+from math import radians, sin, cos, ceil
 import os
 
+import click
 import coloredlogs
 import imageio
 import numpy as np
@@ -37,7 +40,8 @@ class TqdmToLogger(io.StringIO):
 
 tqdm_log = TqdmToLogger(logger, level=logging.INFO)
 
-def colored_by_depth(I, lut):
+"""
+def colored_by_depth_obj(I, lut):
     I = I.astype(np.float32)
     imin, imax = np.min(I), np.max(I)
     In = (I-imin)/(imax-imin)
@@ -49,47 +53,101 @@ def colored_by_depth(I, lut):
         for i in range(3):
             J[iz, :, :, i] = (lut[iz, i] * _I).astype(J.dtype)
     return J
+"""
 
+def colored_by_depth_spl(I, lookup, lateral, axial, rad):
+    imin, imax = np.amin(I).astype(np.float32), np.amax(I).astype(np.float32)
+    logger.info("input range [{}, {}]".format(imin, imax))
+
+    nz, ny, nx = I.shape
+    Dx = np.arange(nx, dtype=np.float32)
+    J = np.empty((nz, ny, nx, 3), dtype=lookup.dtype)
+    for iz, Iz in tqdm(enumerate(I), total=nz, file=tqdm_log):
+        # current shifts
+        D = np.repeat(Dx[None, :], ny, axis=0)
+        D -= np.float32(axial*cos(rad)) * iz
+
+        # projected z
+        D *= np.float32(sin(rad))
+
+        Dp = lookup(D)
+        Iz = (Iz.astype(np.float32)-imin)/(imax-imin)
+        for ic in range(3):
+            J[iz, :, :, ic] = Dp[..., ic] * Iz
+    
+    return J
+        
 def colored_by_intensity(I, lut):
     J = np.empty(I.shape + (3, ), dtype=lut.dtype)
     for i in range(3):
         J[..., i] = lut[I, i]
     return J
 
-def create_lut(cm, scale):
-    imin, imax = scale # intensity range
-    npts = imax-imin+1
-    ratio, _ = cm.shape
+def create_lookup_function(cm, scale):
+    smin, smax = scale
 
-    cm_s = np.empty((npts, 3), dtype=cm.dtype)
-    # intensity lookup
-    x = np.linspace(-imin/(imax-imin)*ratio, ratio, npts)
-    # cm lookup
-    xp = np.arange(0, ratio)
+    xp = np.linspace(smin, smax, cm.shape[0])
+    def lookup(I):
+        # clip the input array to specified range for interpolation
+        np.clip(I, smin, smax, out=I)
 
-    for i in range(3):
-        cm_s[:, i] = np.interp(x, xp, cm[:, i])
+        # linearize to ease the processing
+        shape = I.shape
+        If = np.ravel(I)
+        J = np.empty((I.size, 3), dtype=cm.dtype)
+        for i in range(3):
+            J[:, i] = np.interp(If, xp, cm[:, i])
 
-    return cm_s
+        return np.reshape(J, shape + (3, ))
+    lookup.dtype = cm.dtype
 
-def main():
+    return lookup
+
+@click.command()
+@click.option('-t', '--type', 'scan_type', type=click.Choice(['spl', 'obj']), 
+              default='obj', 
+              help="Scan type, either sample scan (spl) or objective scan (obj), default is obj.")
+@click.option('-l', '--lateral', type=float, default=.102,
+              help='Lateral resolution in um, default is 0.102')
+@click.option('-a', '--axial', type=float, default=.15, 
+              help='Axial resolution in um, default is 0.15')
+@click.option('--angle', type=float, default=32.8,
+              help='Coverslip rotation angle in degrees, default is 32.8')
+@click.option('-s', '--suffix', type=str, default='_colored', 
+              help="Suffix for output file name, default is '_colored'")
+@click.argument('image', type=click.Path(exists=True))
+@click.argument('colormap', type=click.Path(exists=True))
+def main(image, colormap, scan_type, lateral, axial, angle, suffix):
     # load image
-    im_path = 'data/Figure2D_HyperStack_ResliceZ_22To153_Reverse.tif'
-    logger.info("loading \"{}\"".format(im_path))
-    I = imageio.volread(im_path)
+    logger.info("loading \"{}\"".format(image))
+    I = imageio.volread(image)
     logger.info("image shape {}".format(I.shape))
 
     # load colormap
-    cm_path = 'data/Figure2D_HyperStack_Spectrum_ResliceZ_TemporalColorCode.tif'
-    cm = imageio.imread(cm_path)
+    cm = imageio.imread(colormap)
     cm = cm[0, :, :]
+    logger.info("colormap contains {} steps".format(cm.shape[0]))
 
-    nz, _, _ = I.shape
-    lut = create_lut(cm, (0, nz))
+    nz, ny, nx = I.shape
+    rad = radians(angle)
+    if scan_type == 'obj':
+        #scale = (0, nz)
+        #convert = colored_by_depth_obj
+        raise NotImplementedError
+    elif scan_type == 'spl':
+        scale = (np.float32(0.), np.float32(nx*sin(rad)))
+        convert = lambda x, y: colored_by_depth_spl(x, y, lateral, axial, rad)
+    lookup = create_lookup_function(cm, scale)
 
-    J = colored_by_depth(I, lut)
-    imageio.volwrite('J.tif', J, bigtiff=True)
+    J = convert(I, lookup)
+
+    # apply suffix
+    fn, ext = os.path.splitext(image)
+    for ij, j in enumerate(J):
+        imageio.imwrite('{}_{}{}.{}'.format(fn, ij, suffix, ext), j)
 
 if __name__ == '__main__':
-    main()
-
+    try:
+        main()
+    except Exception as ex:
+        logger.error(str(ex))
