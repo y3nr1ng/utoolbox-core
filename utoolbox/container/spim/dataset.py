@@ -6,12 +6,12 @@ import re
 
 import imageio
 
-from utoolbox.container import ImageDatastore
+from utoolbox.container import AbstractDataset, ImageDatastore
 from .settings import Settings
 
 logger = logging.getLogger(__name__)
 
-class Dataset(object):
+class Dataset(AbstractDataset):
     """
     Representation of an acquisition result from LatticeScope, containing
     software setup and collected data.
@@ -29,9 +29,7 @@ class Dataset(object):
         refactor : bool
             Refactor filenames, default is True.
         """
-        if not os.path.exists(root):
-            raise FileNotFoundError("invalid root folder")
-        self._root = root
+        super().__init__(root)
 
         settings_file = self._find_settings_file()
         logger.debug("settings file \"{}\"".format(settings_file))
@@ -74,16 +72,8 @@ class Dataset(object):
         return self._root
 
     def preview(self, view='all'):
-        """
-        Generate projection view for the dataset.
-
-        Parameters
-        ----------
-        view : one of ['xy', 'yz', 'xz'], or 'all'
-            Projected view to generate, 'all' will composite all views to a 
-            single frame.
-        """
-        pass
+        
+        raise NotImplementedError
 
     def _find_settings_file(self, extension='txt'):
         """
