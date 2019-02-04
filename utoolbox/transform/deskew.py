@@ -57,7 +57,7 @@ class Deskew(metaclass=AbstractAlgorithm):
         
         out_buf = np.empty(shape, dtype=np.float32)
 
-        self._run(If, rad, shift, ratio, rotate, resample, out_buf)
+        self._run(If, shift, rot, rotate, out_buf)
 
         out_buf = np.swapaxes(out_buf, 0, 1)
         np.ascontiguousarray(out_buf, dtype=I.dtype)
@@ -191,31 +191,34 @@ class Deskew_GPU(Deskew):
         self._out_buf = None
 
     def _run(self, I, shift, rot, ratio, out):
+        logger.debug("I.shape={}".format(I.shape))
         # bind input image to texture
         _in_buf = cuda.np_to_array(I, 'C')
-        self._texture.set_array(_in_buf)
+        self._shear_texture.set_array(_in_buf)
+
+        # determine grid and block size
+        _, nv, nu = out.shape
+        block_sz = (32, 32, 1)
+        grid_sz = (ceil(float(nu)/block_sz[0]), ceil(float(nv)/block_sz[1]))
 
         if (self._out_buf is None) or (self._out_buf.shape != out.shape):
             logger.debug("resize buffer to {}".format(out.shape))
             self._out_buf = gpuarray.empty(out.shape, dtype=np.float32, order='C')
-            
-        # determine grid and block size
-        nv, nu = out.shape
-        block_sz = (32, 32, 1)
-        grid_sz = (ceil(float(nu)/block_sz[0]), ceil(float(nv)/block_sz[1]))
 
+        # TODO create rotate kernel buffer area
+            
         # execute
-        ny, nx = I.shape
-        dx, dy = shift
-        sx, sy = scale
-        self._kernel.prepared_call(
+        nz, ny, nx = I.shape
+        self._shear_kernel.prepared_call(
             grid_sz, block_sz,
             self._out_buf.gpudata,
-            np.float32(dx), np.float32(dy),
+            np.float32(shift),
             np.uint32(nu), np.uint32(nv),
-            np.float32(sx), np.float32(sy),
-            np.uint32(nx), np.uint32(ny)
+            np.float32(ratio),
+            np.uint32(nx), np.uint32(ny),
+            np.float32(nz)
         )
+        # TODO add rotate kernel call
         self._out_buf.get(out)
 
         # unbind texture
