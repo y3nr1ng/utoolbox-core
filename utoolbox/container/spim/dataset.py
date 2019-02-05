@@ -11,7 +11,7 @@ from .settings import Settings
 
 logger = logging.getLogger(__name__)
 
-class Dataset(AbstractDataset):
+class SPIMDataset(AbstractDataset):
     """
     Representation of an acquisition result from LatticeScope, containing
     software setup and collected data.
@@ -29,6 +29,8 @@ class Dataset(AbstractDataset):
         refactor : bool
             Refactor filenames, default is True.
         """
+        if not os.path.exists(root):
+            raise FileNotFoundError("invalid dataset source")
         super().__init__(root)
 
         settings_file = self._find_settings_file()
@@ -47,32 +49,11 @@ class Dataset(AbstractDataset):
                 return (x, imageio.volread(x))
         else:
             read_func = imageio.volread
+        self._load_datastore(read_func)    
 
-        # partition the dataset to different datastore by channels 
-        self._datastore = dict()
-        for channel in self.settings.waveform.channels:
-            if channel.wavelength in self._datastore:
-                logger.warning("duplicated wavelength, ignore")
-                continue
-            self._datastore[channel.wavelength] = ImageDatastore(
-                self.root,
-                read_func,
-                sub_dir=False,
-                pattern="*_ch{}_*".format(channel.id)
-            )
-
-        #TODO generate inventory file
-
-    @property
-    def datastore(self):
-        return self._datastore
-
-    @property
-    def root(self):
-        return self._root
+        self._generate_inventory()
 
     def preview(self, view='all'):
-        
         raise NotImplementedError
 
     def _find_settings_file(self, extension='txt'):
@@ -91,7 +72,7 @@ class Dataset(AbstractDataset):
         ds_names = []
         for filename in filenames:
             basename = os.path.basename(filename)
-            matches = re.match(Dataset.SETTINGS_PATTERN, basename)
+            matches = re.match(SPIMDataset.SETTINGS_PATTERN, basename)
             if matches is None:
                 continue
             ds_names.append((matches.group('ds_name'), filename))
@@ -116,3 +97,20 @@ class Dataset(AbstractDataset):
             return ds_names[index][1]
         else:
             return ds_names[0][1]
+    
+    def _generate_inventory(self):
+        raise NotImplementedError
+
+    def _load_datastore(self, read_func):
+        # partition the dataset to different datastore by channels 
+        self._datastore = dict()
+        for channel in self.settings.waveform.channels:
+            if channel.wavelength in self._datastore:
+                logger.warning("duplicated wavelength, ignore")
+                continue
+            self._datastore[channel.wavelength] = ImageDatastore(
+                self.root,
+                read_func,
+                sub_dir=False,
+                pattern="*_ch{}_*".format(channel.id)
+            )
