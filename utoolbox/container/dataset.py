@@ -9,8 +9,6 @@ class AbstractDataset(metaclass=ABCMeta):
         root : str
             Source of the dataset, flat layout.
         """
-        if not os.path.exists(root):
-            raise FileNotFoundError("invalid dataset source")
         self._root = root
         self._datastore = None
     
@@ -21,6 +19,11 @@ class AbstractDataset(metaclass=ABCMeta):
     @property
     def root(self):
         return self._root
+
+    @staticmethod
+    def convert_from(ds):
+        """Convert dataset of other format to current format."""
+        return NotImplemented
 
     @abstractmethod
     def preview(self, view='all'):
@@ -33,4 +36,12 @@ class AbstractDataset(metaclass=ABCMeta):
             Projected view to generate, 'all' will composite all views to a 
             single frame.
         """
-        return NotImplemented
+        raise NotImplementedError
+
+    @abstractmethod
+    def _generate_inventory(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def _load_datastore(self):
+        raise NotImplementedError
