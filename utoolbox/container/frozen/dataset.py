@@ -1,5 +1,9 @@
+import logging
+import os
 
 from utoolbox.container import AbstractDataset
+
+logger = logging.getLogger(__name__)
 
 class FrozenDataset(AbstractDataset):
     """
@@ -13,8 +17,11 @@ class FrozenDataset(AbstractDataset):
         #TODO read_func attach with dynamic decompression
 
     @staticmethod
-    def convert_from(ds):
+    def from_dataset(ds, **kwargs):
+        pass
+        
         #TODO create tar file
+        filename = os.path.basename(ds.root)
 
         #TODO save inventory
 
@@ -24,11 +31,15 @@ class FrozenDataset(AbstractDataset):
         #TODO .. xxhash
 
         #TODO consolidate tar
+    
+    @staticmethod
+    def _from_spimdataset(ds):
         pass
     
-    def preview(self, view='all'):
-        raise NotImplementedError
-    
+    @staticmethod
+    def _from_genericdataset(ds):
+        pass
+
     def _generate_inventory(self):
         raise NotImplementedError
     

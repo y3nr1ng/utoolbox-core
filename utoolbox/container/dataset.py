@@ -21,22 +21,16 @@ class AbstractDataset(metaclass=ABCMeta):
         return self._root
 
     @staticmethod
-    def convert_from(ds):
-        """Convert dataset of other format to current format."""
-        return NotImplemented
-
-    @abstractmethod
-    def preview(self, view='all'):
+    def from_dataset(ds, **kwargs):
         """
-        Generate projection view for the dataset.
-
-        Parameters
-        ----------
-        view : one of ['xy', 'yz', 'xz'], or 'all'
-            Projected view to generate, 'all' will composite all views to a 
-            single frame.
+        Convert other form of dataset into current one.
+        
+        Parameter
+        ---------
+        ds : AbstractDataset
+            Source dataset.
         """
-        raise NotImplementedError
+        raise UndefinedConversionError
 
     @abstractmethod
     def _generate_inventory(self):
@@ -45,3 +39,9 @@ class AbstractDataset(metaclass=ABCMeta):
     @abstractmethod
     def _load_datastore(self):
         raise NotImplementedError
+
+class DatasetError(Exception):
+    """Base class for dataset-related exceptions."""
+
+class UndefinedConversionError(DatasetError):
+    """Raised when dataset conversion is impossible."""
