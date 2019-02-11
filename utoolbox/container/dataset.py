@@ -1,4 +1,7 @@
+# pylint: disable=undefined-variable
+
 from abc import ABCMeta, abstractmethod
+from collections.abc import Mapping
 import os
 
 class AbstractDataset(metaclass=ABCMeta):
@@ -36,9 +39,28 @@ class AbstractDataset(metaclass=ABCMeta):
     def _generate_inventory(self):
         raise NotImplementedError
 
+class AbstractMultiChannelDataset(AbstractDataset, Mapping):
+    def __init__(self, root):
+        super(AbstractMultiChannelDataset, self).__init__(root)
+        self._datastore = dict()
+
+    def __getitem__(self, key):
+        return self._datastore[key]
+    
+    def __iter__(self):
+        """During iterations, we are actually iterate over the datastore."""
+        return self._datastore
+    
+    def __len__(self):
+        return len(self._datastore)
+
+    # alias
+    channels = datastore
+
     @abstractmethod
-    def _load_datastore(self):
-        raise NotImplementedError
+    def _map_channels(self):
+        """Map channels to datastore from dataset root."""
+        return NotImplementedError
 
 class DatasetError(Exception):
     """Base class for dataset-related exceptions."""

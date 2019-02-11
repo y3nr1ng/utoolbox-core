@@ -25,6 +25,9 @@ class FrozenDataset(AbstractDataset):
 
         #TODO save inventory
 
+        for channel in ds:
+            
+
         #TODO iterate over files 
         #TODO .. compress in lzma (xz)
         #TODO .. write chunk
