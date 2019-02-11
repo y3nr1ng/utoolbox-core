@@ -6,12 +6,16 @@ import re
 
 import imageio
 
-from utoolbox.container import AbstractDataset, ImageDatastore
+from utoolbox.container import (
+    AbstractMultiChannelDataset,
+    DatasetError,
+    ImageDatastore
+)
 from .settings import Settings
 
 logger = logging.getLogger(__name__)
 
-class SPIMDataset(AbstractDataset):
+class SPIMDataset(AbstractMultiChannelDataset):
     """
     Representation of an acquisition result from LatticeScope, containing
     software setup and collected data.
@@ -49,7 +53,7 @@ class SPIMDataset(AbstractDataset):
                 return (x, imageio.volread(x))
         else:
             read_func = imageio.volread
-        self._load_datastore(read_func)    
+        self._map_channels(read_func)    
 
         self._generate_inventory()
 
@@ -75,7 +79,7 @@ class SPIMDataset(AbstractDataset):
             ds_names.append((matches.group('ds_name'), filename))
         
         if not ds_names:
-            raise FileNotFoundError("no known settings file")
+            raise SettingsNotFoundError("no known settings file")
         elif len(ds_names) > 1:
             logger.warning("diverged dataset, attempting to resolve it")
 
@@ -88,7 +92,7 @@ class SPIMDataset(AbstractDataset):
             try:
                 index = ds_names_tr[0].index(prefix)
             except ValueError:
-                raise RuntimeError(
+                raise MultipleSettingsError(
                     "unable to determine which settings file to use"
                 )
             return ds_names[index][1]
@@ -98,12 +102,11 @@ class SPIMDataset(AbstractDataset):
     def _generate_inventory(self):
         raise NotImplementedError
 
-    def _load_datastore(self, read_func):
-        # partition the dataset to different datastore by channels 
-        self._datastore = dict()
+    def _map_channels(self, read_func):
+        # partition by channels 
         for channel in self.settings.waveform.channels:
             if channel.wavelength in self._datastore:
-                logger.warning("duplicated wavelength, ignore")
+                logger.warning("found duplicate wavelength definition, ignored")
                 continue
             self._datastore[channel.wavelength] = ImageDatastore(
                 self.root,
@@ -111,3 +114,12 @@ class SPIMDataset(AbstractDataset):
                 sub_dir=False,
                 pattern="*_ch{}_*".format(channel.id)
             )
+
+class SettingsError(DatasetError):
+    """SPIM-generated settings related errors."""
+
+class SettingsNotFoundError(SettingsError):
+    """Unable to find SPIM-generated settings."""
+
+class MultipleSettingsError(SettingsError):
+    """Confuse between multiple settings."""
