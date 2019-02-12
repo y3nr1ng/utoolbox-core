@@ -180,10 +180,11 @@ setup(
         'click',
         'coloredlogs',
         'tqdm',
-        'jinja2' # template engine used by pycuda
+        'jinja2', # template engine used by pycuda
+        'xxhash'
     ],
 
-    ext_modules=cmake_exts,
+    #ext_modules=cmake_exts,
 
     cmdclass={
         'build_ext': CMakeBuild
