@@ -1,0 +1,3 @@
+[submodule "utoolbox/compression/libbsc"]
+	path = utoolbox/compression/libbsc
+	url = https://github.com/IlyaGrebnov/libbsc.git
