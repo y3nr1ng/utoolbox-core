@@ -7,7 +7,7 @@ from abc import ABCMeta, abstractmethod
 import glob
 import json
 import logging
-from lzma import LZMADecompressor
+from lzma import FORMAT_XZ, LZMADecompressor
 import os
 import tarfile
 
@@ -109,12 +109,12 @@ class Datastore(object, metaclass=ABCMeta):
         self._read_size = 1
 
 class FileDatastore(Datastore):
-    def __init__(self, location, read_func=None, sub_dir=False, pattern='*', 
+    def __init__(self, root, read_func=None, sub_dir=False, pattern='*', 
                  extensions=None):
         """
         Parameters
         ----------
-        location : str or list of str
+        root : str or list of str
             Files or folders to include in the datastore.
         read_func : func
             Function to perform the read operation.
@@ -128,14 +128,14 @@ class FileDatastore(Datastore):
         super(FileDatastore, self).__init__(read_func)
 
         if sub_dir:
-            location = os.path.join(location, "**")
+            root = os.path.join(root, "**")
 
         extensions = [pattern if extensions is None else extensions]
         extensions = ["{}.{}".format(pattern, ext) for ext in extensions]
 
         files = []
         for ext in extensions:
-            pathname = os.path.join(location, ext)
+            pathname = os.path.join(root, ext)
             files.extend(glob.glob(pathname, recursive=sub_dir))
         self._inventory = files
 
@@ -146,16 +146,15 @@ class FileDatastore(Datastore):
 class ImageDatastore(FileDatastore):
     supported_extensions = ("tif")
 
-    def __init__(self, location, read_func, extensions=None, **kwargs):
+    def __init__(self, root, read_func, extensions=None, **kwargs):
         if extensions is None:
             extensions = ImageDatastore.supported_extensions
         super(ImageDatastore, self).__init__(
-            location, read_func=read_func, extensions=extensions, **kwargs
+            root, read_func=read_func, extensions=extensions, **kwargs
         )
 
 class TarDatastore(Datastore):
-    def __init__(self, root, read_func, mapped=False, verify=True, 
-                 memlimit=None):
+    def __init__(self, root, read_func, memlimit=None):
         if not root.lower().endswith('.tar'):
             raise ValueError("not a TAR file")   
         self._root = root
@@ -164,44 +163,31 @@ class TarDatastore(Datastore):
         self._tar = tar
         self._inventory = tar.getmembers()
 
-        self._decompressor = LZMADecompressor(
-            format=FORMAT_XZ, 
-            memlimit=memlimit
-        )
-        def _extract(tarinfo):
-            """Extract and decompress."""
-            data = self._tar.extractfile(tarinfo).read()
-            return self._decompressor.decompress(data)
-        if verify:
-            def _extract_and_verify(tarinfo):
-                """Extract, decompress, and verify."""
-                ori_digest = tarinfo.name
-                data = read(tarinfo)
-                ext_digest = xxhash.xxh64_hexdigest(data)
-                if ori_digest != ext_digest:
-                    raise HashMismatchError("hash mismatch after decompression")
-                return data
-            extract = _extract_and_verify
-        else:
-            extract = _extract
-        
-        def _read_func(x):
-            """Read from extracted data."""
-            return read_func(extract(x))
-        super(TarDatastore, self).__init__(_read_func)
-
+        # TODO do we need metadata?
         try:
-            mapping = tar.getmember('mapping.json')
+            tarinfo = tar.getmember('metadata')
+            metadata = tar.extractfile(tarinfo).read()
+            self._metadata = json.load(metadata)
         except KeyError:
-            if mapped:
-                raise UndefinedMappingError(
-                    "cannot find mapping in the archive"
-                )
-            # use default order
-            names = tar.getnames()
-            mapping = {k: "{:03d}".format(i) for i, k in enumerate(names)} 
-        
-        # TODO save filename re-matcher
+            raise InvalidMetadataError()
+
+        self._decompressor = LZMADecompressor(
+            format=FORMAT_XZ, memlimit=memlimit
+        )
+        def _wrapped_read_func(tarinfo):
+            """Read from compressed data block."""
+            data = self._tar.extractfile(tarinfo).read()
+            data = self._decompressor.decompress(data)
+
+            digest = xxhash.xxh64_hexdigest(data)
+            if tarinfo.name != digest:
+                raise HashMismatchError("hash mismatch after decompression")
+
+            return read_func(data)
+        super(TarDatastore, self).__init__(_wrapped_read_func)
+
+        # non-wrapped read_func
+        self._base_read_func = read_func
         
     def __enter__(self):
         return self
@@ -216,8 +202,8 @@ class TarDatastore(Datastore):
 class DatastoreError(Exception):
     """Base class for datastore exceptions."""
 
-class UndefinedMappingError(DatastoreError):
-    """Undefine filename mapping for tar datastores."""
+class InvalidMetadataError(DatastoreError):
+    """Invalid metadata in tar datastores."""
 
 class HashMismatchError(DatastoreError):
     """Digest mismatch after file decompression."""
