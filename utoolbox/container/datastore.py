@@ -4,13 +4,18 @@ Create datastore for large collections of data.
 # pylint: disable=E1102
 
 from abc import ABCMeta, abstractmethod
+import gc
 import glob
 import json
 import logging
 from lzma import FORMAT_XZ, LZMADecompressor
+import mmap
 import os
+import re
 import tarfile
+import tempfile
 
+import numpy as np
 import xxhash
 
 __all__ = [
@@ -129,14 +134,18 @@ class FileDatastore(Datastore):
 
         if sub_dir:
             root = os.path.join(root, "**")
+        logger.debug("search under \"{}\"".format(root))
 
-        extensions = [pattern if extensions is None else extensions]
-        extensions = ["{}.{}".format(pattern, ext) for ext in extensions]
+        if extensions is None:
+            extensions = [pattern]
+        else:
+            extensions = ["{}.{}".format(pattern, ext) for ext in extensions]
+        logger.debug("{} search patterns".format(len(extensions)))
 
         files = []
         for ext in extensions:
-            pathname = os.path.join(root, ext)
-            files.extend(glob.glob(pathname, recursive=sub_dir))
+            path = os.path.join(root, ext)
+            files.extend(glob.glob(path, recursive=sub_dir))
         self._inventory = files
 
     @property
@@ -144,7 +153,7 @@ class FileDatastore(Datastore):
         return self._inventory
     
 class ImageDatastore(FileDatastore):
-    supported_extensions = ("tif")
+    supported_extensions = ['tif']
 
     def __init__(self, root, read_func, extensions=None, **kwargs):
         if extensions is None:
@@ -152,6 +161,64 @@ class ImageDatastore(FileDatastore):
         super(ImageDatastore, self).__init__(
             root, read_func=read_func, extensions=extensions, **kwargs
         )
+
+class SparseImageDatastore(ImageDatastore):
+    """Each folder is a stack."""
+    stack_pattern = r'.*-Pos_(\d{3,})_(\d{3,})$'
+
+    def __init__(self, root, read_func, **kwargs):
+        kwargs['sub_dir'] = True
+        super(SparseImageDatastore, self).__init__(
+            root, read_func=read_func, **kwargs
+        )
+        self._root = root
+        
+        stacks = next(os.walk(root))[1]
+        logger.debug("found {} stacks".format(len(stacks)))
+    
+        # overwrite the original file list
+        self._inventory, self._raw_files = stacks, self._inventory
+
+        # staging area
+        self._mmap, self._buffer = None, None
+
+    def __enter__(self):
+        self._generate_buffer()
+        return self
+    
+    def __exit__(self, exc_type, exc_value, traceback):
+        del self._buffer
+        self._buffer = None
+        self._mmap.close()
+        logger.debug("buffer destroyed")
+        
+    @property
+    def root(self):
+        return self._root
+
+    def _generate_buffer(self):
+        im = self.read_func(self._raw_files[0])
+        ny, nx = im.shape
+        nz = self._find_max_depth()
+        logger.info("dimension {}, {}".format((nx, ny, nz), im.dtype))
+        
+        raise RuntimeError("DEBUG")
+
+        self._mmap = mmap.mmap(-1, 0)
+        shape, dtype = None, None
+        self._buffer = np.ndarray(shape, dtype, buffer=self._mmap)
+        
+        #TODO
+        
+    def _find_max_depth(self, pattern=r'img_\d+_.*_(\d{3,})\.'):
+        """Determine depth by one of the stack."""
+        print(self._raw_files)       
+        src_dir = os.path.join(self.root, self.files[0])
+        layers = [
+            int(re.search(pattern, fp).group(1))
+            for fp in filter(lambda x: x.startswith(src_dir), self._raw_files)
+        ]
+        return max(layers)-min(layers)+1
 
 class TarDatastore(Datastore):
     def __init__(self, root, read_func, memlimit=None):
@@ -177,7 +244,8 @@ class TarDatastore(Datastore):
         def _wrapped_read_func(tarinfo):
             """Read from compressed data block."""
             data = self._tar.extractfile(tarinfo).read()
-            data = self._decompressor.decompress(data)
+            # TODO decompression
+            #data = self._decompressor.decompress(data)
 
             digest = xxhash.xxh64_hexdigest(data)
             if tarinfo.name != digest:
