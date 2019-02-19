@@ -1,7 +1,6 @@
 from pprint import pprint
 
 import coloredlogs
-import imageio
 
 from utoolbox.container.datastore import SparseImageDatastore
 
@@ -11,10 +10,8 @@ coloredlogs.install(
     datefmt='%H:%M:%S'
 )
 
+dummy_read = lambda x: x
 with SparseImageDatastore(
-    'GH146ACV_power100_60ms_z3_split', 
-    imageio.imread, 
-    pattern='*488nm*'
+    'umanager_mock_dataset', dummy_read, pattern='*561*'
 ) as ds:
-    for im in ds.read():
-        pprint(ds.files)
+    pprint(ds.files)
