@@ -162,25 +162,32 @@ class ImageDatastore(FileDatastore):
             root, read_func=read_func, extensions=extensions, **kwargs
         )
 
-class SparseImageDatastore(ImageDatastore):
-    """Each folder is a stack."""
+class SparseStackImageDatastore(ImageDatastore):
+    """Each folder represents a stack."""
     stack_pattern = r'.*-Pos_(\d{3,})_(\d{3,})$'
 
     def __init__(self, root, read_func, **kwargs):
-        kwargs['sub_dir'] = True
-        super(SparseImageDatastore, self).__init__(
-            root, read_func=read_func, **kwargs
-        )
-        self._root = root
-        
         stacks = next(os.walk(root))[1]
+        stacks.sort()
         logger.debug("found {} stacks".format(len(stacks)))
-    
-        # overwrite the original file list
-        self._inventory, self._raw_files = stacks, self._inventory
+        # add suffix
+        stacks[:] = [os.path.join(root, fp) for fp in stacks]
 
         # staging area
         self._mmap, self._buffer = None, None
+        self._raw_read_func = read_func
+
+        kwargs['sub_dir'] = True
+        super(SparseStackImageDatastore, self).__init__(
+            root, read_func=self._load_to_buffer, **kwargs
+        )
+        self._root = root
+        
+        # overwrite the original file list
+        self._inventory, self._raw_files = stacks, self._inventory
+
+        # update depth
+        self._nz = self._find_max_depth()
 
     def __enter__(self):
         self._generate_buffer()
@@ -191,34 +198,46 @@ class SparseImageDatastore(ImageDatastore):
         self._buffer = None
         self._mmap.close()
         logger.debug("buffer destroyed")
-        
+
+    @property
+    def nz(self):
+        return self._nz
+
     @property
     def root(self):
         return self._root
 
-    def _generate_buffer(self):
-        im = self.read_func(self._raw_files[0])
-        ny, nx = im.shape
-        nz = self._find_max_depth()
-        logger.info("dimension {}, {}".format((nx, ny, nz), im.dtype))
-        
-        raise RuntimeError("DEBUG")
-
-        self._mmap = mmap.mmap(-1, 0)
-        shape, dtype = None, None
-        self._buffer = np.ndarray(shape, dtype, buffer=self._mmap)
-        
-        #TODO
-        
-    def _find_max_depth(self, pattern=r'img_\d+_.*_(\d{3,})\.'):
+    def _find_max_depth(self, pattern=r'.*_(\d{3,})\.'):
         """Determine depth by one of the stack."""
-        print(self._raw_files)       
-        src_dir = os.path.join(self.root, self.files[0])
+        src_dir = self.files[0]
         layers = [
             int(re.search(pattern, fp).group(1))
             for fp in filter(lambda x: x.startswith(src_dir), self._raw_files)
         ]
         return max(layers)-min(layers)+1
+
+    def _generate_buffer(self):
+        im = self._raw_read_func(self._raw_files[0])
+        (ny, nx), nz = im.shape, self.nz
+
+        nbytes = (nx*ny*nz) * im.dtype.itemsize
+        logger.info(
+            "dimension {}, {}, {} bytes".format((nx, ny, nz), im.dtype, nbytes)
+        )
+
+        self._mmap = mmap.mmap(-1, nbytes)
+        self._buffer = np.ndarray((nz, ny, nx), im.dtype, buffer=self._mmap)
+
+    def _load_to_buffer(self, fn):
+        layers = list(filter(lambda x: x.startswith(fn), self._raw_files))
+        layers.sort()
+        for iz, fp in enumerate(layers):
+            self._buffer[iz, ...] = self._raw_read_func(fp)
+        return self._buffer
+
+class SparseTilesImageDatastore(ImageDatastore):
+    """Each folder represents a tile stack."""
+    pass
 
 class TarDatastore(Datastore):
     def __init__(self, root, read_func, memlimit=None):
