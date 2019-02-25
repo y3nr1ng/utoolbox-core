@@ -3,6 +3,7 @@ from pprint import pprint
 import coloredlogs
 import imageio
 import numpy as np
+import objgraph
 
 from utoolbox.container.datastore import SparseStackImageDatastore
 
@@ -20,3 +21,9 @@ with SparseStackImageDatastore(
     for i, im in enumerate(ds):
         avg, std = np.mean(im), np.std(im)
         print("[{:03d}] {:.4f} +/- {:.4f}".format(i, avg, std))
+    
+    print("\n=== objgraph ===")
+    objgraph.show_growth(limit=30)
+    print()
+    
+objgraph.show_growth(limit=30)
