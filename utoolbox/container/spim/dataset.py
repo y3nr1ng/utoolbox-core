@@ -6,12 +6,16 @@ import re
 
 import imageio
 
-from utoolbox.container import ImageDatastore
+from utoolbox.container import (
+    AbstractMultiChannelDataset,
+    DatasetError,
+    ImageDatastore
+)
 from .settings import Settings
 
 logger = logging.getLogger(__name__)
 
-class Dataset(object):
+class SPIMDataset(AbstractMultiChannelDataset):
     """
     Representation of an acquisition result from LatticeScope, containing
     software setup and collected data.
@@ -30,8 +34,8 @@ class Dataset(object):
             Refactor filenames, default is True.
         """
         if not os.path.exists(root):
-            raise FileNotFoundError("invalid root folder")
-        self._root = root
+            raise FileNotFoundError("invalid dataset source")
+        super().__init__(root)
 
         settings_file = self._find_settings_file()
         logger.debug("settings file \"{}\"".format(settings_file))
@@ -49,41 +53,9 @@ class Dataset(object):
                 return (x, imageio.volread(x))
         else:
             read_func = imageio.volread
+        self._map_channels(read_func)    
 
-        # partition the dataset to different datastore by channels 
-        self._datastore = dict()
-        for channel in self.settings.waveform.channels:
-            if channel.wavelength in self._datastore:
-                logger.warning("duplicated wavelength, ignore")
-                continue
-            self._datastore[channel.wavelength] = ImageDatastore(
-                self.root,
-                read_func,
-                sub_dir=False,
-                pattern="*_ch{}_*".format(channel.id)
-            )
-
-        #TODO generate inventory file
-
-    @property
-    def datastore(self):
-        return self._datastore
-
-    @property
-    def root(self):
-        return self._root
-
-    def preview(self, view='all'):
-        """
-        Generate projection view for the dataset.
-
-        Parameters
-        ----------
-        view : one of ['xy', 'yz', 'xz'], or 'all'
-            Projected view to generate, 'all' will composite all views to a 
-            single frame.
-        """
-        pass
+        self._generate_inventory()
 
     def _find_settings_file(self, extension='txt'):
         """
@@ -101,13 +73,13 @@ class Dataset(object):
         ds_names = []
         for filename in filenames:
             basename = os.path.basename(filename)
-            matches = re.match(Dataset.SETTINGS_PATTERN, basename)
+            matches = re.match(SPIMDataset.SETTINGS_PATTERN, basename)
             if matches is None:
                 continue
             ds_names.append((matches.group('ds_name'), filename))
         
         if not ds_names:
-            raise FileNotFoundError("no known settings file")
+            raise SettingsNotFoundError("no known settings file")
         elif len(ds_names) > 1:
             logger.warning("diverged dataset, attempting to resolve it")
 
@@ -120,9 +92,34 @@ class Dataset(object):
             try:
                 index = ds_names_tr[0].index(prefix)
             except ValueError:
-                raise RuntimeError(
+                raise MultipleSettingsError(
                     "unable to determine which settings file to use"
                 )
             return ds_names[index][1]
         else:
             return ds_names[0][1]
+    
+    def _generate_inventory(self):
+        raise NotImplementedError
+
+    def _map_channels(self, read_func):
+        # partition by channels 
+        for channel in self.settings.waveform.channels:
+            if channel.wavelength in self._datastore:
+                logger.warning("found duplicate wavelength definition, ignored")
+                continue
+            self._datastore[channel.wavelength] = ImageDatastore(
+                self.root,
+                read_func,
+                sub_dir=False,
+                pattern="*_ch{}_*".format(channel.id)
+            )
+
+class SettingsError(DatasetError):
+    """SPIM-generated settings related errors."""
+
+class SettingsNotFoundError(SettingsError):
+    """Unable to find SPIM-generated settings."""
+
+class MultipleSettingsError(SettingsError):
+    """Confuse between multiple settings."""
