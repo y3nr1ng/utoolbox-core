@@ -1,8 +1,11 @@
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 texture<float, cudaTextureType2DLayered, cudaReadModeElementType> shear_tex;
 texture<float, cudaTextureType2D, cudaReadModeElementType> rotate_tex;
 =======
 <<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
 __constant__ float px_shift;
 __constant__ float vsin, vcos;
 >>>>>>> Stashed changes
@@ -164,4 +167,7 @@ void transpose_xzy_outofplace(
 	}
 }
 >>>>>>> Stashed changes
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
