@@ -74,7 +74,6 @@ void rotate_kernel(
     const int i = iw*nu + iu;
     dst[i] = ({{ dst_type }})tex3D(ref_vol, ix, iy, iz);
 }
-
 #define TILE_SIZE 16
 
 __global__

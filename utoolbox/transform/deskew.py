@@ -1,9 +1,5 @@
 import logging
-from math import hypot, sin, cos, radians, ceil
-
-from math import radians, sin, cos, ceil, hypot
 import math
-
 import os
 
 import numpy as np
@@ -403,7 +399,7 @@ class Deskew(object):
         ref_vol = cuda.np_to_array(data, 'C')
         self._texture.set_array(ref_vol)
         return ref_vol
-
+        
 import pycuda.driver as driver
 
 logger = logging.getLogger(__name__)
