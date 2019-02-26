@@ -1,3 +1,4 @@
+import glob
 import logging
 import os
 
@@ -8,7 +9,7 @@ import pycuda.driver as cuda
 
 from utoolbox.container import ImplTypes
 from utoolbox.parallel.gpu import create_some_context
-from utoolbox.transform.deskew import Deskew
+from utoolbox.transform.shear import Shear2
 
 coloredlogs.install(
     level='DEBUG',
@@ -21,15 +22,10 @@ logger = logging.getLogger(__name__)
 ctx = create_some_context()
 ctx.push()
 
-I = imageio.volread(
-    'cell4_ch0_stack0000_488nm_0000000msec_0007934731msecAbs.tif'
-)
+shear = Shear2(ImplTypes.GPU)
 
-#I = np.ones((3, 4, 5))
-deskew = Deskew()
-J = deskew.run(I)
-
-#J = rotate(I, 32.8, res=(.102, .5), rotate=True, resample=False)
-imageio.volwrite('output.tif', J)
+I = imageio.imread('lena512.bmp')
+J = shear(I, (.5, 0), scale=(.5, 1.)) #, shape=(512, 256))
+imageio.imwrite('output.bmp', J)
 
 cuda.Context.pop()
