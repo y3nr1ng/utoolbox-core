@@ -1,24 +1,13 @@
 import logging
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
 from math import hypot, sin, cos, radians, ceil
-=======
-<<<<<<< Updated upstream
-=======
->>>>>>> Stashed changes
+
 from math import radians, sin, cos, ceil, hypot
-=======
 import math
->>>>>>> Stashed changes
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
+
 import os
 
 import numpy as np
 from pycuda.compiler import SourceModule
-<<<<<<< Updated upstream
 import pycuda.driver as cuda
 import pycuda.gpuarray as gpuarray
 
@@ -236,11 +225,9 @@ class Deskew_GPU(Deskew):
         # TODO add rotate kernel call
         self._out_buf.get(out)
 
-<<<<<<< Updated upstream
         # unbind texture
         _in_buf.free()
-        
-=======
+
     def _load_kernel(self):
         path = os.path.join(os.path.dirname(__file__), "deskew.cu")
         with open(path, 'r') as fd:
@@ -268,7 +255,7 @@ class Deskew_GPU(Deskew):
         ref_vol = cuda.np_to_array(data, 'C')
         self._texture.set_array(ref_vol)
         return ref_vol
-=======
+
 import pycuda.driver as driver
 
 logger = logging.getLogger(__name__)
@@ -409,15 +396,14 @@ class Deskew(object):
     def _prepare_workspace(self, dtype):
         out_shape = self._estimate_output_shape()
 
-<<<<<<< Updated upstream
-=======
+
     def _upload_ref_vol(self, data):
         """Upload the reference volume into texture memory."""
         assert data.dtype == np.float32, "np.float32 is required"
         ref_vol = cuda.np_to_array(data, 'C')
         self._texture.set_array(ref_vol)
         return ref_vol
-=======
+
 import pycuda.driver as driver
 
 logger = logging.getLogger(__name__)
@@ -558,7 +544,6 @@ class Deskew(object):
     def _prepare_workspace(self, dtype):
         out_shape = self._estimate_output_shape()
 
->>>>>>> Stashed changes
         # no need to resize the buffer
         if self._out_buffer is not None:
             if self._out_buffer.shape == out_shape:
@@ -568,8 +553,3 @@ class Deskew(object):
 
     def _estimate_output_shape(self):
         pass
->>>>>>> Stashed changes
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
