@@ -1,9 +1,18 @@
 import logging
+<<<<<<< Updated upstream
 import math
+=======
+<<<<<<< Updated upstream
+from math import radians, sin, cos, ceil, hypot
+=======
+import math
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
 import os
 
 import numpy as np
 from pycuda.compiler import SourceModule
+<<<<<<< Updated upstream
 import pycuda.driver as cuda
 import pycuda.gpuarray as gpuarray
 
@@ -399,7 +408,11 @@ class Deskew(object):
         ref_vol = cuda.np_to_array(data, 'C')
         self._texture.set_array(ref_vol)
         return ref_vol
+<<<<<<< Updated upstream
         
+=======
+=======
+>>>>>>> Stashed changes
 import pycuda.driver as driver
 
 logger = logging.getLogger(__name__)
@@ -549,3 +562,7 @@ class Deskew(object):
 
     def _estimate_output_shape(self):
         pass
+<<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes

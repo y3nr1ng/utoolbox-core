@@ -1,7 +1,11 @@
+<<<<<<< Updated upstream
 
 texture<float, cudaTextureType2DLayered, cudaReadModeElementType> shear_tex;
 texture<float, cudaTextureType2D, cudaReadModeElementType> rotate_tex;
 
+=======
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
 __constant__ float px_shift;
 __constant__ float vsin, vcos;
 
@@ -74,6 +78,10 @@ void rotate_kernel(
     const int i = iw*nu + iu;
     dst[i] = ({{ dst_type }})tex3D(ref_vol, ix, iy, iz);
 }
+<<<<<<< Updated upstream
+=======
+=======
+>>>>>>> Stashed changes
 #define TILE_SIZE 16
 
 __global__
@@ -154,3 +162,7 @@ void transpose_xzy_outofplace(
 		}
 	}
 }
+<<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
