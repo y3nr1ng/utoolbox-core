@@ -49,11 +49,14 @@ class SparseStackImageDatastore(ImageDatastore, BufferedDatastore):
     def root(self):
         return self._root
 
-    def _find_max_depth(self, pattern=r'.*_(\d{3,})\.'):
+    def _extract_depth(self, fn, pattern=r'.*_(\d{3,})\.'):
+        return int(re.search(pattern, fp).group(1))
+
+    def _find_max_depth(self, ):
         """Determine depth by one of the stack."""
         src_dir = self.files[0]
         layers = [
-            int(re.search(pattern, fp).group(1))
+            self._extract_depth(fp)
             for fp in filter(lambda x: x.startswith(src_dir), self._raw_files)
         ]
         return max(layers)-min(layers)+1
@@ -85,15 +88,18 @@ class SparseTilesImageDatastore(SparseStackImageDatastore):
     def tile_sz(self):
         return self._tile_sz
 
-    def _find_tile_sz(self, pattern=r'Pos_(\d{3,})_(\d{3,})'):
+    def _extract_tile_pos(self, fn, pattern=r'.*_(\d{3,})_(\d{3,})'):
+        tokens = re.search(pattern, fn)
+        return int(tokens.group(2)), int(tokens.group(1))
+
+    def _find_tile_sz(self):
         pos = []
         for fn in self.files:
             try:
-                tokens = re.search(pattern, fn)
+                pos.append(self._extract_tile_pos(fn))
             except:
                 logger.warning("unknown stack name \"{}\", ignored".format(fn))
                 continue
-            pos.append((int(tokens.group(2)), int(tokens.group(1))))
         
         ypos, xpos = list(zip(*pos))
         def find_range(lst):
@@ -113,14 +119,23 @@ class SparseTilesImageDatastore(SparseStackImageDatastore):
         self._mmap = mmap.mmap(-1, nbytes)
         self._buffer = np.ndarray(shape, im.dtype, buffer=self._mmap)
     
-    def _load_to_buffer(self, z):
-        #TODO finish this
-        
-        for i, j in itertools.product(range(0, 5), (6, 9)):
-            pass
+    def _load_to_buffer(self, z, pattern=r'.*_(\d{3,})\.'):
+        shape = None
+        for dp in self.files:
+            ty, tx = self._extract_tile_pos(dp)
+            stack = list(filter(lambda x: x.startwith(dp), self._raw_files))
+            #TODO build lookup table instead of search all the times
+            for fp in stack:
+                if self._extract_depth(fp) == z:
+                    im = self._raw_read_func(fp)
 
-        layers = list(filter(lambda x: x.startswith(fn), self._raw_files))
-        layers.sort()
-        for iz, fp in enumerate(layers):
-            self._buffer[iz, ...] = self._raw_read_func(fp)
-        return self._buffer
+                    try:
+                        ny, nx = shape
+                    except TypeError:
+                        shape = im.shape
+                        ny, nx = shape
+                    sel = [slice(ny*ty:ny*(ty+1)), slice(nx*tx:nx*(tx+1))]
+                    
+                    self._buffer[*sel] = im
+
+                    break
