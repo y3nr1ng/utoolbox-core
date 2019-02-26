@@ -1,13 +1,51 @@
-from os import path
+import glob
+import logging
+import os
+import platform
+import re
+import subprocess
 import sys
 
-from setuptools import setup, find_namespace_packages
+import coloredlogs
+from Cython.Build import cythonize
+from setuptools import Extension, find_namespace_packages, setup
+from setuptools.command.build_ext import build_ext
 
-cwd = path.abspath(path.dirname(__file__))
+coloredlogs.install(
+    level='DEBUG',
+    fmt='%(asctime)s %(module)s[%(process)d] %(levelname)s %(message)s',
+    datefmt='%H:%M:%S'
+)
+
+logger = logging.getLogger(__name__)
+
+cwd = os.path.abspath(os.path.dirname(__file__))
 
 # get the long description from README.md
-with open(path.join(cwd, "README.md"), encoding='utf-8') as fd:
+with open(os.path.join(cwd, "README.md"), encoding='utf-8') as fd:
     long_description = fd.read()
+
+def wrapper_path_to_module_name(path):
+    fn = os.path.basename(path)
+    fn, _ = os.path.splitext(fn)
+    # TODO regex wrapper
+    rel_path = os.path.relpath(path, cwd)
+    return rel_path.replace('/', '.')
+
+# find all the wrappers use `wrapper_*.pyx`
+wrappers = glob.glob(
+    os.path.join(cwd, 'utoolbox', '**', 'wrapper_*.pyx'), recursive=True
+)
+# construct extensions
+extensions = [
+    Extension(
+        wrapper_path_to_module_name(path),
+        sources=[path],
+        include_dirs=[os.path.join(cwd, 'utoolbox/compression/libbsc')]
+    )
+    for path in wrappers
+]
+#TODO pass attributes
 
 setup(
     # published project name
@@ -84,8 +122,11 @@ setup(
         'click',
         'coloredlogs',
         'tqdm',
-        'jinja2' # template engine used by pycuda
+        'jinja2', # template engine used by pycuda
+        'xxhash'
     ],
+
+    #ext_modules=cythonize(extensions),
 
     dependency_links=[
     ],
