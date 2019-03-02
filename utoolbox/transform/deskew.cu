@@ -1,10 +1,13 @@
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 
 texture<float, cudaTextureType2DLayered, cudaReadModeElementType> shear_tex;
 texture<float, cudaTextureType2D, cudaReadModeElementType> rotate_tex;
 
 =======
 <<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 __constant__ float px_shift;
 __constant__ float vsin, vcos;
@@ -79,6 +82,10 @@ void rotate_kernel(
     dst[i] = ({{ dst_type }})tex3D(ref_vol, ix, iy, iz);
 }
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+=======
+=======
+>>>>>>> Stashed changes
 =======
 =======
 >>>>>>> Stashed changes
@@ -163,6 +170,9 @@ void transpose_xzy_outofplace(
 	}
 }
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 >>>>>>> Stashed changes
