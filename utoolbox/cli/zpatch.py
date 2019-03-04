@@ -1,3 +1,5 @@
+# pylint: disable=no-value-for-parameter
+# pylint: ignore E1120
 import logging
 import os
 import re
@@ -14,7 +16,7 @@ coloredlogs.install(
 
 logger = logging.getLogger(__name__)
 
-def zpatch(src, zint, inplace=True, pattern="layer_(\d+)", z_col_header="z [nm]"):
+def zpatch(src, zint, inplace=True, pattern=r"layer_(\d+)", z_col_header="z [nm]"):
     match = re.search(pattern, src)
     if not match:
         raise ValueError("unknown filename '{}'".format(src))

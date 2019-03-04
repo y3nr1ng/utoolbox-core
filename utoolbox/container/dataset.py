@@ -54,8 +54,14 @@ class AbstractMultiChannelDataset(AbstractDataset, Mapping):
     def __len__(self):
         return len(self._datastore)
 
-    # alias
-    channels = datastore
+    @property
+    def channels(self):
+        return self._datastore
+    
+    @property
+    def datastore(self):
+        """Block the usage to avoid confusion."""
+        raise NotImplementedError("use `channels` to retrieve datastores")
 
     @abstractmethod
     def _map_channels(self):

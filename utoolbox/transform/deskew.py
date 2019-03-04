@@ -1,9 +1,22 @@
 import logging
-from math import hypot, sin, cos, radians, ceil
+<<<<<<< Updated upstream
+import math
+=======
+<<<<<<< Updated upstream
+from math import radians, sin, cos, ceil, hypot
+=======
+import math
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
 import os
 
 import numpy as np
 from pycuda.compiler import SourceModule
+<<<<<<< Updated upstream
+
+=======
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
 import pycuda.driver as cuda
 import pycuda.gpuarray as gpuarray
 
@@ -223,4 +236,338 @@ class Deskew_GPU(Deskew):
 
         # unbind texture
         _in_buf.free()
+
+    def _load_kernel(self):
+        path = os.path.join(os.path.dirname(__file__), "deskew.cu")
+        with open(path, 'r') as fd:
+            tpl = Template(fd.read())
+            source = tpl.render(dst_type=dtype_to_ctype(self._dtype))
+            module = SourceModule(source)
+
+        self._kernel = module.get_function("deskew_kernel")
+
+        self._d_px_shift, _ = module.get_global('px_shift')
+        self._d_vsin, _ = module.get_global('vsin')
+        self._d_vcos, _ = module.get_global('vcos')
+
+        self._texture = module.get_texref("ref_vol")
+        self._texture.set_address_mode(0, cuda.address_mode.BORDER)
+        self._texture.set_address_mode(1, cuda.address_mode.BORDER)
+        self._texture.set_address_mode(2, cuda.address_mode.BORDER)
+        self._texture.set_filter_mode(cuda.filter_mode.LINEAR)
+
+        self._kernel.prepare('Piiiii',texrefs=[self._texture])
+
+    def _upload_ref_vol(self, data):
+        """Upload the reference volume into texture memory."""
+        assert data.dtype == np.float32, "np.float32 is required"
+        ref_vol = cuda.np_to_array(data, 'C')
+        self._texture.set_array(ref_vol)
+        return ref_vol
+
+import pycuda.driver as driver
+
+logger = logging.getLogger(__name__)
+
+class Deskew(object):
+    def __init__(self, angle=32.8, direction='forward', resolution=(.102, .3), rotate=True):
+        self._angle = angle
+        self._direction = direction
+        self._resolution = resolution
+        self._rotate = rotate
+
+        self._out_buffer = None
+
+        self._copy = self._load_copy_kernel()
+        self._transpose = self._load_transpose_kernel()
+
+    @property
+    def angle(self):
+        return math.degrees(self._angle)
+    
+    @angle.setter
+    def angle(self, degree):
+        self._angle = math.radians(degree)
+
+    @property
+    def direction(self):
+        return self._direction
+    
+    @direction.setter
+    def direction(self, direction):
+        if direction in ('forward', 'reversed'):
+            self._direction = direction
+        else:
+            raise ValueError("invalid shear direction")
+
+    @property
+    def resolution(self):
+        return self._resolution
+    
+    @resolution.setter
+    def resolution(self, resolution):
+        self._resolution = resolution
+
+    @property
+    def rotate(self):
+        return self._rotate
+    
+    @rotate.setter
+    def rotate(self, rotate):
+        self._rotate = rotate
+
+    def run(self, array):
+        shape = array.shape
+        if len(shape) != 3:
+            raise ValueError("only 3D array is allowed")
         
+        nz, ny, nx = shape
+        logger.debug("shape, nx={}, ny={}, nz={}".format(nx, ny, nz))
+
+        self._prepare_workspace(array.dtype)
+
+        locked_in_array = driver.pagelocked_empty_like(array)
+        locked_in_array[:] = array
+
+        locked_out_array = self._copy(locked_in_array)
+        
+        out_array = np.empty_like(locked_out_array)
+        out_array[:] = locked_out_array
+        
+        return out_array
+
+    def _load_copy_kernel(self):
+        path = os.path.join(os.path.dirname(__file__), 'deskew.cu')
+        with open(path, 'r') as fd:
+            module = SourceModule(fd.read())
+        
+        kernel = module.get_function('copy_kernel')
+
+        def function(in_array):
+            nz, ny, nx = in_array.shape
+            out_array = driver.pagelocked_empty_like(
+                in_array,
+                mem_flags=driver.host_alloc_flags.DEVICEMAP
+            )
+
+            block_size = (32, 32, 1)
+            grid_size = (-(-nx//32), -(-ny//32), 1)
+
+            kernel(
+                driver.Out(out_array),
+                driver.In(in_array),
+                np.int32(nx), np.int32(ny), np.int32(nz),
+                grid=grid_size, block=block_size
+            )
+
+            return out_array
+        
+        return function
+
+    def _load_transpose_kernel(self, tile_size=16, elements_per_thread=4):
+        path = os.path.join(os.path.dirname(__file__), 'deskew.cu')
+        with open(path, 'r') as fd:
+            module = SourceModule(fd.read())
+        
+        kernel = module.get_function('transpose_xzy_outofplace')
+
+        def function(in_array):
+            nz, ny, nx = in_array.shape
+            out_array = driver.pagelocked_empty(
+                (ny, nz, nx), 
+                in_array.dtype, 
+                mem_flags=driver.host_alloc_flags.DEVICEMAP
+            )
+
+            block_size = (
+                tile_size,
+                tile_size//elements_per_thread,
+                1
+            )
+            grid_size = (
+                -(-nx//tile_size),
+                -(-ny//tile_size),
+                1
+            )
+            logger.debug("grid={}, block={}".format(grid_size, block_size))
+
+            kernel(
+                driver.Out(out_array), 
+                driver.In(in_array),
+                np.int32(nx), np.int32(ny), np.int32(nz),
+                grid=grid_size, block=block_size
+            )
+
+            return out_array
+        
+        return function
+
+    def _prepare_workspace(self, dtype):
+        out_shape = self._estimate_output_shape()
+
+
+    def _upload_ref_vol(self, data):
+        """Upload the reference volume into texture memory."""
+        assert data.dtype == np.float32, "np.float32 is required"
+        ref_vol = cuda.np_to_array(data, 'C')
+        self._texture.set_array(ref_vol)
+        return ref_vol
+<<<<<<< Updated upstream
+
+=======
+=======
+>>>>>>> Stashed changes
+import pycuda.driver as driver
+
+logger = logging.getLogger(__name__)
+
+class Deskew(object):
+    def __init__(self, angle=32.8, direction='forward', resolution=(.102, .3), rotate=True):
+        self._angle = angle
+        self._direction = direction
+        self._resolution = resolution
+        self._rotate = rotate
+
+        self._out_buffer = None
+
+        self._copy = self._load_copy_kernel()
+        self._transpose = self._load_transpose_kernel()
+
+    @property
+    def angle(self):
+        return math.degrees(self._angle)
+    
+    @angle.setter
+    def angle(self, degree):
+        self._angle = math.radians(degree)
+
+    @property
+    def direction(self):
+        return self._direction
+    
+    @direction.setter
+    def direction(self, direction):
+        if direction in ('forward', 'reversed'):
+            self._direction = direction
+        else:
+            raise ValueError("invalid shear direction")
+
+    @property
+    def resolution(self):
+        return self._resolution
+    
+    @resolution.setter
+    def resolution(self, resolution):
+        self._resolution = resolution
+
+    @property
+    def rotate(self):
+        return self._rotate
+    
+    @rotate.setter
+    def rotate(self, rotate):
+        self._rotate = rotate
+
+    def run(self, array):
+        shape = array.shape
+        if len(shape) != 3:
+            raise ValueError("only 3D array is allowed")
+        
+        nz, ny, nx = shape
+        logger.debug("shape, nx={}, ny={}, nz={}".format(nx, ny, nz))
+
+        self._prepare_workspace(array.dtype)
+
+        locked_in_array = driver.pagelocked_empty_like(array)
+        locked_in_array[:] = array
+
+        locked_out_array = self._copy(locked_in_array)
+        
+        out_array = np.empty_like(locked_out_array)
+        out_array[:] = locked_out_array
+        
+        return out_array
+
+    def _load_copy_kernel(self):
+        path = os.path.join(os.path.dirname(__file__), 'deskew.cu')
+        with open(path, 'r') as fd:
+            module = SourceModule(fd.read())
+        
+        kernel = module.get_function('copy_kernel')
+
+        def function(in_array):
+            nz, ny, nx = in_array.shape
+            out_array = driver.pagelocked_empty_like(
+                in_array,
+                mem_flags=driver.host_alloc_flags.DEVICEMAP
+            )
+
+            block_size = (32, 32, 1)
+            grid_size = (-(-nx//32), -(-ny//32), 1)
+
+            kernel(
+                driver.Out(out_array),
+                driver.In(in_array),
+                np.int32(nx), np.int32(ny), np.int32(nz),
+                grid=grid_size, block=block_size
+            )
+
+            return out_array
+        
+        return function
+
+    def _load_transpose_kernel(self, tile_size=16, elements_per_thread=4):
+        path = os.path.join(os.path.dirname(__file__), 'deskew.cu')
+        with open(path, 'r') as fd:
+            module = SourceModule(fd.read())
+        
+        kernel = module.get_function('transpose_xzy_outofplace')
+
+        def function(in_array):
+            nz, ny, nx = in_array.shape
+            out_array = driver.pagelocked_empty(
+                (ny, nz, nx), 
+                in_array.dtype, 
+                mem_flags=driver.host_alloc_flags.DEVICEMAP
+            )
+
+            block_size = (
+                tile_size,
+                tile_size//elements_per_thread,
+                1
+            )
+            grid_size = (
+                -(-nx//tile_size),
+                -(-ny//tile_size),
+                1
+            )
+            logger.debug("grid={}, block={}".format(grid_size, block_size))
+
+            kernel(
+                driver.Out(out_array), 
+                driver.In(in_array),
+                np.int32(nx), np.int32(ny), np.int32(nz),
+                grid=grid_size, block=block_size
+            )
+
+            return out_array
+        
+        return function
+
+    def _prepare_workspace(self, dtype):
+        out_shape = self._estimate_output_shape()
+
+        # no need to resize the buffer
+        if self._out_buffer is not None:
+            if self._out_buffer.shape == out_shape:
+                return
+
+        self._out_buffer = np.empty(out_shape, dtype=dtype)
+
+    def _estimate_output_shape(self):
+        pass
+<<<<<<< Updated upstream
+
+=======
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes

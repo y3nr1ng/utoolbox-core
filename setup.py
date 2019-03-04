@@ -6,18 +6,9 @@ import re
 import subprocess
 import sys
 
-import coloredlogs
 from Cython.Build import cythonize
 from setuptools import Extension, find_namespace_packages, setup
 from setuptools.command.build_ext import build_ext
-
-coloredlogs.install(
-    level='DEBUG',
-    fmt='%(asctime)s %(module)s[%(process)d] %(levelname)s %(message)s',
-    datefmt='%H:%M:%S'
-)
-
-logger = logging.getLogger(__name__)
 
 cwd = os.path.abspath(os.path.dirname(__file__))
 
@@ -115,7 +106,6 @@ setup(
 
         # parallel
         'dask',
-        'pycuda',
 
         # utils
         'mako',
