@@ -134,8 +134,8 @@ class SparseTilesImageDatastore(SparseStackImageDatastore):
                     except TypeError:
                         shape = im.shape
                         ny, nx = shape
-                    sel = [slice(ny*ty, ny*(ty+1)), slice(nx*tx, nx*(tx+1))]
-                    
-                    self._buffer[*sel] = im
+                    sel = (slice(ny*ty, ny*(ty+1)), slice(nx*tx, nx*(tx+1)))
+                    # TODO fix this vvvvv
+                    #self._buffer[*sel] = im
 
                     break
