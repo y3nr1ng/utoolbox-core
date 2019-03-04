@@ -4,5 +4,6 @@ requires = [
     'wheel',
     'cmake',
     'pybind11',
-    'ninja'
+    'ninja',
+    'cython'
 ]

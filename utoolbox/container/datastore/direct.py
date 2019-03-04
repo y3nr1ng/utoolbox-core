@@ -1,3 +1,6 @@
+"""
+Datastores that can direct access the files.
+"""
 import glob
 import logging
 import os

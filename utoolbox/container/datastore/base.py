@@ -10,6 +10,7 @@ __all__ = [
 ]
 
 class Datastore(object):
+    """Basic datastore that includes abstract read logic."""
     def __init__(self, read_func=None):
         """
         Parameters
@@ -82,10 +83,9 @@ class Datastore(object):
     def read_all(self):
         """Read all data in datastore.
 
-        Note
-        ----
-        If all the data in the datastore does not fit in memory, then `readall`
-        returns an error.
+        .. note::
+            It attemps to load all the data in memory, be aware of the data 
+            size.
         """
         self._index = len(self._inventory)
         return [self.read_func(fp) for fp in self._inventory]
@@ -96,6 +96,9 @@ class Datastore(object):
         self._read_size = 1
 
 class BufferedDatastore(ABC):
+    """
+    Reading data that requires internal buffer to piece together the fractions before returning it.
+    """
     def __init__(self):
         # staging area
         self._mmap, self._buffer = None, None
@@ -117,8 +120,14 @@ class BufferedDatastore(ABC):
 
     @abstractmethod
     def _generate_buffer(self):
+        """Generate the internal buffer."""
         raise NotImplementedError
     
     @abstractmethod
     def _load_to_buffer(self, x):
+        """
+        Load data definition x into the internal buffer.
+        
+        :param x: any definition that can be successfully interpreted internally
+        """
         raise NotImplementedError

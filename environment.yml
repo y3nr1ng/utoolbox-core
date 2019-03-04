@@ -5,18 +5,21 @@ channels:
     - conda-forge
 
 dependencies:
+    # core
+    - python=3
+
     # build tools
-    - conda-build
     - bumpversion
     - twine
+    
+    # docs
+    - sphinx
+    - sphinx_rtd_theme
 
     # tests
     - pytest
     - coverage
     - pytest-cov
-
-    # core
-    - python=3.6
 
     # numpy dependency
     # NOTE Pre-install numpy until upstream pycuda can incorporate
