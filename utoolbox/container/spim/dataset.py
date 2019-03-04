@@ -6,10 +6,10 @@ import re
 
 import imageio
 
-from utoolbox.container import (
+from utoolbox.container import ImageDatastore
+from utoolbox.container.dataset import (
     AbstractMultiChannelDataset,
-    DatasetError,
-    ImageDatastore
+    DatasetError
 )
 from .settings import Settings
 

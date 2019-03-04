@@ -24,6 +24,7 @@ Base class
 ^^^^^^^^^^
 .. automodule:: utoolbox.container.datastore.base
     :members:
+    :private-members:
     
 Direct access
 ^^^^^^^^^^^^^
@@ -33,6 +34,7 @@ Direct access
 Sparse collection
 ^^^^^^^^^^^^^^^^^
 .. automodule:: utoolbox.container.datastore.sparse
+    :special-members:
     :members:
 
 Archive
