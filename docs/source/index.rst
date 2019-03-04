@@ -3,45 +3,14 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to uToolbox's documentation!
-====================================
+uToolbox
+========
 .. toctree::
-   :maxdepth: 4
-   :caption: Contents:
+    :maxdepth: 2
+    :caption: First Steps
 
+.. toctree::
+    :glob:
+    :caption: API Reference
 
-
-Indices and tables
-==================
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
-
-
-
-Container
-=========
-
-Dataset
--------
-.. automodule:: utoolbox.container.dataset
-    :members:
-
-Datastore 
----------
-.. automodule:: utoolbox.container.datastore
-
-Base class
-^^^^^^^^^^
-.. automodule:: utoolbox.container.datastore.base
-    :members:
-    
-Direct access
-^^^^^^^^^^^^^
-.. automodule:: utoolbox.container.datastore.direct
-    :members:
-    
-Sparse collection
-^^^^^^^^^^^^^^^^^
-.. automodule:: utoolbox.container.datastore.sparse
-    :members:
+    api/*
