@@ -1,3 +1,6 @@
+"""
+Datastores that represent sparse collections of stacks.
+"""
 import itertools
 import logging
 import mmap
@@ -19,6 +22,10 @@ __all__ = [
 class SparseStackImageDatastore(ImageDatastore, BufferedDatastore):
     """Each folder represents a stack."""
     def __init__(self, root, read_func, **kwargs):
+        """
+        :param str root: root folder path
+        :param read_func: read function for the actual file
+        """
         stacks = next(os.walk(root))[1]
         stacks.sort()
         logger.debug("found {} stacks".format(len(stacks)))
@@ -52,7 +59,7 @@ class SparseStackImageDatastore(ImageDatastore, BufferedDatastore):
     def _extract_depth(self, fn, pattern=r'.*_(\d{3,})\.'):
         return int(re.search(pattern, fp).group(1))
 
-    def _find_max_depth(self, ):
+    def _find_max_depth(self):
         """Determine depth by one of the stack."""
         src_dir = self.files[0]
         layers = [
@@ -77,8 +84,15 @@ class SparseStackImageDatastore(ImageDatastore, BufferedDatastore):
         return self._buffer
 
 class SparseTilesImageDatastore(SparseStackImageDatastore):
-    """Each folder represents a tile stack."""
+    """Each folder represents a tiled stack."""
     def __init__(self, root, read_func, tile_sz=None, **kwargs):
+        """
+        :param str root: root folder path
+        :param read_func: read function for the actual file
+        :param tuple(int,int) tile_sz: dimension of the tiles
+
+        .. note:: Currently, only 2D tiling is supported.
+        """
         super(SparseTilesImageDatastore, self).__init__(
             root, read_func, **kwargs
         )
