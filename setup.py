@@ -6,9 +6,13 @@ import re
 import subprocess
 import sys
 
-from Cython.Build import cythonize
+try:
+    from Cython.Distutils import build_ext
+except ImportError:
+    USE_CYTHON = False
+else:
+    USE_CYTHON = True
 from setuptools import Extension, find_namespace_packages, setup
-from setuptools.command.build_ext import build_ext
 
 cwd = os.path.abspath(os.path.dirname(__file__))
 
@@ -23,6 +27,7 @@ def wrapper_path_to_module_name(path):
     rel_path = os.path.relpath(path, cwd)
     return rel_path.replace('/', '.')
 
+#TODO adjust .pyx/.c by USE_CYTHON
 # find all the wrappers use `wrapper_*.pyx`
 wrappers = glob.glob(
     os.path.join(cwd, 'utoolbox', '**', 'wrapper_*.pyx'), recursive=True
@@ -37,6 +42,10 @@ extensions = [
     for path in wrappers
 ]
 #TODO pass attributes
+# modify extension compile options
+cmdclass = dict()
+if USE_CYTHON:
+    cmdclass.update({'build_ext': build_ext})
 
 setup(
     # published project name
@@ -116,7 +125,9 @@ setup(
         'xxhash'
     ],
 
-    #ext_modules=cythonize(extensions),
+    cmdclass=cmdclass,
+
+    ext_modules=extensions,
 
     dependency_links=[
     ],
