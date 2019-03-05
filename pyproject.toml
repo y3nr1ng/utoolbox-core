@@ -2,8 +2,5 @@
 requires = [
     'setuptools',
     'wheel',
-    'cmake',
-    'pybind11',
-    'ninja',
     'cython'
 ]
