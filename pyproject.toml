@@ -1,7 +1,5 @@
 [build-system]
 requires = [
     'setuptools',
-    'wheel',
-    'numpy',
-    'cython'
+    'wheel'
 ]
