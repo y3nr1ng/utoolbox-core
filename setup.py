@@ -1,51 +1,133 @@
+from distutils.spawn import find_executable
 import glob
-import logging
 import os
-import platform
-import re
-import subprocess
 import sys
 
-try:
-    from Cython.Distutils import build_ext
-except ImportError:
-    USE_CYTHON = False
-else:
-    USE_CYTHON = True
+from Cython.Build import build_ext
+import numpy as np
 from setuptools import Extension, find_namespace_packages, setup
 
 cwd = os.path.abspath(os.path.dirname(__file__))
 
-# get the long description from README.md
+###
+# get description from README.md
+###
 with open(os.path.join(cwd, "README.md"), encoding='utf-8') as fd:
     long_description = fd.read()
 
-def wrapper_path_to_module_name(path):
-    fn = os.path.basename(path)
-    fn, _ = os.path.splitext(fn)
-    # TODO regex wrapper
-    rel_path = os.path.relpath(path, cwd)
-    return rel_path.replace('/', '.')
+###
+# region FIND DEPENDENCIES
+###
+# numpy include directory
+try:
+    np_include_dir = np.get_include()
+except AttributeError:
+    np_include_dir = np.get_numpy_include()
 
-#TODO adjust .pyx/.c by USE_CYTHON
-# find all the wrappers use `wrapper_*.pyx`
+# cuda 
+def find_cuda_home():
+    try:
+        cuda_home = os.environ['CUDAHOME']
+        nvcc = os.path.join(cuda_home, 'bin', 'nvcc')
+    except KeyError:
+        nvcc = find_executable('nvcc')
+        if nvcc is None:
+            raise EnvironmentError("cannot locate CUDA from PATH or CUDAHOME")
+        cuda_home = os.path.dirname(os.path.dirname(nvcc))
+    
+find_cuda_home()
+
+raise RuntimeError("DEBUG")
+###
+# endregion
+###
+
+###
+# region INJECT NVCC CUSTOMIZATION
+###
+def customize_compiler_for_nvcc(self):
+    """
+    Inject deep into distutils to customize how the dispatch to gcc/nvcc works. 
+    Adapt from rmcgibbo_.
+
+    .. _rmcgibbo: https://github.com/rmcgibbo/npcuda-example/blob/master/cython/setup.py
+    """
+    # tell the compiler it can process .cu
+    self.src_extensions.append('.cu')
+
+    # save references to default compiler and _compile method
+    default_compiler_so, super = self.compiler_so, self._compile
+
+    def _compile(obj, src, ext, cc_args, extra_postargs, pp_opts):
+        _, ext = os.path.splitext(src)
+        if ext == '.cu':
+            # use cuda
+            self.set_executable('compiler_so', CUDA['nvcc'])
+            # use subset of the extra_postargs
+            postargs = extra_postargs['nvcc']
+        else:
+            postargs = extra_postargs['gcc']
+
+        super(obj, src, ext, cc_args, postargs, pp_opts)
+        # reset default compiler
+        self.compiler_so = default_compiler_so
+    # inject method
+    self._compile = _compile
+
+class custom_build_ext(build_ext):
+    def build_extensions(self):
+        customize_compiler_for_nvcc(self.compiler)
+        super().build_extensions()
+###
+# endregion
+###
+
+###
+# region FIND WRAPPER MODULES
+###
+# find all the wrappers
 wrappers = glob.glob(
-    os.path.join(cwd, 'utoolbox', '**', 'wrapper_*.pyx'), recursive=True
+    os.path.join(cwd, 'utoolbox', '**', 'wrapper_*.pyx'), 
+    recursive=True
 )
+
 # construct extensions
-extensions = [
-    Extension(
-        wrapper_path_to_module_name(path),
-        sources=[path],
-        include_dirs=[os.path.join(cwd, 'utoolbox/compression/libbsc')]
+extensions = []
+for abs_path in wrappers:
+    # path to module name
+    fn = os.path.basename(abs_path)
+    fn, _ = os.path.splitext(fn)
+    rel_path = os.path.relpath(abs_path, cwd)
+    module = rel_path.replace(os.sep, '.')
+
+    # external source
+    root = os.path.dirname(abs_path)
+    ext_include_dir = os.path.join(root, 'include')
+    ext_source_dir = os.path.join(root, 'source')
+    
+    extension = Extension(
+        module,
+        sources=[],
+        include_dirs=[
+            np_include_dir,
+            ext_include_dir
+        ],
+        library_dirs=[],
+        runtime_library_dirs=[],
+        #libraries=[], # should specify in wrapper specfial comment block 
+        extra_compile_args={
+            'gcc': [],
+            'nvcc': [
+                '-arch=sm_30',
+                '--ptxas-options=-v',
+                '-c',
+                '--compiler-options \'-fPIC\''
+            ]
+        }
     )
-    for path in wrappers
-]
-#TODO pass attributes
-# modify extension compile options
-cmdclass = dict()
-if USE_CYTHON:
-    cmdclass.update({'build_ext': build_ext})
+###
+# endregion
+###
 
 setup(
     # published project name
@@ -88,13 +170,13 @@ setup(
 
     python_requires='>=3.6',
 
-    # other packages the build system would require during compilation
-    setup_requires=[
-    ],
+    # use pyproject.toml to define build system requirement
+    #setup_requires=[
+    #],
 
     # other packages the project depends on to run
     #   install_requires -> necessity
-    #   requirements.txt -> deployment (use conda environent.yml)
+    #   requirements.txt
     install_requires=[
         # core
         'cython',
@@ -125,12 +207,11 @@ setup(
         'xxhash'
     ],
 
-    cmdclass=cmdclass,
+    cmdclass={
+        'build_ext': custom_build_ext
+    },
 
     ext_modules=extensions,
-
-    dependency_links=[
-    ],
 
     # additional groups of dependencies here for the "extras" syntax
     extras_require={
@@ -155,6 +236,6 @@ setup(
         ]
     }, 
 
-    # cannot safely run in compressed form
+    # contains c source, cannot safely run in compressed form
     zip_safe=False
 )
