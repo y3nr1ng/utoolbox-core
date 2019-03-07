@@ -1,11 +1,6 @@
-from distutils.spawn import find_executable
-import glob
-import os
-import sys
+import os 
 
-from Cython.Build import build_ext
-import numpy as np
-from setuptools import Extension, find_namespace_packages, setup
+from setuptools import find_namespace_packages, setup
 
 cwd = os.path.abspath(os.path.dirname(__file__))
 
@@ -14,120 +9,6 @@ cwd = os.path.abspath(os.path.dirname(__file__))
 ###
 with open(os.path.join(cwd, "README.md"), encoding='utf-8') as fd:
     long_description = fd.read()
-
-###
-# region FIND DEPENDENCIES
-###
-# numpy include directory
-try:
-    np_include_dir = np.get_include()
-except AttributeError:
-    np_include_dir = np.get_numpy_include()
-
-# cuda 
-def find_cuda_home():
-    try:
-        cuda_home = os.environ['CUDAHOME']
-        nvcc = os.path.join(cuda_home, 'bin', 'nvcc')
-    except KeyError:
-        nvcc = find_executable('nvcc')
-        if nvcc is None:
-            raise EnvironmentError("cannot locate CUDA from PATH or CUDAHOME")
-        cuda_home = os.path.dirname(os.path.dirname(nvcc))
-    
-find_cuda_home()
-
-raise RuntimeError("DEBUG")
-###
-# endregion
-###
-
-###
-# region INJECT NVCC CUSTOMIZATION
-###
-def customize_compiler_for_nvcc(self):
-    """
-    Inject deep into distutils to customize how the dispatch to gcc/nvcc works. 
-    Adapt from rmcgibbo_.
-
-    .. _rmcgibbo: https://github.com/rmcgibbo/npcuda-example/blob/master/cython/setup.py
-    """
-    # tell the compiler it can process .cu
-    self.src_extensions.append('.cu')
-
-    # save references to default compiler and _compile method
-    default_compiler_so, super = self.compiler_so, self._compile
-
-    def _compile(obj, src, ext, cc_args, extra_postargs, pp_opts):
-        _, ext = os.path.splitext(src)
-        if ext == '.cu':
-            # use cuda
-            self.set_executable('compiler_so', CUDA['nvcc'])
-            # use subset of the extra_postargs
-            postargs = extra_postargs['nvcc']
-        else:
-            postargs = extra_postargs['gcc']
-
-        super(obj, src, ext, cc_args, postargs, pp_opts)
-        # reset default compiler
-        self.compiler_so = default_compiler_so
-    # inject method
-    self._compile = _compile
-
-class custom_build_ext(build_ext):
-    def build_extensions(self):
-        customize_compiler_for_nvcc(self.compiler)
-        super().build_extensions()
-###
-# endregion
-###
-
-###
-# region FIND WRAPPER MODULES
-###
-# find all the wrappers
-wrappers = glob.glob(
-    os.path.join(cwd, 'utoolbox', '**', 'wrapper_*.pyx'), 
-    recursive=True
-)
-
-# construct extensions
-extensions = []
-for abs_path in wrappers:
-    # path to module name
-    fn = os.path.basename(abs_path)
-    fn, _ = os.path.splitext(fn)
-    rel_path = os.path.relpath(abs_path, cwd)
-    module = rel_path.replace(os.sep, '.')
-
-    # external source
-    root = os.path.dirname(abs_path)
-    ext_include_dir = os.path.join(root, 'include')
-    ext_source_dir = os.path.join(root, 'source')
-    
-    extension = Extension(
-        module,
-        sources=[],
-        include_dirs=[
-            np_include_dir,
-            ext_include_dir
-        ],
-        library_dirs=[],
-        runtime_library_dirs=[],
-        #libraries=[], # should specify in wrapper specfial comment block 
-        extra_compile_args={
-            'gcc': [],
-            'nvcc': [
-                '-arch=sm_30',
-                '--ptxas-options=-v',
-                '-c',
-                '--compiler-options \'-fPIC\''
-            ]
-        }
-    )
-###
-# endregion
-###
 
 setup(
     # published project name
@@ -206,12 +87,6 @@ setup(
         'jinja2', # template engine used by pycuda
         'xxhash'
     ],
-
-    cmdclass={
-        'build_ext': custom_build_ext
-    },
-
-    ext_modules=extensions,
 
     # additional groups of dependencies here for the "extras" syntax
     extras_require={
