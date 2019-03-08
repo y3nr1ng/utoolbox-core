@@ -34,8 +34,8 @@ Direct access
 Sparse collection
 ^^^^^^^^^^^^^^^^^
 .. automodule:: utoolbox.container.datastore.sparse
-    :special-members:
     :members:
+    :special-members:
 
 Archive
 ^^^^^^^
