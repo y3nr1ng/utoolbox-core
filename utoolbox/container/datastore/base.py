@@ -1,6 +1,9 @@
 # pylint: disable=E1102
 from abc import ABC, abstractmethod
+from functools import reduce
 import logging
+import mmap
+from operator import mul
 
 logger = logging.getLogger(__name__)
 
@@ -104,12 +107,15 @@ class BufferedDatastore(ABC):
         self._mmap, self._buffer = None, None
     
     def __enter__(self):
-        self._generate_buffer()
-        shape, dtype, nbytes = \
-            self._buffer.shape, self._buffer.dtype, self._buffer.size
+        shape, dtype = self._buffer_shape()
+        nbytes = dtype.itemsize * reduce(mul, shape)
         logger.info(
             "dimension {}, {}, {} bytes".format(shape[::-1], dtype, nbytes)
         )
+
+        self._mmap = mmap.mmap(-1, nbytes)
+        self._buffer = np.ndarray(shape, dtype, buffer=self._mmap)
+
         return self
     
     def __exit__(self, exc_type, exc_value, traceback):
@@ -119,8 +125,12 @@ class BufferedDatastore(ABC):
         logger.debug("buffer destroyed")
 
     @abstractmethod
-    def _generate_buffer(self):
-        """Generate the internal buffer."""
+    def _buffer_shape(self):
+        """
+        Determine shape and type of the internal buffer.
+        
+        :return: a tuple, (shape, dtype)
+        """
         raise NotImplementedError
     
     @abstractmethod
