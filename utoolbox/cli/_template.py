@@ -1,7 +1,4 @@
 # pylint: disable=no-value-for-parameter
-"""
-Dataset management command-line utility.
-"""
 import logging
 
 import click

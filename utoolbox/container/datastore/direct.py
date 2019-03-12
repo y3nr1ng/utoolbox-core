@@ -6,6 +6,7 @@ import logging
 import os
 
 from .base import Datastore
+from .sparse import SparseStackImageDatastore
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class FileDatastore(Datastore):
         extensions : None or list of str
             Extensions of files, select all if 'None'.
         """
-        super(FileDatastore, self).__init__(read_func)
+        super().__init__(read_func)
 
         if sub_dir:
             root = os.path.join(root, "**")
@@ -59,6 +60,21 @@ class ImageDatastore(FileDatastore):
     def __init__(self, root, read_func, extensions=None, **kwargs):
         if extensions is None:
             extensions = ImageDatastore.supported_extensions
-        super(ImageDatastore, self).__init__(
+        super().__init__(
             root, read_func=read_func, extensions=extensions, **kwargs
         )
+
+    @staticmethod
+    def convert_from(dst, src, write_func):
+        if src is SparseStackImageDatastore:
+            ImageDatastore._from_sparse_stack(dst, src, write_func)
+        else:
+            super().convert_from(src)
+
+    @staticmethod
+    def _from_sparse_stack(dst, src, write_func, extension='tif'):
+        os.mkdirs(dst)
+        for fn, im in zip(src.files, src):
+            fp = os.path.join(dst, "{}.{}".format(fn, extension))
+            write_func(fp, im)
+            
