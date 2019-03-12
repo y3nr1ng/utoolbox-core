@@ -5,6 +5,8 @@ import logging
 import mmap
 from operator import mul
 
+import numpy as np
+
 from .error import UnableToConvertError
 
 logger = logging.getLogger(__name__)
@@ -41,6 +43,9 @@ class Datastore(object):
         else:
             raise StopIteration
 
+    def __len__(self):
+        return len(self._inventory)
+        
     @property
     def has_data(self):
         """Determine if data is available to read."""
@@ -60,12 +65,6 @@ class Datastore(object):
             raise ValueError("size must be greater than 1")
         else:
             self._read_size = new_read_size
-
-    @staticmethod
-    def convert_from(src):
-        raise UnableToConvertError(
-            "unable to convert from {}".format(src.__class__.__name__)
-        )
 
     def preview(self):
         """Subset of data in datastore."""
