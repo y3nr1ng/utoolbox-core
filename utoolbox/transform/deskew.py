@@ -132,9 +132,22 @@ class Deskew(object):
         return dz0 * cos(self._angle) / dr0
 
     def _upload(self, src):
+        """
+        Uplaod data to device.
+
+        :param np.ndarray src: source
+        """
         ushort_to_float(cp.asarray(src), self._template)
 
     def _download(self, dst):
+        """
+        Download data from device.
+
+        :param np.ndarray dst: destination
+
+        .. note::
+            Pinned memory and device memory are reused throughout the process.
+        """
         buffer = cp.asarray(dst)
         float_to_ushort(self._template, buffer)
         dst[...] = cp.asnumpy(buffer)
