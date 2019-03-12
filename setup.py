@@ -73,8 +73,7 @@ setup(
         'tifffile',
 
         # gui
-        'pyqt5',
-        'plotly',
+        'imgui[glfw]>=0.0a0', # pre-release contains required fix
 
         # parallel
         'dask',
