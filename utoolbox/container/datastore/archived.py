@@ -5,7 +5,7 @@ import tarfile
 import xxhash
 
 from .base import Datastore
-from .error import InvalidMetadataError, HashMismatchError
+from .error import HashMismatchError, InvalidMetadataError
 
 class TarDatastore(Datastore):
     def __init__(self, root, read_func, memlimit=None):

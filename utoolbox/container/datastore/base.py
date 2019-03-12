@@ -61,7 +61,7 @@ class Datastore(object):
         else:
             self._read_size = new_read_size
 
-    ＠staticmethod
+    @staticmethod
     def convert_from(src):
         raise UnableToConvertError(
             "unable to convert from {}".format(src.__class__.__name__)
