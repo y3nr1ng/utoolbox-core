@@ -9,13 +9,11 @@ except ImportError:
 else:
     USE_TQDM = True
 
-if USE_TQDM:
-    from utoolbox.util.logging import TqdmLoggingHandler
-
 from .base import Datastore
 
 logger = logging.getLogger(__name__)
 if USE_TQDM:
+    from utoolbox.util.logging import TqdmLoggingHandler
     logger.addHandler(TqdmLoggingHandler())
 
 class DatastoreDescriptor(NamedTuple):

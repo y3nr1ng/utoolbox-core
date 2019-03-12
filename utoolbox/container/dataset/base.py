@@ -4,13 +4,12 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 import os
 
+from .error import UndefinedConversionError
+
 class AbstractDataset(ABC):
     def __init__(self, root):
         """
-        Parameters
-        ----------
-        root : str
-            Source of the dataset, flat layout.
+        :param str root: source of the dataset, flat layout
         """
         self._root = root
         self._datastore = None
@@ -28,10 +27,8 @@ class AbstractDataset(ABC):
         """
         Convert other form of dataset into current one.
         
-        Parameter
-        ---------
-        ds : AbstractDataset
-            Source dataset.
+        :param ds: source dataset
+        :type ds: :class:`.AbstractDataset`
         """
         raise UndefinedConversionError
 
@@ -48,7 +45,10 @@ class AbstractMultiChannelDataset(AbstractDataset, Mapping):
         return self._datastore[key]
     
     def __iter__(self):
-        """During iterations, we are actually iterate over the datastore."""
+        """
+        .. note::
+            During iterations, we are actually iterate over the datastore.
+        """
         return self._datastore
     
     def __len__(self):
@@ -67,9 +67,3 @@ class AbstractMultiChannelDataset(AbstractDataset, Mapping):
     def _map_channels(self):
         """Map channels to datastore from dataset root."""
         return NotImplementedError
-
-class DatasetError(Exception):
-    """Base class for dataset exceptions."""
-
-class UndefinedConversionError(DatasetError):
-    """Raised when dataset conversion is impossible."""
