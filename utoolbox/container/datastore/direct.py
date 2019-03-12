@@ -18,18 +18,11 @@ class FileDatastore(Datastore):
     def __init__(self, root, read_func=None, sub_dir=False, pattern='*', 
                  extensions=None):
         """
-        Parameters
-        ----------
-        root : str or list of str
-            Files or folders to include in the datastore.
-        read_func : func
-            Function to perform the read operation.
-        sub_dir : bool, default to False
-            Include subfolders within folder.
-        pattern : str
-            Patterns in the filename, default to '*'.
-        extensions : None or list of str
-            Extensions of files, select all if 'None'.
+        :param str root: files or folders to include in the datastore
+        :param func read_func: function that perform the read operation
+        :param bool sub_dir: scan nested folders
+        :param str pattern: filename pattern
+        :param str extensions: file extensions to include
         """
         super().__init__(read_func)
 

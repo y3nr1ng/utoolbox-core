@@ -20,10 +20,7 @@ class Datastore(object):
     """Basic datastore that includes abstract read logic."""
     def __init__(self, read_func=None):
         """
-        Parameters
-        ----------
-        read_func : func
-            Function to perform the read operation.
+        :param func read_func: function that perform the read operation
         """
         if read_func is None:
             # nop
@@ -91,7 +88,8 @@ class Datastore(object):
             return self.read_func(self._inventory[self._index-1])
 
     def read_all(self):
-        """Read all data in datastore.
+        """
+        Read all data in datastore.
 
         .. note::
             It attemps to load all the data in memory, be aware of the data 
