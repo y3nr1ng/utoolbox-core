@@ -7,8 +7,8 @@ import re
 
 import numpy as np
 
+from . import ImageDatastore
 from .base import BufferedDatastore
-from .direct import ImageDatastore
 
 logger = logging.getLogger(__name__)
 

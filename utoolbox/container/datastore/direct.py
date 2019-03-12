@@ -5,8 +5,8 @@ import glob
 import logging
 import os
 
+from . import SparseStackImageDatastore
 from .base import Datastore
-from .sparse import SparseStackImageDatastore
 
 logger = logging.getLogger(__name__)
 
