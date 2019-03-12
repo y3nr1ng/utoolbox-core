@@ -1,10 +1,10 @@
 # pylint: disable=undefined-variable
 
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 from collections.abc import Mapping
 import os
 
-class AbstractDataset(metaclass=ABCMeta):
+class AbstractDataset(ABC):
     def __init__(self, root):
         """
         Parameters
