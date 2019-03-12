@@ -55,7 +55,7 @@ class SparseStackImageDatastore(ImageDatastore, BufferedDatastore):
         return self._root
 
     def _extract_depth(self, fn, pattern=r'.*_(\d{3,})\.'):
-        return int(re.search(pattern, fp).group(1))
+        return int(re.search(pattern, fn).group(1))
 
     def _find_max_depth(self):
         """Determine depth by one of the stack."""

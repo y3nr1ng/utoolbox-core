@@ -4,8 +4,10 @@ import coloredlogs
 from imageio import imread, volwrite
 
 from utoolbox.container.datastore import (
+    convert,
+    DatastoreDescriptor,
     ImageDatastore, 
-    SparseImageDatastore
+    SparseStackImageDatastore
 )
 
 coloredlogs.install(
@@ -14,8 +16,16 @@ coloredlogs.install(
     datefmt='%H:%M:%S'
 )
 
-with SparseImageDatastore(
-    'umanager_mock_dataset', imread, pattern='*561*'
-) as ds:
-    ImageDatastore.convert_from('umanager_dense_dataset', ds, imageio.volwrite)
-    
+src = DatastoreDescriptor(
+    ds_type=SparseStackImageDatastore,
+    uri='/home/ytliu/nas/hive_archive/ytliu/brain_clarity_lectin/poststain_640_z5',
+    pattern='*_640_*',
+    read_func=imread
+)
+dst = DatastoreDescriptor(
+    ds_type=ImageDatastore,
+    uri='/home/ytliu/nas/hive_buffer/ytliu/brain_clarity_lectin/poststain_640_z5_dense',
+    write_func=volwrite
+)
+
+convert(dst, src)
