@@ -1,7 +1,6 @@
 import os 
 
 from setuptools import find_namespace_packages, setup
-
 cwd = os.path.abspath(os.path.dirname(__file__))
 
 ###
@@ -73,7 +72,7 @@ setup(
         'tifffile',
 
         # gui
-        'imgui[glfw]>=0.0a0', # pre-release contains required fix
+        'PySide2', 
 
         # parallel
         'dask',
@@ -84,7 +83,7 @@ setup(
         'coloredlogs',
         'tqdm',
         'jinja2', # template engine used by pycuda
-        'xxhash'
+        'xxhash'ß
     ],
 
     # additional groups of dependencies here for the "extras" syntax
