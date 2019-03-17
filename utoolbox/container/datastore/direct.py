@@ -40,6 +40,7 @@ class FileDatastore(Datastore):
         for ext in extensions:
             path = os.path.join(root, ext)
             files.extend(glob.glob(path, recursive=sub_dir))
+        files.sort()
         self._inventory = files
 
     @property
