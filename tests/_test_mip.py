@@ -4,12 +4,10 @@ import os
 import coloredlogs
 import imageio
 import numpy as np
-import pycuda.driver as cuda
 import tqdm
 
-from utoolbox.util.decorator.benchmark import timeit
-from utoolbox.parallel.gpu import create_some_context
-from utoolbox.transform import MIPTransform
+from utoolbox.util.decorator import timeit
+from utoolbox.transform.projections import Orthogonal
 
 coloredlogs.install(
     level='DEBUG',
@@ -20,34 +18,17 @@ coloredlogs.install(
 logger = logging.getLogger(__name__)
 
 
-##### FETCH DATA #####
-path = "deskew_output.tif"
-I_in = imageio.volread(path)
-logger.info("I_in.shape={}".format(I_in.shape))
+path = "test_ortho.tif"
+I = imageio.volread(path)
+logger.info("I.shape={}".format(I.shape))
 
 
-##### EXCEUTE DESKEW #####
-@timeit
-def gpu(data):
-    ctx = create_some_context()
-    ctx.push()
-
-    transform = MIPTransform('z')
-    for _ in tqdm.trange(100):
-        I_out = transform(I_in)
-
-    cuda.Context.pop()
-
-    return I_out
-
-@timeit
-def cpu(data):
-    for _ in tqdm.trange(100):
-        I_out = np.max(data, axis=0).squeeze()
-    return I_out
+with Orthogonal(I) as ortho:
+    Ixy = ortho.xy
+    imageio.imwrite("mip_xy.tif", Ixy)
     
-I_out_gpu = gpu(I_in)
-I_out_cpu = cpu(I_in)
+    Ixz = ortho.xz
+    imageio.imwrite("mip_xz.tif", Ixz)
 
-##### RESULT #####
-#imageio.imwrite("deskew_output_mip.tif", I_out)
+    Iyz = ortho.yz
+    imageio.imwrite("mip_yz.tif", Iyz)
