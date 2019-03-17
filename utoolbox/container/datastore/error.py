@@ -6,6 +6,3 @@ class UnableToConvertError(DatastoreError):
 
 class InvalidMetadataError(DatastoreError):
     """Invalid metadata in tar datastores."""
-
-class HashMismatchError(DatastoreError):
-    """Digest mismatch after file decompression."""

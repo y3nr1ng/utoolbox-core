@@ -4,7 +4,7 @@ Datastore is a respository for collections of data that may be too large to fit 
 .. note::
     Datastore imitates and expands upon the MATLAB equivalent.
 """
-from .archived import *
 from .convert import convert, DatastoreDescriptor
 from .direct import *
+from .hdf5 import *
 from .sparse import *
