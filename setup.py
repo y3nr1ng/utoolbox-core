@@ -83,7 +83,6 @@ setup(
         'coloredlogs',
         'tqdm',
         'jinja2', # template engine used by pycuda
-        'xxhash'ß
     ],
 
     # additional groups of dependencies here for the "extras" syntax
@@ -105,7 +104,8 @@ setup(
     entry_points={
         'console_scripts': [
             'deskew=utoolbox.cli.deskew:main',
-            'zpatch=utoolbox.cli.zpatch:main'
+            'zpatch=utoolbox.cli.zpatch:main',
+            'dataset=utoolbox.cli.dataset:main'
         ]
     }, 
 
