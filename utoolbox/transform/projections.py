@@ -15,7 +15,7 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 ###
-# regions: Kernel definitions
+# region: Kernel definitions
 ###
 
 cu_file = os.path.join(os.path.dirname(__file__), 'projections.cu')
