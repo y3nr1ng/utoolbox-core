@@ -7,6 +7,11 @@ import numpy as np
 
 from utoolbox.util.decorator import run_once
 
+__all__ = [
+    'Histogram', 
+    'histogram'
+]
+
 logger = logging.getLogger(__name__)
 
 ###
@@ -98,7 +103,7 @@ def histogram(data, n_bins=256):
     except ValueError:
         # unable to squeeze
         pass
-        
+
     if data.ndim == 2:
         hist, _ = np.histogram(data, n_bins, (0, 2**16))
         return hist
