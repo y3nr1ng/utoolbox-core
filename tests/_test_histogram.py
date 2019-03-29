@@ -25,14 +25,23 @@ def cpu():
     hist_cpu, _ = np.histogram(array, n_bins, (0, 2**16))
     return hist_cpu
 hist_cpu = cpu()
-#print(hist_cpu)
-#print("n={}".format(hist_cpu.sum()))
+print(hist_cpu)
+print("n={}".format(hist_cpu.sum()))
 
 @timeit
-def gpu():
+def gpu1():
     return histogram(array, n_bins)
-hist_gpu = gpu()
-#print(hist_gpu)
-#print("n={}".format(hist_gpu.sum()))
+hist_gpu1 = gpu1()
+print(hist_gpu1)
+print("n={}".format(hist_gpu1.sum()))
+np.testing.assert_array_equal(hist_cpu, hist_gpu1)
 
-np.testing.assert_array_equal(hist_cpu, hist_gpu)
+@timeit
+def gpu2():
+    import cupy as cp
+    h, _ = cp.histogram(cp.asarray(array), n_bins)
+    return cp.asnumpy(h)
+hist_gpu2 = gpu2()
+print(hist_gpu2)
+print("n={}".format(hist_gpu2.sum()))
+np.testing.assert_array_equal(hist_cpu, hist_gpu2)
