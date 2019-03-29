@@ -14,11 +14,11 @@ __all__ = [
     'deskew'
 ]
 
-cu_file = os.path.join(os.path.dirname(__file__), 'deskew.cu')
-
 ###
 # region: kernel definitions
 ###
+
+cu_file = os.path.join(os.path.dirname(__file__), 'deskew.cu')
 
 ushort_to_float = cp.ElementwiseKernel(
     'uint16 src', 'float32 dst',
