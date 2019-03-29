@@ -97,7 +97,8 @@ class Histogram(object):
 
         return cp.asnumpy(hist)
 
-def histogram(data, n_bins=256):  
+def histogram(data, n_bins=256): 
+    """Helper function that wraps :class:`.Histogram` for one-off use.""" 
     try:
         data = np.squeeze(data, axis=0)
     except ValueError:
