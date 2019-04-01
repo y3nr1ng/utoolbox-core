@@ -8,6 +8,8 @@ https://github.com/scikit-image/scikit-image/blob/master/skimage/feature/registe
 import logging
 from math import ceil, floor
 
+import pdb
+
 import cupy as cp
 import numpy as np
 
@@ -37,31 +39,11 @@ ushort_to_float = cp.ElementwiseKernel(
 # endregion
 ###
 
-def _compute_phase_diff(cross_corr_max):
-    """
-    Compute global phase difference betweeen the two images (should be zero if 
-    images are non-negative).
-
-    :param cupy.complex64 cross_corr_max: complex value of the cross correlation at its maximum point
-    """
-    return cp.arctan2(cross_corr_max.image, cross_corr_max.real)
-
-@cp.fuse()
-def _compute_error(cross_corr_max, template, target):
-    """
-    Compute RMS error metric between template, and target.
-
-    :param cupy.complex64 cross_corr_max: complex value of the cross correlation at its maximum point
-    :param np.float32 template: normalized average intensity of the template
-    :param np.float32 target: normalized average intensity of the target
-    """
-    error = 1. - cross_corr_max * cross_corr_max.conj() / (template * target)
-    return cp.sqrt(cp.abs(error))
-
 class DftRegister(object):
-    def __init__(self, template, upsample_factor=1):
+    def __init__(self, template, upsample_factor=1, return_error=True):
         self._real_tpl, self._cplx_tpl = template, None
         self._upsample_factor = int(upsample_factor)
+        self._return_error, self._int_tpl = return_error, None
 
     def __enter__(self):
         # upload to device
@@ -71,6 +53,25 @@ class DftRegister(object):
         
         # forward FT
         self._cplx_tpl = cp.fft.fft2(self.real_tpl)
+
+        # normalization factor
+        self._norm_factor = self.cplx_tpl.size * self.upsample_factor**2
+
+        # intensity of the template
+        if self._return_error:
+            if self.upsample_factor > 1:
+                # using upsampled intensity
+                self._int_tpl = cp.asnumpy(
+                    self._upsampled_dft(
+                        self.cplx_tpl * self.cplx_tpl.conj(),
+                        1,
+                        self.upsample_factor
+                    )
+                )[0, 0]
+                self._int_tpl /= np.float32(self.norm_factor)
+            else:
+                self._int_tpl = cp.asnumpy(cp.sum(cp.abs(self.cplx_tpl)**2))
+                self._int_tpl /= self.cplx_tpl.size
         
         return self
     
@@ -84,6 +85,10 @@ class DftRegister(object):
         return self._cplx_tpl
     
     @property
+    def norm_factor(self):
+        return self._norm_factor
+
+    @property
     def real_tpl(self):
         return self._real_tpl
     
@@ -94,8 +99,6 @@ class DftRegister(object):
     def register(self, target, return_error=True):
         if target.shape != self.real_tpl.shape:
             raise ValueError("shape mismatch")
-
-        ### DEVICE MEOMRY
 
         # upload target to device
         real_tar = cp.empty(target.shape, dtype=cp.float32)
@@ -108,63 +111,81 @@ class DftRegister(object):
         cross_corr = cp.fft.ifft2(_product)
 
         # local maxima
-        maxima = cp.unravel_index(
-            cp.argmax(cp.abs(cross_corr)),
+        maxima = np.unravel_index(
+            cp.asnumpy(cp.argmax(cp.abs(cross_corr))),
             cross_corr.shape
         )
-        logger.debug("maxima.dtype={}".format(maxima))
         # coarse shifts, wrap around 
-        coarse_shifts = np.array([
-            int(max_pt-ax_sz) if max_pt > ax_sz//2 else max_pt
-            for max_pt, ax_sz in zip(maxima, target.shape)
-        ])
-        #logger.debug("coarse_shifts={}".format(coarse_shifts))
+        shifts = tuple(
+            (ax_max-ax_sz) if ax_max > ax_sz//2 else ax_max
+            for ax_max, ax_sz in zip(maxima, target.shape)
+        )
+        #logger.debug("coarse_shifts={}".format(shifts))
 
         if self.upsample_factor == 1:
-            shifts = coarse_shifts
-
             if return_error:    
-                raise NotImplementedError()
+                cross_corr_max = cp.asnumpy(cross_corr[maxima])
+                int_tar = cp.asnumpy(cp.sum(cp.abs(target) ** 2))
+                int_tar /= target.size
+                error = self._compute_error(cross_corr_max, int_tar)
         else:
             region_sz = ceil(self.upsample_factor * 1.5)
-            #logger.debug("peak_region_sz={}".format(region_sz))
 
             # center the output array at dft_shift+1
-            dft_shift = floor(region_sz / 2.)
-
-            region_offset = [
+            dft_shift = region_sz//2
+            region_offset = tuple(
                 dft_shift - shift * self.upsample_factor
-                for shift in coarse_shifts
-            ]
-            #logger.debug("region_offset={}".format(region_offset))
+                for shift in shifts
+            )
             
             # refine shift estimate by matrix multiply DFT
             cross_corr = self._upsampled_dft(
                 _product, 
                 region_sz, 
                 region_offset
-            ).conj()
+            )
             # normalization
-            norm_factor = self.cplx_tpl.size * self.upsample_factor ** 2
-            cross_corr /= norm_factor
+            cross_corr /= self.norm_factor
 
             # local maxima
-            maxima = cp.unravel_index(
-                cp.argmax(cp.abs(cross_corr)),
+            maxima = np.unravel_index(
+                cp.asnumpy(cp.argmax(cp.abs(cross_corr))),
                 cross_corr.shape
             )
             # wrap around
-            fine_shifts = np.array(maxima, dtype=np.float32)
-            fine_shifts = \
-                (fine_shifts - dft_shift) / np.float32(self.upsample_factor)
-            shifts = coarse_shifts + fine_shifts
-
-            #logger.debug("shifts={}".format(shifts))
-
-            #raise RuntimeError("DEBUG")
+            shifts = tuple(
+                shift + float(ax_max-dft_shift) / self.upsample_factor
+                for shift, ax_max in zip(shifts, maxima)
+            )
+            #logger.debug("fine_shifts={}".format(shifts))
 
             if return_error:
-                raise NotImplementedError()
+                cross_corr_max = cp.asnumpy(cross_corr[maxima])
+                int_tar = cp.asnumpy(
+                    self._upsampled_dft(
+                        cplx_tar * cplx_tar.conj(),
+                        1,
+                        self.upsample_factor
+                    )
+                )[0, 0]
+                int_tar /= self.norm_factor
+                error = self._compute_error(cross_corr_max, int_tar)
+
+        if return_error:
+            return shifts, error
+        else:
+            return shifts
+
+    def _compute_error(self, cross_corr_max, int_tar):
+        """
+        Compute RMS error metric between template, and target.
+
+        :param cupy.complex64 cross_corr_max: complex value of the cross correlation at its maximum point
+        :param cupy.complex64 int_tar: normalized maximum intensity of the target array
+        """
+        error = \
+            1. - cross_corr_max*cross_corr_max.conj() / (self._int_tpl*int_tar)
+        return np.sqrt(np.abs(error))
 
     def _upsampled_dft(self, array, region_sz, offsets=None):
         """
@@ -191,7 +212,7 @@ class DftRegister(object):
                 )
         except TypeError:
             # expand integer to list
-            region_sz = [region_sz, ] * array.ndim
+            region_sz = (region_sz, ) * array.ndim
 
         try: 
             if len(offsets) != array.ndim:
@@ -200,7 +221,7 @@ class DftRegister(object):
                 )
         except TypeError:
             # expand integer to list
-            offsets = [offsets, ] * array.ndim
+            offsets = (offsets, ) * array.ndim
 
         dim_props = zip(
             reversed(array.shape), reversed(region_sz), reversed(offsets)
