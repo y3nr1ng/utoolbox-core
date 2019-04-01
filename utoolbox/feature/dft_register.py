@@ -6,7 +6,7 @@ Port of Taylor Scott's code from skimage package:
 https://github.com/scikit-image/scikit-image/blob/master/skimage/feature/register_translation.py
 """
 import logging
-from math import ceil
+from math import ceil, floor
 
 import cupy as cp
 import numpy as np
@@ -37,27 +37,6 @@ ushort_to_float = cp.ElementwiseKernel(
 # endregion
 ###
 
-def _upsampled_dft(array, region_sz, upsample_factor=1, offsets=None):
-    """
-    Upsampled DFT by matrix multiplication.
-
-    This code is intended to provide the same result as if the following operations are performed:
-        - Embed the array to a larger one of size `upsample_factor` times larger in each dimension. 
-        - ifftshift to bring the center of the image to (1, 1)
-        - Take the FFT of the larger array.
-        - Extract region of size [region_sz] from the result, starting with offsets.
-    
-    It achieves this result by computing the DFT in the output array without the need to zeropad. Much faster and memroy efficient than the zero-padded FFT approach if region_sz is much smaller than array.size * upsample_factor.
-
-    :param cupy.ndarray array: DFT of the data to be upsampled
-    :param int region_sz: size of the region to be sampled
-    :param integer upsample_factor: the upsampling factor
-    :param integers offsets: offsets to the sampling region
-    :return: upsampled DFT of the specified region
-    :rtype: cupy.ndarray
-    """
-    
-
 def _compute_phase_diff(cross_corr_max):
     """
     Compute global phase difference betweeen the two images (should be zero if 
@@ -82,7 +61,7 @@ def _compute_error(cross_corr_max, template, target):
 class DftRegister(object):
     def __init__(self, template, upsample_factor=1):
         self._real_tpl, self._cplx_tpl = template, None
-        self._upsample_factor = upsample_factor
+        self._upsample_factor = int(upsample_factor)
 
     def __enter__(self):
         # upload to device
@@ -133,44 +112,42 @@ class DftRegister(object):
             cp.argmax(cp.abs(cross_corr)),
             cross_corr.shape
         )
-        # wrap around
-        shifts = np.array(maxima, dtype=np.float32)
-        shape = np.array(target.shape)
-        shifts[maxima > (shape//2)] -= shape
+        logger.debug("maxima.dtype={}".format(maxima))
+        # coarse shifts, wrap around 
+        coarse_shifts = np.array([
+            int(max_pt-ax_sz) if max_pt > ax_sz//2 else max_pt
+            for max_pt, ax_sz in zip(maxima, target.shape)
+        ])
+        #logger.debug("coarse_shifts={}".format(coarse_shifts))
 
-        upsample_factor = np.array(self.upsample_factor, dtype=np.float32)
-        if upsample_factor == 1:
+        if self.upsample_factor == 1:
+            shifts = coarse_shifts
+
             if return_error:    
                 raise NotImplementedError()
         else:
-            # estimate shift by upsample factor
-            shifts = np.round(shifts * upsample_factor) / upsample_factor
-            region_sz = np.ceil(upsample_factor * 1.5, dtype=np.float32)
+            region_sz = ceil(self.upsample_factor * 1.5)
+            #logger.debug("peak_region_sz={}".format(region_sz))
 
-            # center the output array
-            dft_shifts = np.floor(region_sz / 2., dtype=np.float32)
-            logger.debug("dft_shifts={}".format(dft_shifts))
+            # center the output array at dft_shift+1
+            dft_shift = floor(region_sz / 2.)
 
-            region_offset = dft_shifts - shifts * upsample_factor
-            logger.debug("region_offset={}".format(region_offset))
+            region_offset = [
+                dft_shift - shift * self.upsample_factor
+                for shift in coarse_shifts
+            ]
+            #logger.debug("region_offset={}".format(region_offset))
             
             # refine shift estimate by matrix multiply DFT
-            cross_corr = _upsampled_dft(
+            cross_corr = self._upsampled_dft(
                 _product, 
                 region_sz, 
-                upsample_factor, 
                 region_offset
             ).conj()
-
-            #TODO normalize
-            norm_factor = (self.cplx_tpl.size * upsample_factor ** 2)
-            logger.debug("norm_factor.dtype={}".format(norm_factor.dtype))
-            
-            raise RuntimeError("DEBUG")
-
+            # normalization
+            norm_factor = self.cplx_tpl.size * self.upsample_factor ** 2
             cross_corr /= norm_factor
 
-            #NOTE repeat!!!
             # local maxima
             maxima = cp.unravel_index(
                 cp.argmax(cp.abs(cross_corr)),
@@ -178,22 +155,71 @@ class DftRegister(object):
             )
             # wrap around
             fine_shifts = np.array(maxima, dtype=np.float32)
-            fine_shifts -= dft_shifts
-            shifts += fine_shifts / upsample_factor
+            fine_shifts = \
+                (fine_shifts - dft_shift) / np.float32(self.upsample_factor)
+            shifts = coarse_shifts + fine_shifts
 
-            logger.debug("shifts={}".format(shifts))
+            #logger.debug("shifts={}".format(shifts))
 
-            raise RuntimeError("DEBUG")
+            #raise RuntimeError("DEBUG")
 
             if return_error:
                 raise NotImplementedError()
 
-        tmp = cp.abs(cross_corr)
-        from imageio import imwrite
-        imwrite('debug.tif', cp.asnumpy(tmp))
+    def _upsampled_dft(self, array, region_sz, offsets=None):
+        """
+        Upsampled DFT by matrix multiplication.
 
-        ### HOST MEMORY
+        This code is intended to provide the same result as if the following operations are performed:
+            - Embed the array to a larger one of size `upsample_factor` times larger in each dimension. 
+            - ifftshift to bring the center of the image to (1, 1)
+            - Take the FFT of the larger array.
+            - Extract region of size [region_sz] from the result, starting with offsets.
+        
+        It achieves this result by computing the DFT in the output array without the need to zeropad. Much faster and memroy efficient than the zero-padded FFT approach if region_sz is much smaller than array.size * upsample_factor.
 
-def dft_register(image, template, upsample_factor=1, space='real', return_error=True):
-    #TODO return_error?
+        :param cupy.ndarray array: DFT of the data to be upsampled
+        :param int region_sz: size of the region to be sampled
+        :param integers offsets: offsets to the sampling region
+        :return: upsampled DFT of the specified region
+        :rtype: cupy.ndarray
+        """
+        try:
+            if len(region_sz) != array.ndim:
+                raise ValueError(
+                    "upsampled region size must match array dimension"
+                )
+        except TypeError:
+            # expand integer to list
+            region_sz = [region_sz, ] * array.ndim
+
+        try: 
+            if len(offsets) != array.ndim:
+                raise ValueError(
+                    "axis offsets must match array dimension"
+                )
+        except TypeError:
+            # expand integer to list
+            offsets = [offsets, ] * array.ndim
+
+        dim_props = zip(
+            reversed(array.shape), reversed(region_sz), reversed(offsets)
+        )
+        for ax_sz, up_ax_sz, ax_offset in dim_props:
+            # float32 sample frequencies
+            fftfreq = cp.hstack((
+                cp.arange(0, (ax_sz-1)//2 + 1, dtype=cp.float32),
+                cp.arange(-(ax_sz//2), 0, dtype=cp.float32)
+            )) / ax_sz / self.upsample_factor
+            # upsampling kernel
+            kernel = cp.exp(
+                (1j * 2 * np.pi)
+                * (cp.arange(up_ax_sz, dtype=np.float32) - ax_offset)[:, None] \
+                * fftfreq
+            )
+            # convolve
+            array = cp.tensordot(kernel, array, axes=(1, -1))
+        return array
+
+def dft_register(template, target, upsample_factor=1):
     pass
