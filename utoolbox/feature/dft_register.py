@@ -43,14 +43,41 @@ def _compute_error():
     pass
 
 class DftRegister(object):
-    def __init__(self):
-        pass    
+    def __init__(self, template, upsample_factor=1):
+        self._real_tpl, self._cplx_tpl = template, None
 
     def __enter__(self):
+        self._cplx_tpl = cp.fft.fft2(self.real_tpl)
         return self
     
     def __exit__(self, exc_type, exc_value, traceback):
-        pass
+        self._cplx_tpl = None
+
+    @property
+    def cplx_tpl(self):
+        return self._cplx_tpl
+    
+    @property
+    def real_tpl(self):
+        return self._real_tpl
+
+    def register(self, real_img, return_error=True):
+        if real_img.shape != self.real_tpl.shape:
+            raise ValueError("shape mismatch")
+        cplx_img = cp.fft.fft2(real_img)
+
+        ### DEVICE MEOMRY
+
+        # compute cross-correlation by IFT
+        _product = self.cplx_tpl * cplx_img.conj()
+        cross_corr = cp.fft.ifft2(_product)
+
+        print(cross_corr)
+
+        # find local minimum
+
+
+        ### HOST MEMORY
 
 def dft_register(image, template, upsample_factor=1, space='real', return_error=True):
     #TODO return_error?
