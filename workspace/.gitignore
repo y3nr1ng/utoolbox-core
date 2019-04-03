@@ -2,3 +2,6 @@
 *
 # ... except this file
 !.gitignore
+
+# allow all scripts
+!*.py
