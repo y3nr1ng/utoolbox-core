@@ -180,8 +180,8 @@ class DftRegister(object):
         """
         Compute RMS error metric between template, and target.
 
-        :param cupy.complex64 cross_corr_max: complex value of the cross correlation at its maximum point
-        :param cupy.complex64 int_tar: normalized maximum intensity of the target array
+        :param np.complex64 cross_corr_max: complex value of the cross correlation at its maximum point
+        :param np.complex64 int_tar: normalized maximum intensity of the target array
         """
         error = \
             1. - cross_corr_max*cross_corr_max.conj() / (self._int_tpl*int_tar)
@@ -243,4 +243,5 @@ class DftRegister(object):
         return array
 
 def dft_register(template, target, upsample_factor=1):
-    pass
+    with DftRegister(template, upsample_factor=upsample_factor) as dft_reg:
+        return dft_reg.register(target, return_error=False)
