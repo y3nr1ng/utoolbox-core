@@ -4,6 +4,7 @@ Datastores that can direct access the files.
 import glob
 import logging
 import os
+import re
 
 from .base import Datastore
 
@@ -40,12 +41,27 @@ class FileDatastore(Datastore):
         for ext in extensions:
             path = os.path.join(root, ext)
             files.extend(glob.glob(path, recursive=sub_dir))
-        files.sort()
+        FileDatastore._sort_numerically(files)
         self._inventory = files
 
     @property
     def files(self):
         return self._inventory
+
+    @staticmethod
+    def _sort_numerically(files):
+        # extract valid numbers from filenames
+        keys = [list(map(int, re.findall(r'[0-9]+', fn))) for fn in files]
+        # identify constant variables
+        flags = [
+            all(elem == elems[0] for elem in elems) 
+            for elems in zip(*keys)
+        ]
+        # keep varying keys
+        keys[:] = [[k for k, f in zip(key, flags) if not f] for key in keys]
+        
+        # sort the file list based on extracted keys
+        files[:] = [f for _, f in sorted(zip(keys, files))]
 
 class ImageDatastore(FileDatastore):
     supported_extensions = ['tif']
