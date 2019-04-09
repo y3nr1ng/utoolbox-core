@@ -67,7 +67,7 @@ class FileDatastore(Datastore):
         files[:] = [f for _, f in sorted(zip(keys, files))]
 
 class ImageDatastore(FileDatastore):
-    supported_extensions = ('tif')
+    supported_extensions = ('tif', )
 
     def __init__(self, root, read_func, extensions=None, **kwargs):
         if extensions is None:
