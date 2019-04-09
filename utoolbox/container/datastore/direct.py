@@ -16,16 +16,15 @@ __all__ = [
 ]
 
 class FileDatastore(Datastore):
-    def __init__(self, root, read_func=None, sub_dir=False, pattern='*', 
-                 extensions=None):
+    def __init__(self, root, sub_dir=False, pattern='*', extensions=None, 
+                 **kwargs):
         """
         :param str root: files or folders to include in the datastore
-        :param func read_func: function that perform the read operation
         :param bool sub_dir: scan nested folders
         :param str pattern: filename pattern
         :param str extensions: file extensions to include
         """
-        super().__init__(read_func)
+        super().__init__(**kwargs)
 
         if sub_dir:
             root = os.path.join(root, "**")
@@ -42,14 +41,18 @@ class FileDatastore(Datastore):
             path = os.path.join(root, ext)
             files.extend(glob.glob(path, recursive=sub_dir))
         FileDatastore._sort_numerically(files)
-        self._inventory = files
 
-    @property
-    def files(self):
-        return self._inventory
+        # simple 1-1 mapping
+        for path in files:
+            self._uri[os.path.basename(path)] = path
 
     @staticmethod
     def _sort_numerically(files):
+        """
+        Sort the file list based on numebers that are constantly changing.
+        
+        :param list(str) files: file list
+        """
         # extract valid numbers from filenames
         keys = [list(map(int, re.findall(r'[0-9]+', fn))) for fn in files]
         # identify constant variables
@@ -64,7 +67,7 @@ class FileDatastore(Datastore):
         files[:] = [f for _, f in sorted(zip(keys, files))]
 
 class ImageDatastore(FileDatastore):
-    supported_extensions = ['tif']
+    supported_extensions = ('tif')
 
     def __init__(self, root, read_func, extensions=None, **kwargs):
         if extensions is None:
