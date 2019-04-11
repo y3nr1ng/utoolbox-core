@@ -75,6 +75,7 @@ setup(
         'PySide2', 
 
         # parallel
+        'cupy>=0.0dev0',
         'dask',
 
         # utils
