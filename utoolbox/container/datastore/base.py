@@ -24,26 +24,46 @@ __all__ = [
 
 class Datastore(MutableMapping):
     """Basic datastore that includes abstract read logic."""
-    def __init__(self, read_func=None, write_func=None):
+    def __init__(self, read_func=None, write_func=None, immutable=False):
         """
         :param func read_func: function that perform the read operation
         """
+        self._uri = OrderedDict()
+
         if read_func is None:
             # nop
-            read_func = lambda x: x
+            _read_func = lambda x: x
+        else:
+            def wrapped_read_func(key):
+                try:
+                    return read_func(self._uri[key])
+                except KeyError:
+                    raise FileNotFoundError("unknown key \"{}\"".format(key))
+            _read_func = wrapped_read_func
         if write_func is None:
-            def raise_readonly_error():
-                raise ReadOnlyError()
-            write_func = raise_readonly_error
-        self._read_func, self._write_func = read_func, write_func
+            def raise_readonly_error(key, value):
+                raise ReadOnlyDataError("current dataset is read-only")
+            _write_func = raise_readonly_error
+        else:
+            def wrapped_write_func(key, value):
+                try:
+                    uri = self._uri[key]
+                except KeyError:
+                    if immutable:
+                        raise ImmutableUriListError("datastore is immutable")
+                    else:
+                        uri = self._key_to_uri(key)
+                        self._uri[key] = uri
+                write_func(uri, value)
+            _write_func = wrapped_write_func
+        self._read_func, self._write_func = _read_func, _write_func
 
-        self._uri = OrderedDict()
-    
     def __delitem__(self, key):
         raise ImmutableInventoryError("cannot delete entries in a datastore")
 
     def __getitem__(self, key):
-        return self.read_func(self._uri[key])
+        print(key)
+        return self.read_func(key)
     
     def __iter__(self):
         return iter(self._uri)
@@ -52,7 +72,7 @@ class Datastore(MutableMapping):
         return len(self._uri)
 
     def __setitem__(self, key, value):
-        self.write_func(self._uri[key], value)
+        self.write_func(key, value)
 
     @property
     def read_func(self):
@@ -61,6 +81,9 @@ class Datastore(MutableMapping):
     @property
     def write_func(self):
         return self._write_func
+    
+    def _key_to_uri(self, key):
+        raise ImmutableUriListError("key transform function not defined")
 
 class BufferedDatastore(Datastore):
     """
