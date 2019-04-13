@@ -1,26 +1,27 @@
 import logging
 from math import hypot
 import os
+from pprint import pprint
 
 import coloredlogs
 import imageio
 import numpy as np
-from tqdm import tqdm
+#from tqdm import tqdm
 
 from skimage.feature import register_translation
 
 from utoolbox.container.datastore import ImageDatastore
-from utoolbox.feature import DftRegister
-from utoolbox.util.logging import TqdmLoggingHandler
+from utoolbox.stitching import Sandbox
+#from utoolbox.feature import DftRegister
+#from utoolbox.util.logging import TqdmLoggingHandler
 
 from utoolbox.util.decorator import timeit
 
 ###
 # region: Configure logging facilities
 ###
-
 logger = logging.getLogger(__name__)
-logger.addHandler(TqdmLoggingHandler())
+#logger.addHandler(TqdmLoggingHandler())
 
 logging.getLogger('tifffile').setLevel(logging.ERROR)
 
@@ -29,7 +30,6 @@ coloredlogs.install(
     fmt='%(asctime)s %(levelname)s %(message)s',
     datefmt='%H:%M:%S'
 )
-
 ###
 # endregion
 ###
@@ -39,139 +39,47 @@ def tuple_float_to_str(t, digits=4):
     fmt = '(' + ', '.join([float_fmt, ] * len(t)) + ')'
     return fmt.format(*list(t))
 
-## 
-# region: DEBUG test register
-##
-#template_path = 'data/xy/cell7_zp3um_561_1.tif'
-#target_path = 'data/xy/cell7_zp3um_561_9.tif'
-#
-#template = imageio.imread(template_path)
-#template = np.asarray(template)
-#
-#target = imageio.imread(target_path)
-#target = np.asarray(target)
-#
-#
-#@timeit
-#def gpu():
-#    with DftRegister(template, upsample_factor=100) as dft_reg:
-#        for _ in range(100):
-#            shifts, error = dft_reg.register(target, return_error=True)
-#    return shifts, error
-#shifts, error = gpu()
-#logger.info("gpu, shifts={}, error={:.4f}".format(tuple_float_to_str(shifts), error))
-#
-#@timeit
-#def cpu():
-#    for _ in range(100):
-#        shifts, error, _ = register_translation(
-#            template, target, upsample_factor=100
-#        )
-#    return shifts, error
-#shifts, error = cpu()
-#logger.info("cpu, shifts={}, error={:.4f}".format(tuple_float_to_str(shifts), error))
-## 
-# endregion
-##
-
 data_dir = 'data'
 projs = ('xy', 'xz', 'yz')
 
-imds = ImageDatastore(
-    #os.path.join(data_dir, 'xy'),
-    "/Users/Andy/Desktop/mouse_2/slice_1/grayscale",
-    imageio.volread
+ds = ImageDatastore(
+    os.path.join(data_dir, projs[0]),
+    imageio.imread
 )
-from pprint import pprint
-pprint(list(zip(enumerate(imds.files))))
-im_projs = list(imds)
 
-im = im_projs[0]
+# use arbitrary item as size template
+im = next(iter(ds.values()))
 logger.info("shape={}, {}".format(im.shape, im.dtype))
 
 # upsampling factor
 uf = 10
 # overlap ratio
-overlap_perct = 0.5
+overlap_perct = 0.2
 
-shift_min = min(im.shape) * (1.-overlap_perct)
-shift_max = hypot(*im.shape) * (1.+overlap_perct)
+# minimum area = 
+ny, nx = im.shape
+min_overlap_area = (ny*overlap_perct) * (nx*overlap_perct)
 
-logger.info("overlap percentage {:.1f}%, shifts [{:.2f}, {:.2f}]".format(
-    overlap_perct*100, shift_min, shift_max
-))
+keys = [key for key in ds.keys()]
+sb = Sandbox(ds)
 
-from math import hypot
-@timeit
-def gpu():
-    n_im = len(imds)
-    graph = {}
-    for i_ref in range(n_im):
-        with DftRegister(im_projs[i_ref], upsample_factor=uf) as dft_reg:
-            adj_list = []
-            for i_tar in range(i_ref+1, n_im):
-                shifts, error = dft_reg.register(
-                    im_projs[i_tar], return_error=True
-                )
-                sy, sx = shifts
+n_im = len(ds)
+for i_ref in range(n_im):
+    adj_list = []
+    for i_tar in range(i_ref+1, n_im):
+        shifts, error, _ = register_translation(
+            ds[keys[i_ref]], ds[keys[i_tar]], upsample_factor=uf
+        )
 
-                d = hypot(*shifts)
-                print(d)
-                if (d < shift_min) or (d > shift_max):
-                    continue
-                adj_list.append([i_tar, error, shifts, hypot(shifts[0], shifts[1])])
-                #adj_list.append([i_tar, error])
-            graph[i_ref] = adj_list
-    return graph
-graph = gpu()
+        # filter out-of-range shifts
+        dy, dx = shifts
+        ny, nx = im.shape
+        overlap_area = (ny-abs(dy)) * (nx-abs(dx))
 
-from pprint import pprint
-pprint(graph)
+        if (overlap_area < 0) or (overlap_area < min_overlap_area):
+            continue
+        sb.link(keys[i_ref], keys[i_tar], shifts, error)
 
-#raise RuntimeError("DEBUG")
-@timeit
-def cpu():
-    n_im = len(imds)
-    graph = {}
-    for i_ref in range(n_im):
-        adj_list = []
-        for i_tar in range(i_ref+1, n_im):
-            shifts, error, _ = register_translation(
-                im_projs[i_ref], im_projs[i_tar], upsample_factor=uf
-            )
-            adj_list.append([i_tar, error])
-        graph[i_ref] = adj_list
-    return graph
-#graph = cpu()
+        #adj_list.append([i_tar, error, shifts, hypot(*shifts)])
 
-#from pprint import pprint
-#pprint(graph)
-
-#raise RuntimeError("DEBUG")
-
-# https://codereview.stackexchange.com/questions/174946/prims-algorithm-using-heapq-module-in-python
-from heapq import heappush, heappop
-
-def prims_algorithm(graph):
-    explored = [] # vertices in tree
-    start = next(iter(graph)) # arbitrary starting vertex
-    #unexplored = [(0, start)] # unexplored edges, (cost, vertex) pairs
-    unexplored = [(0, 9)]
-    print(unexplored)
-    while unexplored:
-        cost, vertex = heappop(unexplored)
-        if vertex not in explored:
-            explored.append(vertex)
-            for neighbor, cost, _, _ in graph[vertex]:
-                if neighbor not in explored:
-                    heappush(unexplored, (cost, neighbor))
-        print()
-        print(">> explored")
-        pprint(explored)
-        print(">> unexplored")
-        pprint(unexplored)
-    return explored
-
-path = prims_algorithm(graph)
-print()
-print(' -> '.join([str(p) for p in path]))
+sb.consolidate()

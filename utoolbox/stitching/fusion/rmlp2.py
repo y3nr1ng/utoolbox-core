@@ -397,9 +397,9 @@ def dbrg(images, T, r):
                     break
         #return psv
         return R
-    psv = psv_func(ps, M, R)
-    #if ps:
-    #    R = psv_func(ps, M, R)
+    #psv = psv_func(ps, M, R)
+    if ps:
+        R = psv_func(ps, M, R)
 
     # move into psv
     #for (y, x), v in zip(ps, psv):
