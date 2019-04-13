@@ -1,3 +1,4 @@
+# pylint: disable=no-value-for-parameter
 import glob
 import logging
 import os
@@ -9,11 +10,26 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-coloredlogs.install(
-    level='DEBUG',
-    fmt='%(asctime)s  %(levelname)s %(message)s',
-    datefmt='%H:%M:%S'
-)
+@click.group()
+@click.option('-v', 'verbose', count=True)
+@click.pass_context
+def main(ctx, verbose):
+    if verbose == 0:
+        verbose = 'WARNING'
+    elif verbose == 1:
+        verbose = 'INFO'
+    else:
+        verbose = 'DEBUG'
+    coloredlogs.install(
+        level=verbose,
+        fmt='%(asctime)s %(levelname)s %(message)s',
+        datefmt='%H:%M:%S'
+    )
+
+@main.command('split', short_help="split a stack to files")
+@click.argument('src')
+def split(src):
+    print('split, {}'.format(src))
 
 def _split_stack_file(src_fp, dst_dp=None):
     # filename to folder name
@@ -59,4 +75,4 @@ def split_stack(root):
         _split_stack_file(root)
 
 if __name__ == '__main__':
-    split_stack()
+    main(obj={})
