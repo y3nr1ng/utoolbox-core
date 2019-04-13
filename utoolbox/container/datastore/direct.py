@@ -7,6 +7,7 @@ import os
 import re
 
 from .base import Datastore
+from .error import InvalidDatastoreRootError
 
 logger = logging.getLogger(__name__)
 
@@ -16,15 +17,27 @@ __all__ = [
 ]
 
 class FileDatastore(Datastore):
-    def __init__(self, root, sub_dir=False, pattern='*', extensions=None, 
-                 **kwargs):
+    def __init__(self, root, sub_dir=False, pattern='*', extensions=None,
+                 create_new=True, **kwargs):
         """
         :param str root: files or folders to include in the datastore
         :param bool sub_dir: scan nested folders
         :param str pattern: filename pattern
         :param str extensions: file extensions to include
+        :param bool create_new: create datastore root if not exists
         """
         super().__init__(**kwargs)
+
+        if not os.path.exists(root):
+            if create_new:
+                os.mkdir(root)
+            else:
+                raise InvalidDatastoreRootError(
+                    "unable to find \"{}\"".format(root)
+                )
+            # short circuit
+            return
+        self._root = root
 
         if sub_dir:
             root = os.path.join(root, "**")
@@ -46,6 +59,10 @@ class FileDatastore(Datastore):
         for path in files:
             self._uri[os.path.basename(path)] = path
 
+    @property
+    def root(self):
+        return self._root
+
     @staticmethod
     def _sort_numerically(files):
         """
@@ -66,13 +83,16 @@ class FileDatastore(Datastore):
         # sort the file list based on extracted keys
         files[:] = [f for _, f in sorted(zip(keys, files))]
 
+    def _key_to_uri(self, key):
+        return os.path.join(self.root, key)
+        
 class ImageDatastore(FileDatastore):
     supported_extensions = ('tif', )
 
-    def __init__(self, root, read_func, extensions=None, **kwargs):
+    def __init__(self, root, extensions=None, **kwargs):
         if extensions is None:
             extensions = ImageDatastore.supported_extensions
         super().__init__(
-            root, read_func=read_func, extensions=extensions, **kwargs
+            root, extensions=extensions, **kwargs
         )
             
