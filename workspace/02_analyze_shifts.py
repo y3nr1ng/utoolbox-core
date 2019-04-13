@@ -44,7 +44,7 @@ projs = ('xy', 'xz', 'yz')
 
 ds = ImageDatastore(
     os.path.join(data_dir, projs[0]),
-    imageio.imread
+    read_func=imageio.imread
 )
 
 # use arbitrary item as size template
