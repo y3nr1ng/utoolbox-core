@@ -1,4 +1,5 @@
 import logging
+from pprint import pprint
 
 import networkx as nx
 
@@ -33,6 +34,8 @@ class Sandbox(object):
     def consolidate(self):
         # build graph
         mst = nx.minimum_spanning_tree(self._links)
+
+        pprint(mst.edges(data=True))
 
         #TODO determine bounding box
 
