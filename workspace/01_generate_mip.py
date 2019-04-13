@@ -12,7 +12,6 @@ from utoolbox.util.logging import TqdmLoggingHandler
 ###
 # region: Configure logging facilities
 ###
-
 logger = logging.getLogger(__name__)
 logger.addHandler(TqdmLoggingHandler())
 
@@ -23,30 +22,29 @@ coloredlogs.install(
     fmt='%(asctime)s %(levelname)s %(message)s',
     datefmt='%H:%M:%S'
 )
-
 ###
 # endregion
 ###
 
 data_dir = 'data'
-imds = ImageDatastore(
+src_ds = ImageDatastore(
     os.path.join(data_dir, 'raw'),
-    lambda x: (x, imageio.volread(x))
+    read_func=imageio.volread
 )
 
 logger.info("create output directories")
 projs = ('xy', 'xz', 'yz')
-for view in projs:
-    try:
-        os.makedirs(os.path.join(data_dir, view))
-    except:
-        pass
 
-for fp, I in tqdm(imds):
+mip_ds = [
+    ImageDatastore(os.path.join(
+        data_dir, view), 
+        write_func=imageio.imwrite
+    )
+    for view in projs
+]
+
+for filename, I in tqdm(src_ds.items()):
     with Orthogonal(I) as ortho:
-        for view in projs:
+        for i, view in enumerate(projs):
             J = getattr(ortho, view)
-
-            fn = os.path.basename(fp)
-            fp = os.path.join(data_dir, view, fn)
-            imageio.imwrite(fp, J)
+            mip_ds[i][filename] = J
