@@ -3,6 +3,7 @@ from math import ceil
 import os
 
 import cupy as cp
+import imageio
 from mako.template import Template
 from numba import jit
 import numpy as np
@@ -207,11 +208,11 @@ def _density_distribution(n, M, r):
     D = []
     selem = _disk(r)
     # normalization term: c
-    Ar = np.ones(M.shape)
+    Ar = np.ones(M.shape, dtype=np.float32)
     c = ndi.convolve(Ar, selem, mode='constant', cval=0)
     for _n in range(1, n+1):
         # delta function
-        Mp = (M == _n).astype(int)
+        Mp = (M == _n).astype(M.dtype)
         v = ndi.convolve(Mp, selem, mode='constant', cval=0)
         Dp = v / c
         D.append(Dp)
@@ -292,7 +293,7 @@ def _generate_init_mask(I, T):
     grid_sz = (int(ceil(nelem/n_threads)), )
 
     M, V = cp.ones_like(S, dtype=cp.int32), sml(S, T)
-    for i, iI in enumerate(I[1:], 1):
+    for i, iI in enumerate(I[1:], 2):
         S = cp.array(iI)
         S = sml(S, T)
         keep_max_kernel(
@@ -334,59 +335,82 @@ def dbrg(images, T, r):
 
     # label by density map
     for i, d in enumerate(D):
+        logger.debug("density {}".format(i))
         R[(d > V) & S] = i+1
         V[(d > V) & S] = d[(d > V) & S]
 
     # label by density connectivity
-    n, m = M.shape
-    v = np.empty(len(D)+1, dtype=np.float32)
-    ps = [] # reset of the pixel coordinates
-    for y in range(0, n):
-        for x in range(0, m):
-            if R[y, x] > 0:
-                continue
-            pu = min(y+r, n-1)
-            pd = max(y-r, 0)
-            pr = min(x+r, m-1)
-            pl = max(x-r, 0)
-            v.fill(0)
-            for yy in range(pd, pu+1):
-                for xx in range(pl, pr+1):
-                    if ((xx-x)*(xx-x) + (yy-y)*(yy-y) <= r*r):
-                        v[R[yy, xx]] += 1
-            R[y, x] = v.argmax()
-            if R[y, x] == 0:
-                ps.append((y, x))
+    v = np.empty(len(D)+1, dtype=np.uint32) # buffer
+    @timeit
+    #@jit(nopython=True)
+    def ps_func(M, R, v):
+        n, m = M.shape
+        ps = [] # reset of the pixel coordinates
+        for y in range(0, n):
+            for x in range(0, m):
+                if R[y, x] > 0:
+                    continue
+                pu = min(y+r, n-1)
+                pd = max(y-r, 0)
+                pr = min(x+r, m-1)
+                pl = max(x-r, 0)
+                v.fill(0)
+                for yy in range(pd, pu+1):
+                    for xx in range(pl, pr+1):
+                        if ((xx-x)*(xx-x) + (yy-y)*(yy-y) <= r*r):
+                            v[R[yy, xx]] += 1
+                R[y, x] = v.argmax()
+                if R[y, x] == 0:
+                    ps.append((y, x))
+        return ps
+    ps = ps_func(M, R, v)
 
     # label by nearest neighbor
-    psv = [] # filled result
-    for y, x in ps:
-        r = 1
-        while True:
-            pu = min(y+r, n-1)
-            pd = max(y-r, 0)
-            pr = min(x+r, m-1)
-            pl = max(x-r, 0)
-            v = []
-            for yy in range(pd, pu+1):
-                for xx in range(pl, pr+1):
-                    if R[yy, xx] > 0:
-                        v.append((R[yy, xx], (xx-x)*(xx-x) + (yy-y)*(yy-y)))
-            if len(v) == 0:
-                r += 1
-            else:
-                v.sort(key=lambda p: p[1])
-                psv.append(v[0][0])
-                break
-    for (y, x), v in zip(ps, psv):
-        R[y, x] = v
+    @timeit
+    @jit(nopython=True)
+    def psv_func(ps, M, R):
+        n, m = M.shape
+        #psv = [] # filled result
+        for y, x in ps:
+            r = 1
+            while True:
+                pu = min(y+r, n-1)
+                pd = max(y-r, 0)
+                pr = min(x+r, m-1)
+                pl = max(x-r, 0)
+                v = []
+                for yy in range(pd, pu+1):
+                    for xx in range(pl, pr+1):
+                        if R[yy, xx] > 0:
+                            v.append((R[yy, xx], (xx-x)*(xx-x) + (yy-y)*(yy-y)))
+                if len(v) == 0:
+                    r += 1
+                else:
+                    #v.sort(key=lambda p: p[1])
+                    #psv.append(v[0][0])
+                    R_min, _d_min = v[0]
+                    for _R, _d in v[1:]:
+                        if _d < _d_min:
+                            R_min, _d_min = _R, _d
+                    #psv.append(R_min)
+                    R[y, x] = R_min
+                    break
+        #return psv
+        return R
+    psv = psv_func(ps, M, R)
+    #if ps:
+    #    R = psv_func(ps, M, R)
+
+    # move into psv
+    #for (y, x), v in zip(ps, psv):
+    #    R[y, x] = v
 
     # make sure each position is assigned a mask value
     assert(np.all(R != 0))
     return R
 
 @timeit
-def rmlp2(images, T=1/255., r=4, K=7):
+def rmlp2(images, T=1/255., r=4, K=7, sigma=None):
     """
     Perform region-based Laplacian pyramids multi-focus image fusion.
 
@@ -402,5 +426,5 @@ def rmlp2(images, T=1/255., r=4, K=7):
         Level of the pyramids.
     """
     R = dbrg(images, T, r)
-    F = pyramid_fusion(images, R, K)
+    F = pyramid_fusion(images, R, K, sigma=sigma)
     return F
