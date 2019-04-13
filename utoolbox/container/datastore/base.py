@@ -48,7 +48,7 @@ class Datastore(MutableMapping):
     def __iter__(self):
         return iter(self._uri)
 
-    def __len__():
+    def __len__(self):
         return len(self._uri)
 
     def __setitem__(self, key, value):
