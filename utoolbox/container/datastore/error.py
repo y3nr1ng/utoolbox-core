@@ -6,6 +6,7 @@ class InvalidDatastoreRootError(DatastoreError):
 
 class ReadOnlyDataError(DatastoreError):
     """Datastore is readonly."""
+    
 class ImmutableUriListError(DatastoreError):
     """File list in datastore is immutable."""
 

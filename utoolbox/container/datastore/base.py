@@ -62,7 +62,6 @@ class Datastore(MutableMapping):
         raise ImmutableInventoryError("cannot delete entries in a datastore")
 
     def __getitem__(self, key):
-        print(key)
         return self.read_func(key)
     
     def __iter__(self):
