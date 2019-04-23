@@ -82,8 +82,7 @@ setup(
         'mako',
         'click',
         'coloredlogs',
-        'tqdm',
-        'jinja2', # template engine used by pycuda
+        'tqdm'
     ],
 
     # additional groups of dependencies here for the "extras" syntax
