@@ -21,11 +21,9 @@ coloredlogs.install(
 logger = logging.getLogger(__name__)
 
 ds = ImageDatastore(
-    #'../data/fusion/crop', 
-    '/Users/Andy/Documents/Sinica (Data)/Projects/ExM SIM/20181224_Expan_Tub_Tiling_SIM/widefield',
-    #'/Volumes/SSD-2/fuse',
-    imageio.volread,
-    pattern='RAWcell1_*'
+    '../workspace/data/tls_exm/raw',
+    read_func=imageio.volread,
+    pattern='*_tilingp*'
 )
 
 Is = []
@@ -35,7 +33,7 @@ for fn, I in ds.items():
 nz, _, _ = Is[0].shape
 logger.info("{} layers".format(nz))
 
-dst_root = 'test'
+dst_root = "{}_rmlp".format(ds.root)
 try:
     os.mkdir(dst_root)
 except:
@@ -45,6 +43,13 @@ except:
 for iz in range(nz//2, nz//2+1):
     print("process {}".format(iz))
     Iz = [I[iz, ...].astype(np.float32) for I in Is] 
+
+    Iz = [Iz[0], Iz[2], Iz[4]]
+    for i, I in enumerate(Iz):
+        imageio.imwrite(
+            os.path.join(dst_root, "I_{}_z{}.tif".format(i, iz)),
+            I
+        )
    
     Rz = rmlp2(Iz, T=1/255., r=3, K=16, sigma=1)
 
