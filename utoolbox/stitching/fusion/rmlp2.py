@@ -149,13 +149,21 @@ def pyramid_fusion(images, M, K, sigma=None):
     LP = zip(*[list(_pyramid_laplacian(img, max_layer=K, sigma=sigma)) for img in images])
     F = []
 
+    ilp = 0 #DEBUG
     for lp in LP:
+        imageio.imwrite("M_K{}.tif".format(ilp), M.astype(np.uint8)*120) #DEBUG
+        
         fused = np.zeros_like(lp[0])
         M = resize(M, lp[0].shape, preserve_range=True,
                    order=0, mode='edge', anti_aliasing=False)
         for (i, l) in zip(range(1, 1+len(lp)), lp):
+            imageio.imwrite("LP_{}_K{}.tif".format(i-1, ilp), l.astype(np.float32)) #DEBUG
             fused[M == i] = l[M == i]
         F.append(fused)
+
+        ilp += 1 #DEBUG
+
+    ilp = 0 #DEBUG
 
     fused_F = F[-1]
     for f in reversed(F[:-1]):
@@ -164,6 +172,10 @@ def pyramid_fusion(images, M, K, sigma=None):
                            mode='edge', anti_aliasing=False)
         smoothed_F = _smooth(resized_F, sigma=sigma, mode='reflect', cval=0)
         fused_F = smoothed_F + f
+        
+        imageio.imwrite("fused_K{}.tif".format(ilp), fused_F.astype(np.float32)) #DEBUG
+
+        ilp += 1 #DEBUG
 
     return fused_F
 
@@ -342,7 +354,7 @@ def dbrg(images, T, r):
     # label by density connectivity
     v = np.empty(len(D)+1, dtype=np.uint32) # buffer
     @timeit
-    #@jit(nopython=True)
+    @jit(nopython=True)
     def ps_func(M, R, v):
         n, m = M.shape
         ps = [] # reset of the pixel coordinates
