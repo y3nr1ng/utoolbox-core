@@ -1,5 +1,6 @@
 # uToolbox
-[![Build Status](https://travis-ci.com/liuyenting/uToolbox.svg?token=RnNdzNQoCUCRNxtUiy7m&branch=master)](https://travis-ci.com/liuyenting/uToolbox)  
+[![Build Status](https://travis-ci.com/liuyenting/uToolbox.svg?token=RnNdzNQoCUCRNxtUiy7m&branch=master)](https://travis-ci.com/liuyenting/uToolbox) 
+[![Doc Status](https://readthedocs.org/projects/pip/badge/?version=latest&style=flat)](https://utoolbox.readthedocs.io/) 
 A Python image processing package for LLSM.
 
 ## Getting Started

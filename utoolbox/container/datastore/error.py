@@ -1,8 +1,11 @@
 class DatastoreError(Exception):
     """Base class for datastore exceptions."""
 
-class InvalidMetadataError(DatastoreError):
-    """Invalid metadata in tar datastores."""
+class InvalidDatastoreRootError(DatastoreError):
+    """Unable to find the root directory."""
 
-class HashMismatchError(DatastoreError):
-    """Digest mismatch after file decompression."""
+class ReadOnlyDataError(DatastoreError):
+    """Datastore is readonly."""
+
+class ImmutableUriListError(DatastoreError):
+    """File list in datastore is immutable."""

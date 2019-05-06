@@ -1,13 +1,14 @@
-import itertools
+"""
+Datastores that represent sparse collections of stacks.
+"""
 import logging
-import mmap
 import os
 import re
 
 import numpy as np
 
+from . import ImageDatastore
 from .base import BufferedDatastore
-from .direct import ImageDatastore
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,10 @@ __all__ = [
 class SparseStackImageDatastore(ImageDatastore, BufferedDatastore):
     """Each folder represents a stack."""
     def __init__(self, root, read_func, **kwargs):
+        """
+        :param str root: root folder path
+        :param read_func: read function for the actual file
+        """
         stacks = next(os.walk(root))[1]
         stacks.sort()
         logger.debug("found {} stacks".format(len(stacks)))
@@ -50,9 +55,9 @@ class SparseStackImageDatastore(ImageDatastore, BufferedDatastore):
         return self._root
 
     def _extract_depth(self, fn, pattern=r'.*_(\d{3,})\.'):
-        return int(re.search(pattern, fp).group(1))
+        return int(re.search(pattern, fn).group(1))
 
-    def _find_max_depth(self, ):
+    def _find_max_depth(self):
         """Determine depth by one of the stack."""
         src_dir = self.files[0]
         layers = [
@@ -61,13 +66,11 @@ class SparseStackImageDatastore(ImageDatastore, BufferedDatastore):
         ]
         return max(layers)-min(layers)+1
 
-    def _generate_buffer(self):
+    def _buffer_shape(self):
         im = self._raw_read_func(self._raw_files[0])
         (ny, nx), nz = im.shape, self.nz
 
-        nbytes = (nx*ny*nz) * im.dtype.itemsize
-        self._mmap = mmap.mmap(-1, nbytes)
-        self._buffer = np.ndarray((nz, ny, nx), im.dtype, buffer=self._mmap)
+        return (nz, ny, nx), im.dtype
 
     def _load_to_buffer(self, fn):
         layers = list(filter(lambda x: x.startswith(fn), self._raw_files))
@@ -77,8 +80,15 @@ class SparseStackImageDatastore(ImageDatastore, BufferedDatastore):
         return self._buffer
 
 class SparseTilesImageDatastore(SparseStackImageDatastore):
-    """Each folder represents a tile stack."""
+    """Each folder represents a tiled stack."""
     def __init__(self, root, read_func, tile_sz=None, **kwargs):
+        """
+        :param str root: root folder path
+        :param read_func: read function for the actual file
+        :param tuple(int,int) tile_sz: dimension of the tiles
+
+        .. note:: Currently, only 2D tiling is supported.
+        """
         super(SparseTilesImageDatastore, self).__init__(
             root, read_func, **kwargs
         )
@@ -109,15 +119,14 @@ class SparseTilesImageDatastore(SparseStackImageDatastore):
         
         return tile_sz
 
-    def _generate_buffer(self):
+    def _buffer_shape(self):
         im = self._raw_read_func(self._raw_files[0])
         ny, nx = im.shape
         nty, ntx = self.tile_sz
 
         shape = ny*nty, nx*ntx
-        nbytes = shape[0] * shape[1] * im.dtype.itemsize
-        self._mmap = mmap.mmap(-1, nbytes)
-        self._buffer = np.ndarray(shape, im.dtype, buffer=self._mmap)
+        
+        return (shape, im.dtype)
     
     def _load_to_buffer(self, z, pattern=r'.*_(\d{3,})\.'):
         shape = None
@@ -134,8 +143,8 @@ class SparseTilesImageDatastore(SparseStackImageDatastore):
                     except TypeError:
                         shape = im.shape
                         ny, nx = shape
-                    sel = [slice(ny*ty:ny*(ty+1)), slice(nx*tx:nx*(tx+1))]
-                    
-                    self._buffer[*sel] = im
+                    sel = (slice(ny*ty, ny*(ty+1)), slice(nx*tx, nx*(tx+1)))
+                    # TODO fix this vvvvv
+                    #self._buffer[*sel] = im
 
                     break
