@@ -1,226 +1,173 @@
+from functools import reduce
 import logging
-from math import hypot, sin, cos, radians, ceil
+from math import ceil, cos, degrees, radians, sin
+from operator import mul
 import os
 
+import cupy as cp
 import numpy as np
-from pycuda.compiler import SourceModule
-import pycuda.driver as cuda
-import pycuda.gpuarray as gpuarray
-
-from utoolbox.container import AbstractAlgorithm, ImplTypes, interface
 
 logger = logging.getLogger(__name__)
 
-class Deskew(metaclass=AbstractAlgorithm):
-    """
-    Specialized geometry transformation for LLSM datasets using sample scan.
-    """
-    def __call__(self, I, deg, res=(1., 1.), rotate=True, resample=True, 
-    shape=None):
+__all__ = [
+    'Deskew', 
+    'deskew'
+]
+
+###
+# region: kernel definitions
+###
+
+cu_file = os.path.join(os.path.dirname(__file__), 'deskew.cu')
+
+ushort_to_float = cp.ElementwiseKernel(
+    'uint16 src', 'float32 dst',
+    'dst = (float)src',
+    'ushort_to_float'
+)
+
+float_to_ushort = cp.ElementwiseKernel(
+    'float32 src', 'uint16 dst',
+    'dst = (unsigned short)src',
+    'float_to_ushort'
+)
+
+###
+# endregion
+###
+
+class Deskew(object):
+    """Restore the actual spatial size of acquired lightsheet data."""
+    def __init__(self, angle=32.8, dr=.108, dz=0.5, rotate=True):
         """
-        Parameters
-        ----------
-        I : np.ndarray
-            Input image.
-        deg : float
-            Rotation angle in degrees.
-        res : tuple of float
-            Resolution in the form of (lateral, axial) axis, default is (1., 1.)
-        rotate : boolean
-            Rotate the output volume after shearing, default is True.
-        resample : boolean
-            Resample the volume to isotropic voxel size.
-        shape : tuple of int, optional
-            Output shape, default to maximize entire shape.
-
-        Note
-        ----
-        Volume is sampled to isotropic scale.
+        :param float angle: target objective angle
+        :param float dr: lateral resolution
+        :param float dz: step size of the piezo stage
+        :param bool rotate: rotate the result to conventional axis
         """
-        if I.ndim != 3:
-            raise NotImplementedError("only 3D data is allowed")
-        nz, ny, nx = I.shape
-        logger.debug("[input] x={}, y={}, z={}".format(nx, ny, nz))
+        self._angle = radians(angle)
+        self._in_res = (dr, dz)
+        self._rotate = rotate
 
-        If = np.swapaxes(I, 0, 1)
-        np.ascontiguousarray(If, dtype=np.float32) #TODO slow
-        
-        #If = I.astype(np.float32) #NOTE merged in np.ascontiguousarray
-        rad = radians(deg)
-        res, shift, rot, ratio = self._estimate_parameters(
-            I, rad, res, rotate, resample
-        )
-        logger.debug("shift={:.4f}, rot={}, ratio={:.4f}".format(shift, rot, ratio))
-        if shape is None:
-            shape = self._estimate_out_shape(If, res, shift, rot, ratio)
-            logger.info("estimated output shape {}".format(shape))
-        
-        out_buf = np.empty(shape, dtype=np.float32)
-
-        self._run(If, shift, rot, rotate, out_buf)
-
-        out_buf = np.swapaxes(out_buf, 0, 1)
-        np.ascontiguousarray(out_buf, dtype=I.dtype)
-        return out_buf
-    
-    def _estimate_parameters(self, I, rad, res, rotate, resample):
-        """
-        Non-rigid parameters, including shearing and rescaling.
-
-        Parameters
-        ----------
-        rad : float 
-            Rotation angle in radians.
-        res : tuple of float
-            Resolution in the form of (lateral, axial) axis.
-        resample : boolean 
-            Resample the volume to isotropic voxel size.
-
-        Return
-        ------
-        res : tuple of float
-            Updated resolution in the form of (lateral, axial) axis.
-        shift : float
-            Plane shift in unit pixels.
-        rot : tuple of float
-            Rotation matrix, (sin(a), cos(a)).
-        ratio : float
-            Ratio of axial resolution over lateral resolution.
-        """
-        lat, ax = res
-        shift = ax*cos(rad) / lat
-
-        ax = ax*sin(rad)
-
-        if resample:
-            ratio = ax/lat
-            shift /= ratio # shrink the step size
-        else:
-            ratio = 1.
-
+        #DEBUG
         if rotate:
-            # estimate discrete sin/cos
-            _, ny, _ = I.shape
-            dx, dy = ceil(shift * (ny-1)), ceil(ratio * ny)
-            h = hypot(dx, dy)
-            vsin, vcos = dy/h, dx/h
-        else:
-            vsin, vcos = (0., 1.)
+            raise NotImplementedError("not yet supported")
 
-        return (lat, ax), shift, (vsin, vcos), ratio
+        self._out_res = self._estimate_resolution()
 
-    def _estimate_out_shape(self, I, res, shift, rot, ratio):
-        nz, ny, nx = I.shape
-  
-        #
-        # shear: xyz -> uvw
-        #
-        # update shape based on scaling ratio
-        nv = ceil(ratio * ny)
-        nu = nx + ceil(shift * (nv-1))
-        logger.debug("[sheared] x={}, y={}, z={}".format(nu, nz, nv))
-        
-        #
-        # rotate: uvw -> pqr
-        #
-        corners = [(1., 1.), (-1., 1.), (-1., -1.), (1., -1.)]
-        vsin, vcos = rot
-        fx = lambda x, y: x*nu/2. * vcos - y*nv/2. * vsin
-        fy = lambda x, y: x*nu/2. * vsin + y*nv/2. * vcos
-        np = [fx(*p) for p in corners]
-        nq = [fy(*p) for p in corners]
+        self._in_shape, self._out_shape = None, None
+        self._template = None
 
-        # TODO crop at the edges, not the full size
-        nq = int(ceil(max(nq)-min(nq)))
-        np = int(ceil(max(np)-min(np)))
-        logger.debug("[rotated] x={}, y={}, z={}".format(np, nz, nq))
-
-        return (nz, nq, np)
-
-    @interface
-    def _run(self, I, shift, rot, ratio, out):
+    @property
+    def angle(self):
         """
-        Parameters
-        ----------
-        I : np.ndarray, dtype=np.float32
-            Input image.
-        shift : float
-            Plane shift in unit pixels.
-        rot : tuple of float
-            Rotation matrix, (sin(a), cos(a)).
-        ratio : float
-            Ratio of axial resolution over lateral resolution.
-        out : np.ndarray, dtype=np.float32
-            Output array. Sampling grid is determined by size of this buffer.
+        Target objective angle in degrees
         """
-        pass
+        return degrees(self._angle)
 
-class Deskew_GPU(Deskew):
-    _strategy = ImplTypes.GPU
+    @property
+    def dr(self):
+        """Output lateral resolution in microns."""
+        return self._out_res[0]
+    
+    @property
+    def dz(self):
+        """Output axial resolution in microns."""
+        return self._out_res[1]
+    
+    @property
+    def rotate(self):
+        """Rotate the result to conventional axis."""
+        return self._rotate
 
-    def __init__(self):
-        # load kernel from file
-        path = os.path.join(os.path.dirname(__file__), 'deskew.cu')
-        with open(path, 'r') as fd:
-            try:
-                module = SourceModule(fd.read())
-            except cuda.CompileError as err:
-                logger.error("compile error: " + str(err))
-                raise
-        self._shear_kernel = module.get_function('shear_kernel')
-        self._rotate_kernel = module.get_function('rotate_kernel')
+    @property
+    def shape(self):
+        """Final shape after deskew."""
+        return self._out_shape
+    
+    def _estimate_resolution(self):
+        """
+        Estimate output lateral and axial resolution.
         
-        # preset texture
-        shear_texture = module.get_texref('shear_tex')
-        shear_texture.set_address_mode(0, cuda.address_mode.BORDER)
-        shear_texture.set_address_mode(1, cuda.address_mode.BORDER)
-        shear_texture.set_address_mode(2, cuda.address_mode.BORDER)
-        shear_texture.set_filter_mode(cuda.filter_mode.LINEAR)
-        self._shear_texture = shear_texture
-        rotate_texture = module.get_texref('rotate_tex')
-        rotate_texture.set_address_mode(0, cuda.address_mode.BORDER)
-        rotate_texture.set_address_mode(1, cuda.address_mode.BORDER)
-        rotate_texture.set_filter_mode(cuda.filter_mode.LINEAR)
-        self._rotate_texture = rotate_texture
+        :return: (lateral, axial) resolution
+        :rtype: tuple(float,float)
+        """
+        dr, dz0 = self._in_res
+        dz = dz0 * sin(self._angle)
+        return (dr, dz)
 
-        # preset kernel launch parameters
-        self._shear_kernel.prepare('PffIIffIII', texrefs=[shear_texture])
-        self._rotate_kernel.prepare('PfIIffII', texrefs=[rotate_texture])
+    def _refresh_internal_buffers(self, ref):
+        logger.info("updating internal buffers")
 
-        # output staging buffer
-        self._out_buf = None
+        # reference for interpolation, on device
+        self._template = cp.empty_like(ref, dtype=cp.float32)
 
-    def _run(self, I, shift, rot, ratio, out):
-        logger.debug("I.shape={}".format(I.shape))
-        # bind input image to texture
-        _in_buf = cuda.np_to_array(I, 'C')
-        self._shear_texture.set_array(_in_buf)
+        # store shape info
+        self._in_shape = ref.shape
+        self._out_shape = self._estimate_shape(ref)
 
-        # determine grid and block size
-        _, nv, nu = out.shape
-        block_sz = (32, 32, 1)
-        grid_sz = (ceil(float(nu)/block_sz[0]), ceil(float(nv)/block_sz[1]))
-
-        if (self._out_buf is None) or (self._out_buf.shape != out.shape):
-            logger.debug("resize buffer to {}".format(out.shape))
-            self._out_buf = gpuarray.empty(out.shape, dtype=np.float32, order='C')
-
-        # TODO create rotate kernel buffer area
-            
-        # execute
-        nz, ny, nx = I.shape
-        self._shear_kernel.prepared_call(
-            grid_sz, block_sz,
-            self._out_buf.gpudata,
-            np.float32(shift),
-            np.uint32(nu), np.uint32(nv),
-            np.float32(ratio),
-            np.uint32(nx), np.uint32(ny),
-            np.float32(nz)
-        )
-        # TODO add rotate kernel call
-        self._out_buf.get(out)
-
-        # unbind texture
-        _in_buf.free()
+    def _estimate_shape(self, ref):
+        """
+        Estimate output shape.
         
+        :return: numpy shape format, (nz, ny, nx)
+        :rtype: tuple(int,int,int)
+        """
+        #DEBUG
+        return ref.shape
+
+        dx = self._estimate_shift()
+        nz, ny, nx0 = ref.shape
+        nx = ceil(nx0 + dx * (nz-1))
+        return (nz, ny, nx)
+
+    def _estimate_shift(self):
+        """
+        Estimate pixel shift per layer.
+        
+        :return: pixel shift
+        :rtype: float
+        """
+        dr0, dz0 = self._in_res
+        return dz0 * cos(self._angle) / dr0
+
+    def _upload(self, src):
+        """
+        Uplaod data to device.
+
+        :param np.ndarray src: source
+        """
+        ushort_to_float(cp.asarray(src), self._template)
+
+    def _download(self, dst):
+        """
+        Download data from device.
+
+        :param np.ndarray dst: destination
+
+        .. note::
+            Pinned memory and device memory are reused throughout the process.
+        """
+        buffer = cp.asarray(dst)
+        float_to_ushort(self._template, buffer)
+        dst[...] = cp.asnumpy(buffer)
+
+    def run(self, data, out=None):
+        try:
+            if data.shape != self._in_shape:
+                raise RuntimeError("incompatible buffer")
+        except:
+            self._refresh_internal_buffers(data)
+
+        self._upload(data)
+
+        #TODO execute conversion
+
+        if out is None:
+            out = np.empty(self._out_shape, data.dtype)
+        self._download(out)
+        return out
+    
+def deskew(data, **kwargs):
+    """Helper function that wraps :class:`.Deskew` for one-off use."""
+    pass

@@ -1,6 +1,5 @@
 from abc import ABCMeta
 import enum
-import pprint
 
 try:
     import utoolbox.parallel.gpu
@@ -16,23 +15,24 @@ __all__ = [
 
 class ImplTypes(enum.IntFlag):
     """Types of implementations."""
-    CPU_ONLY = 1
-    GPU = 2
-    DISTRIBUTED = 4
+    CPU_ONLY = 1    #: only requires CPU resource
+    GPU = 2         #: in addition to CPU, this implementation requires GPU
+    DISTRIBUTED = 4 #: algorithm can function across worker nodes
 
-INTERFACE_FLAG = '_interface'
-
+INTERFACE_FLAG = '_interface'   
 def interface(func):
     """
-    This decorate set a label that mark this function to be an requirement in 
-    all subclasses.
+    This decorator sets a label that marks this function to be an requirement 
+    in all subclasses.
     """
     setattr(func, INTERFACE_FLAG, True)
     return func
 
 class AlgorithmFactory(type):
+    """
+    Support class that modify the generated classes to be a factory.
+    """
     def __call__(cls, impl_type, *args, **kwargs):
-        """Modify generated classes to be a factory."""
         try:
             subcls = cls._impl[impl_type]
         except KeyError:
