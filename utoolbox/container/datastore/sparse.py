@@ -1,16 +1,14 @@
 """
 Datastores that represent sparse collections of stacks.
 """
-import itertools
 import logging
-import mmap
 import os
 import re
 
 import numpy as np
 
+from . import ImageDatastore
 from .base import BufferedDatastore
-from .direct import ImageDatastore
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +55,7 @@ class SparseStackImageDatastore(ImageDatastore, BufferedDatastore):
         return self._root
 
     def _extract_depth(self, fn, pattern=r'.*_(\d{3,})\.'):
-        return int(re.search(pattern, fp).group(1))
+        return int(re.search(pattern, fn).group(1))
 
     def _find_max_depth(self):
         """Determine depth by one of the stack."""
@@ -68,13 +66,11 @@ class SparseStackImageDatastore(ImageDatastore, BufferedDatastore):
         ]
         return max(layers)-min(layers)+1
 
-    def _generate_buffer(self):
+    def _buffer_shape(self):
         im = self._raw_read_func(self._raw_files[0])
         (ny, nx), nz = im.shape, self.nz
 
-        nbytes = (nx*ny*nz) * im.dtype.itemsize
-        self._mmap = mmap.mmap(-1, nbytes)
-        self._buffer = np.ndarray((nz, ny, nx), im.dtype, buffer=self._mmap)
+        return (nz, ny, nx), im.dtype
 
     def _load_to_buffer(self, fn):
         layers = list(filter(lambda x: x.startswith(fn), self._raw_files))
@@ -123,15 +119,14 @@ class SparseTilesImageDatastore(SparseStackImageDatastore):
         
         return tile_sz
 
-    def _generate_buffer(self):
+    def _buffer_shape(self):
         im = self._raw_read_func(self._raw_files[0])
         ny, nx = im.shape
         nty, ntx = self.tile_sz
 
         shape = ny*nty, nx*ntx
-        nbytes = shape[0] * shape[1] * im.dtype.itemsize
-        self._mmap = mmap.mmap(-1, nbytes)
-        self._buffer = np.ndarray(shape, im.dtype, buffer=self._mmap)
+        
+        return (shape, im.dtype)
     
     def _load_to_buffer(self, z, pattern=r'.*_(\d{3,})\.'):
         shape = None

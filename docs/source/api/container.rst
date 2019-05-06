@@ -13,7 +13,13 @@ Algorithm
 Dataset
 -------
 .. automodule:: utoolbox.container.dataset
+
+Base class
+^^^^^^^^^^
+.. automodule:: utoolbox.container.dataset.base 
     :members:
+    :private-members:
+    :special-members:
 
 
 Datastore 
@@ -30,12 +36,13 @@ Direct access
 ^^^^^^^^^^^^^
 .. automodule:: utoolbox.container.datastore.direct
     :members:
+    :special-members:
     
 Sparse collection
 ^^^^^^^^^^^^^^^^^
 .. automodule:: utoolbox.container.datastore.sparse
-    :special-members:
     :members:
+    :special-members:
 
 Archive
 ^^^^^^^

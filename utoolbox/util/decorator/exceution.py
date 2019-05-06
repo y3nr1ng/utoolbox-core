@@ -13,17 +13,10 @@ class lazy_property(object):
 
     def __get__(self, instance, owner):
         """
-        Parameter
-        ---------
-        instance: object
-            the instance that the attribute was accessed through.
-        owner: object
-            the owner class of the instance
-
-        Return
-        ------
-        (dynamic)
-            evaluated value from encapsulated instance method.
+        :param object intance: instance that the attribute was accessed through
+        :param object owner: owner class of the instance
+        
+        :return: evaluated value from encapsulated instance method
         """
         value = self._func(instance)
         setattr(instance, self._func.__name__, value)
