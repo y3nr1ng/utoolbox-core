@@ -1,42 +1,13 @@
-import glob
-import logging
-import os
-import platform
-import re
-import subprocess
-import sys
+import os 
 
-from Cython.Build import cythonize
-from setuptools import Extension, find_namespace_packages, setup
-from setuptools.command.build_ext import build_ext
-
+from setuptools import find_namespace_packages, setup
 cwd = os.path.abspath(os.path.dirname(__file__))
 
-# get the long description from README.md
+###
+# get description from README.md
+###
 with open(os.path.join(cwd, "README.md"), encoding='utf-8') as fd:
     long_description = fd.read()
-
-def wrapper_path_to_module_name(path):
-    fn = os.path.basename(path)
-    fn, _ = os.path.splitext(fn)
-    # TODO regex wrapper
-    rel_path = os.path.relpath(path, cwd)
-    return rel_path.replace('/', '.')
-
-# find all the wrappers use `wrapper_*.pyx`
-wrappers = glob.glob(
-    os.path.join(cwd, 'utoolbox', '**', 'wrapper_*.pyx'), recursive=True
-)
-# construct extensions
-extensions = [
-    Extension(
-        wrapper_path_to_module_name(path),
-        sources=[path],
-        include_dirs=[os.path.join(cwd, 'utoolbox/compression/libbsc')]
-    )
-    for path in wrappers
-]
-#TODO pass attributes
 
 setup(
     # published project name
@@ -79,13 +50,13 @@ setup(
 
     python_requires='>=3.6',
 
-    # other packages the build system would require during compilation
-    setup_requires=[
-    ],
+    # use pyproject.toml to define build system requirement
+    #setup_requires=[
+    #],
 
     # other packages the project depends on to run
     #   install_requires -> necessity
-    #   requirements.txt -> deployment (use conda environent.yml)
+    #   requirements.txt
     install_requires=[
         # core
         'cython',
@@ -101,24 +72,17 @@ setup(
         'tifffile',
 
         # gui
-        'pyqt5',
-        'plotly',
+        'PySide2', 
 
         # parallel
+        'cupy>=0.0dev0',
         'dask',
 
         # utils
         'mako',
         'click',
         'coloredlogs',
-        'tqdm',
-        'jinja2', # template engine used by pycuda
-        'xxhash'
-    ],
-
-    #ext_modules=cythonize(extensions),
-
-    dependency_links=[
+        'tqdm'
     ],
 
     # additional groups of dependencies here for the "extras" syntax
@@ -140,10 +104,11 @@ setup(
     entry_points={
         'console_scripts': [
             'deskew=utoolbox.cli.deskew:main',
-            'zpatch=utoolbox.cli.zpatch:main'
+            'zpatch=utoolbox.cli.zpatch:main',
+            'dataset=utoolbox.cli.dataset:main'
         ]
     }, 
 
-    # cannot safely run in compressed form
+    # contains c source, cannot safely run in compressed form
     zip_safe=False
 )
