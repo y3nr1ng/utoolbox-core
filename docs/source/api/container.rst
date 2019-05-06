@@ -44,11 +44,6 @@ Sparse collection
     :members:
     :special-members:
 
-Archive
-^^^^^^^
-.. automodule:: utoolbox.container.datastore.archived
-    :members:
-
 Error
 ^^^^^
 .. automodule:: utoolbox.container.datastore.error
