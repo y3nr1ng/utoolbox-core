@@ -24,45 +24,37 @@ __all__ = [
 
 class Datastore(MutableMapping):
     """Basic datastore that includes abstract read logic."""
-    def __init__(self, read_func=None, write_func=None, immutable=False):
+    def __init__(self, read_func=None, write_func=None, del_func=None,  
+                 immutable=False):
         """
-        :param func read_func: function that perform the read operation
+        :param func read_func: read operation
+        :param func write_func: write operation
+        :param func del_func: delete operation
+        :param bool immutable: is URI entries modifiable
         """
         self._uri = OrderedDict()
-
-        if read_func is None:
-            # nop
-            _read_func = lambda x: x
-        else:
-            def wrapped_read_func(key):
-                try:
-                    return read_func(self._uri[key])
-                except KeyError:
-                    raise FileNotFoundError("unknown key \"{}\"".format(key))
-            _read_func = wrapped_read_func
-        if write_func is None:
-            def raise_readonly_error(key, value):
-                raise ReadOnlyDataError("current dataset is read-only")
-            _write_func = raise_readonly_error
-        else:
-            def wrapped_write_func(key, value):
-                try:
-                    uri = self._uri[key]
-                except KeyError:
-                    if immutable:
-                        raise ImmutableUriListError("datastore is immutable")
-                    else:
-                        uri = self._key_to_uri(key)
-                        self._uri[key] = uri
-                write_func(uri, value)
-            _write_func = wrapped_write_func
-        self._read_func, self._write_func = _read_func, _write_func
+        self._read_func, self._write_func, self._del_func, self._immutable = \
+            read_func, write_func, del_func, immutable
 
     def __delitem__(self, key):
-        raise ImmutableInventoryError("cannot delete entries in a datastore")
+        try:
+            uri = self._uri[key]
+            self._del_func(uri)
+            del self._uri[key]
+        except TypeError:
+            raise ImmutableUriListError("datastore is immutable")
+        except KeyError:
+            raise FileNotFoundError("unknown key \"{}\"".format(key))
 
     def __getitem__(self, key):
-        return self.read_func(key)
+        try:
+            uri = self._uri[key]
+            return self._read_func(uri)
+        except TypeError:
+            # nop
+            return key
+        except KeyError:
+            raise FileNotFoundError("unknown key \"{}\"".format(key))
     
     def __iter__(self):
         return iter(self._uri)
@@ -71,20 +63,49 @@ class Datastore(MutableMapping):
         return len(self._uri)
 
     def __setitem__(self, key, value):
-        self.write_func(key, value)
+        try:
+            uri = self._uri[key]
+        except TypeError:
+            raise ReadOnlyDataError("current dataset is read-only")
+        except KeyError:
+            if self.immutable:
+                raise ImmutableUriListError("datastore is immutable")
+            else:
+                # create new entry
+                uri = self._key_to_uri(key)
+                self._uri[key] = uri
+        self._write_func(uri, value)
 
     @property
-    def read_func(self):
-        return self._read_func
-
-    @property
-    def write_func(self):
-        return self._write_func
+    def immutable(self):
+        return self._immutable
     
     def _key_to_uri(self, key):
         raise ImmutableUriListError("key transform function not defined")
 
-class BufferedDatastore(Datastore):
+class TransientDatastore(Datastore):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def __enter__(self):
+        self._allocate_resources()
+        return self
+    
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+    
+    def close(self):
+        self._free_resources()
+    
+    @abstractmethod
+    def _allocate_resources(self):
+        pass
+    
+    @abstractmethod
+    def _free_resources(self):
+        pass
+
+class BufferedDatastore(TransientDatastore):
     """
     Reading data that requires internal buffer to piece together the fractions before returning it.
     """
@@ -93,17 +114,6 @@ class BufferedDatastore(Datastore):
         self._mmap, self._buffer = None, None
 
         super().__init__(*args, **kwargs)
-    
-    def __enter__(self):
-        self._allocate_buffer()
-        return self
-    
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
-
-    def close(self):
-        self._free_buffer()
-        logger.debug("internal buffer destroyed")
 
     @abstractmethod
     def _buffer_shape(self):
@@ -123,7 +133,7 @@ class BufferedDatastore(Datastore):
         """
         raise NotImplementedError
 
-    def _allocate_buffer(self):
+    def _allocate_resources(self):
         shape, dtype = self._buffer_shape()
         nbytes = dtype.itemsize * reduce(mul, shape)
         logger.info(
@@ -133,9 +143,11 @@ class BufferedDatastore(Datastore):
         self._mmap = mmap.mmap(-1, nbytes)
         self._buffer = np.ndarray(shape, dtype, buffer=self._mmap)
 
-    def _free_buffer(self):
+    def _free_resources(self):
         if sys.getrefcount(self._buffer) > 2:
             # getrefcount + self._buffer -> 2 references
             logger.warning("buffer is referenced externally")
         self._buffer = None
         self._mmap.close()
+
+        logger.debug("internal buffer destroyed")
