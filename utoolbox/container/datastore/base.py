@@ -38,7 +38,7 @@ class Datastore(MutableMapping):
         self._immutable = immutable
 
         # short circuit if immutable
-        self._del_func = None if immutable else self._del_func
+        self._del_func = None if immutable else del_func
         
     def __delitem__(self, key):
         try:
