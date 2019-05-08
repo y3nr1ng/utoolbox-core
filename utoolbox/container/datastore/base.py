@@ -30,12 +30,16 @@ class Datastore(MutableMapping):
         :param func read_func: read operation
         :param func write_func: write operation
         :param func del_func: delete operation
-        :param bool immutable: is URI entries modifiable
+        :param bool immutable: is URI entries fixed
         """
         self._uri = OrderedDict()
-        self._read_func, self._write_func, self._del_func, self._immutable = \
-            read_func, write_func, del_func, immutable
+        
+        self._read_func, self._write_func = read_func, write_func
+        self._immutable = immutable
 
+        # short circuit if immutable
+        self._del_func = None if immutable else self._del_func
+        
     def __delitem__(self, key):
         try:
             uri = self._uri[key]
