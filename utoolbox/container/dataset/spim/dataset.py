@@ -1,4 +1,3 @@
-import copy
 import glob
 import logging
 import os
@@ -16,6 +15,7 @@ from .settings import Settings
 
 logger = logging.getLogger(__name__)
 
+
 class SPIMDataset(MultiChannelDataset):
     """
     Representation of an acquisition result from LatticeScope, containing
@@ -29,13 +29,12 @@ class SPIMDataset(MultiChannelDataset):
         :param bool refactor: refactor filenames
         """
         if not os.path.exists(root):
-            raise FileNotFoundError("invalid dataset source")
+            raise FileNotFoundError("invalid dataset root")
         super().__init__(root)
 
     @property
     def read_func(self):
-        #return imageio.volread
-        return lambda x: x
+        return imageio.volread
 
     def _find_settings_file(self, extension='txt'):
         """
@@ -85,8 +84,6 @@ class SPIMDataset(MultiChannelDataset):
         return Settings(lines)
 
     def _find_channels(self):
-        n_channels = len(self.metadata.waveform.channels)
-        logger.info("{} channel(s)".format(n_channels))
         return [
             channel.wavelength for channel in self.metadata.waveform.channels
         ]
@@ -98,4 +95,3 @@ class SPIMDataset(MultiChannelDataset):
             sub_dir=False,
             pattern="*_{}nm_*".format(channel)
         )
-
