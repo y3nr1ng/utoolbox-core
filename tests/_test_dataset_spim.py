@@ -1,5 +1,3 @@
-# pylint: disable=W0612
-
 import os
 from pprint import pprint
 
@@ -14,14 +12,14 @@ coloredlogs.install(
 )
 
 test_dir = os.path.dirname(os.path.realpath(__file__))
-path = os.path.join(test_dir, "GH146ACV_power100_60ms_z3")
+path = os.path.join(test_dir, "../data/20170112_RFiSHp2aLFCYC/raw")
 
 dataset = SPIMDataset(path)
-pprint(dataset.metadata)
+pprint(dataset.metadata.waveform.channels)
 
 for ch, data in dataset.items():
     print(" << {} >>".format(ch))
-    pprint(list(data.keys()))
+    pprint(list(data.items()))
 
 """
 ##### SORT #####
