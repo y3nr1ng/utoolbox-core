@@ -1,8 +1,9 @@
-# pylint: disable=undefined-variable
-
 from abc import abstractmethod
 from collections.abc import Mapping
-import os
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class Dataset(Mapping):
     def __init__(self, root):
@@ -11,14 +12,14 @@ class Dataset(Mapping):
         """
         self._root = root
         self._metadata = self._load_metadata()
-        self._datastore = self._load_datastore() 
+        self._datastore = self._load_datastore()
 
     def __getitem__(self, key):
         return self._datastore[key]
-    
+
     def __iter__(self):
         return self._datastore
-    
+
     def __len__(self):
         return len(self._datastore)
 
@@ -40,10 +41,11 @@ class Dataset(Mapping):
     def _load_metadata(self):
         pass
 
+
 class MultiChannelDataset(Dataset):
     def __init__(self, root):
         super().__init__(root)
-    
+
     def __iter__(self):
         return iter(self._datastore)
 
@@ -57,8 +59,9 @@ class MultiChannelDataset(Dataset):
 
     def _load_datastore(self):
         """Override for multi-channel setup."""
+        channels = self._find_channels()
+        logger.info("{} channel(s)".format(len(channels)))
         return {
             channel: self._load_channel(channel)
-            for channel in self._find_channels()
+            for channel in channels
         }
-        
