@@ -21,6 +21,20 @@ Base class
     :private-members:
     :special-members:
 
+SPIM
+^^^^
+.. automodule:: utoolbox.container.dataset.spim
+    :members:
+    :private-members:
+    :special-members:
+
+Micro-Manager
+^^^^^^^^^^^^^
+.. automodule:: utoolbox.container.dataset.mm
+    :members:
+    :private-members:
+    :special-members:
+
 
 Datastore 
 ---------
@@ -43,11 +57,6 @@ Sparse collection
 .. automodule:: utoolbox.container.datastore.sparse
     :members:
     :special-members:
-
-Archive
-^^^^^^^
-.. automodule:: utoolbox.container.datastore.archived
-    :members:
 
 Error
 ^^^^^

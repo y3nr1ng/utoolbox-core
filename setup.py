@@ -1,4 +1,4 @@
-import os 
+import os
 
 from setuptools import find_namespace_packages, setup
 cwd = os.path.abspath(os.path.dirname(__file__))
