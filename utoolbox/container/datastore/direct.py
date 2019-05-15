@@ -26,6 +26,9 @@ class FileDatastore(Datastore):
         :param str extensions: file extensions to include
         :param bool create_new: create datastore root if not exists
         """
+        if 'del_func' not in kwargs:
+            kwargs['del_func'] = os.unlink
+
         super().__init__(**kwargs)
 
         if not os.path.exists(root):
@@ -35,8 +38,6 @@ class FileDatastore(Datastore):
                 raise InvalidDatastoreRootError(
                     "unable to find \"{}\"".format(root)
                 )
-            # short circuit
-            return
         self._root = root
 
         if sub_dir:

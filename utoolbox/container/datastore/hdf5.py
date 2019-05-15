@@ -1,28 +1,21 @@
 import h5py
 
-from .base import Datastore
+from .base import TransientDatastore
 
-class HDF5Datastore(Datastore):
+class HDF5Datastore(TransientDatastore):
     def __init__(self, root):
-        if isinstance(root, h5py.File):
-            self._handle = root
-        else:
-            self._handle = h5py.File(root, 'r')
+        """
+        :param h5py.Dataset root: dataset handle
+        """
+        self._root = root
 
-        self._inventory = self.handle.keys()
-        super().__init__(lambda x: self.handle[x])
-        
-    def __enter__(self):
-        return self
-    
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.handle.close()
+        # read-only
+        super().__init__(
+            read_func=lambda zt: self._root[zt, ...], 
+            immutable=True
+        )
 
     @property
-    def handle(self):
-        return self._handle
-
-    @property
-    def root(self):
-        """Location of the HDF5 file."""
-        return self.handle.filename
+    def filename(self):
+        """File system location of the root HDF5 file."""
+        return self._root.file.filename
