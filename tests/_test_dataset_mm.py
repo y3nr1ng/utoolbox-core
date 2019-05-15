@@ -7,7 +7,7 @@ from utoolbox.container.dataset import MicroManagerDataset
 
 coloredlogs.install(
     level='DEBUG',
-    fmt='%(asctime)s %(module)s[%(process)d] %(levelname)s %(message)s',
+    fmt='%(asctime)s %(levelname)s %(message)s',
     datefmt='%H:%M:%S'
 )
 
