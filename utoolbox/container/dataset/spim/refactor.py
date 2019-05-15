@@ -20,7 +20,7 @@ if refactor:
     rename_by_mapping(self.root, data_files_orig, data_files)
 """
 
-#TODO create wrapper object for linked dataset
+# TODO create wrapper object for linked dataset
 
 def rename_by_mapping(root, old_filenames, new_filenames):
     for old_fnobj, new_fnobj in tqdm(zip(old_filenames, new_filenames), total=len(new_filenames)):
