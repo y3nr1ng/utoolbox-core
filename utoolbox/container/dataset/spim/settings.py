@@ -24,7 +24,7 @@ class TriggerMode(Enum):
 
 Channel = namedtuple(
     'Channel', 
-    ['id', 'filter', 'wavelength', 'power', 'exposure']
+    ['id', 'filter', 'wavelength', 'power', 'exposure', 'stacks']
 )
 
 class Settings(AttrDict):
@@ -118,12 +118,35 @@ class Settings(AttrDict):
 
         # NOTE exception, deal with multi-channel
         #TODO allow N/A filter 
-        values = re.findall(
+        ch_settings = re.findall(
             r"^Excitation Filter, Laser, Power \(%\), Exp\(ms\) \((\d+)\) :\t(\D+)\t(\d+)\t(\d+)\t(\d+(?:\.\d+)?)",
             lines,
             re.MULTILINE
         )
-        parsed['channels'] = [Channel(*value) for value in values]
+        # sort by channel id
+        ch_settings.sort(key=lambda t: t[0])
+
+        ch_stacks = re.findall(
+            r"^# of stacks \((\d+)\) :\t(\d+)",
+            lines,
+            re.MULTILINE
+        )
+        # sort by channel id
+        ch_stacks.sort(key=lambda t: t[0])
+
+        # map number of stacks
+        ch_settings[:] = [
+            settings + (n_stacks[1], )
+            for settings, n_stacks in zip(ch_settings, ch_stacks)
+        ]
+
+        # convert power, exposure, stacks to numbers
+        ch_settings[:] = [
+            (id_, filter_, laser, float(power), float(exposure), int(stacks))
+            for id_, filter_, laser, power, exposure, stacks in ch_settings
+        ]
+
+        parsed['channels'] = [Channel(*value) for value in ch_settings]
 
         return 'waveform', parsed
 

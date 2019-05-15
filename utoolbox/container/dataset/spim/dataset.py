@@ -1,4 +1,3 @@
-import copy
 import glob
 import logging
 import os
@@ -7,50 +6,35 @@ import re
 import imageio
 
 from utoolbox.container import ImageDatastore
-from utoolbox.container.dataset import (
-    AbstractMultiChannelDataset,
-    DatasetError
+from ..base import MultiChannelDataset
+from .error import (
+    MultipleSettingsError,
+    SettingsNotFoundError
 )
 from .settings import Settings
 
 logger = logging.getLogger(__name__)
 
-class SPIMDataset(AbstractMultiChannelDataset):
+
+class SPIMDataset(MultiChannelDataset):
     """
     Representation of an acquisition result from LatticeScope, containing
     software setup and collected data.
     """
     SETTINGS_PATTERN = r"(?P<ds_name>.+)_Settings.txt$"
 
-    def __init__(self, root, show_uri=False, refactor=True):
+    def __init__(self, root, refactor=True):
         """
         :param str root: source directory of the dataset
-        :param bool show_uri: return image URI when requested
         :param bool refactor: refactor filenames
         """
         if not os.path.exists(root):
-            raise FileNotFoundError("invalid dataset source")
+            raise FileNotFoundError("invalid dataset root")
         super().__init__(root)
 
-        settings_file = self._find_settings_file()
-        logger.debug("settings file \"{}\"".format(settings_file))
-        # NOTE some files have corrupted timestamp causing utf-8 decode error
-        with open(settings_file, 'r', errors='ignore') as fd:
-            lines = fd.read()
-        self.settings = Settings(lines)
-
-        n_channels = len(self.settings.waveform.channels)
-        logger.info("{} channel(s) in settings".format(n_channels))
-
-        # if requested, wrap the reader before creating datastores
-        if show_uri:
-            def read_func(x):
-                return (x, imageio.volread(x))
-        else:
-            read_func = imageio.volread
-        self._map_channels(read_func)    
-
-        self._generate_inventory()
+    @property
+    def read_func(self):
+        return imageio.volread
 
     def _find_settings_file(self, extension='txt'):
         """
@@ -59,7 +43,7 @@ class SPIMDataset(AbstractMultiChannelDataset):
         :param str extension: settings file extension, default is 'txt'
         """
         # settings are .txt files
-        search_pattern = os.path.join(self.root, "*.{}".format(extension))
+        search_pattern = os.path.join(self.root, "*.txt")
         filenames = glob.glob(search_pattern)
 
         ds_names = []
@@ -90,28 +74,24 @@ class SPIMDataset(AbstractMultiChannelDataset):
             return ds_names[index][1]
         else:
             return ds_names[0][1]
-    
-    def _generate_inventory(self):
-        raise NotImplementedError
 
-    def _map_channels(self, read_func):
-        # partition by channels 
-        for channel in self.settings.waveform.channels:
-            if channel.wavelength in self._datastore:
-                logger.warning("found duplicate wavelength definition, ignored")
-                continue
-            self._datastore[channel.wavelength] = ImageDatastore(
-                self.root,
-                read_func,
-                sub_dir=False,
-                pattern="*_ch{}_*".format(channel.id)
-            )
+    def _load_metadata(self):
+        settings_file = self._find_settings_file()
+        logger.debug("settings file \"{}\"".format(settings_file))
+        # NOTE some files have corrupted timestamp causing utf-8 decode error
+        with open(settings_file, 'r', errors='ignore') as fd:
+            lines = fd.read()
+        return Settings(lines)
 
-class SettingsError(DatasetError):
-    """SPIM-generated settings related errors."""
+    def _find_channels(self):
+        return [
+            channel.wavelength for channel in self.metadata.waveform.channels
+        ]
 
-class SettingsNotFoundError(SettingsError):
-    """Unable to find SPIM-generated settings."""
-
-class MultipleSettingsError(SettingsError):
-    """Confuse between multiple settings."""
+    def _load_channel(self, channel):
+        return ImageDatastore(
+            self.root,
+            read_func=self.read_func,
+            sub_dir=False,
+            pattern="*_{}nm_*".format(channel)
+        )
