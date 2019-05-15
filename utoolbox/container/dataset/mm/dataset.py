@@ -41,7 +41,7 @@ class MicroManagerDataset(MultiChannelDataset):
                     break
             if path == self.root:
                 raise NoMetadataInTileFolderError()
-            logger.debug("using metadata from `{}`".format(path))
+            logger.debug("using metadata from \"{}\"".format(path))
         path = os.path.join(path, 'metadata.txt')
 
         with open(path, 'r') as fd:
