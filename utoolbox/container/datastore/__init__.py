@@ -6,4 +6,4 @@ Datastore is a respository for collections of data that may be too large to fit 
 """
 from .direct import *
 from .hdf5 import *
-from .sparse import *
+from .multifile import *
