@@ -22,6 +22,7 @@ __all__ = [
     'BufferedDatastore'
 ]
 
+
 class Datastore(MutableMapping):
     """Basic datastore that includes abstract read logic."""
     def __init__(self, read_func=None, write_func=None, del_func=None,  
@@ -70,7 +71,8 @@ class Datastore(MutableMapping):
         try:
             uri = self._uri[key]
         except TypeError:
-            raise ReadOnlyDataError("current dataset is read-only")
+            raise ReadOnlyDataError("current dataset is read-only") 
+            # TODO tied to write_func?
         except KeyError:
             if self.immutable:
                 raise ImmutableUriListError("datastore is immutable")
@@ -87,37 +89,48 @@ class Datastore(MutableMapping):
     def _key_to_uri(self, key):
         raise ImmutableUriListError("key transform function not defined")
 
+
 class TransientDatastore(Datastore):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(*kwargs)
 
     def __enter__(self):
         self._allocate_resources()
         return self
-    
+
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
-    
+
     def close(self):
         self._free_resources()
-    
+
     @abstractmethod
     def _allocate_resources(self):
         pass
-    
+
     @abstractmethod
     def _free_resources(self):
         pass
 
+
 class BufferedDatastore(TransientDatastore):
     """
-    Reading data that requires internal buffer to piece together the fractions before returning it.
+    Reading data that requires internal buffer to piece together the fractions
+    before returning it.
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, read_func=None, write_func=None, **kwargs):
         # staging area
         self._mmap, self._buffer = None, None
 
-        super().__init__(*args, **kwargs)
+        self._raw_read_func = read_func
+        if read_func is not None:
+            read_func = self._deserialize_to_buffer
+        self._raw_write_func = write_func
+        if write_func is not None:
+            write_func = self._serialize_from_buffer
+        super().__init__(
+            read_func=read_func, write_func=write_func, **kwargs
+        )
 
     @abstractmethod
     def _buffer_shape(self):
@@ -128,13 +141,15 @@ class BufferedDatastore(TransientDatastore):
         """
         raise NotImplementedError
     
-    @abstractmethod
-    def _load_to_buffer(self, x):
+    def _deserialize_to_buffer(self, uri):
         """
         Load data definition x into the internal buffer.
         
-        :param x: any definition that can be successfully interpreted internally
+        :param x: any definition that can be interpreted internally
         """
+        raise NotImplementedError
+
+    def _serialize_from_buffer(self, uri):
         raise NotImplementedError
 
     def _allocate_resources(self):

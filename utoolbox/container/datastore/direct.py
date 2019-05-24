@@ -16,6 +16,7 @@ __all__ = [
     'ImageDatastore'
 ]
 
+
 class FileDatastore(Datastore):
     def __init__(self, root, sub_dir=False, pattern='*', extensions=None,
                  create_new=True, **kwargs):
@@ -85,15 +86,15 @@ class FileDatastore(Datastore):
         files[:] = [f for _, f in sorted(zip(keys, files))]
 
     def _key_to_uri(self, key):
+        """Convert key to URI when writing new data into datastore."""
         return os.path.join(self.root, key)
-        
+
+
 class ImageDatastore(FileDatastore):
     supported_extensions = ('tif', )
 
-    def __init__(self, root, extensions=None, **kwargs):
-        if extensions is None:
-            extensions = ImageDatastore.supported_extensions
-        super().__init__(
-            root, extensions=extensions, **kwargs
-        )
+    def __init__(self, root, **kwargs):
+        if 'extensions' not in kwargs:
+            kwargs['extensions'] = ImageDatastore.supported_extensions
+        super().__init__(root, **kwargs)
             

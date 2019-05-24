@@ -1,84 +1,64 @@
 """
-Datastores that represent sparse collections of stacks.
+Datastores that use multiple files to composite a single data entry.
 """
 import logging
 import os
 import re
 
-import numpy as np
-
-from . import ImageDatastore
+from . import FileDatastore
 from .base import BufferedDatastore
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    'SparseStackImageDatastore',
-    'SparseTilesImageDatastore'
+    'FolderCollectionDatastore'
 ]
 
-class SparseStackImageDatastore(ImageDatastore, BufferedDatastore):
+
+class FolderCollectionDatastore(FileDatastore):
     """Each folder represents a stack."""
-    def __init__(self, root, read_func, **kwargs):
+    def __init__(self, root, folder_pattern='*', file_pattern='*',
+                 extensions=None, **kwargs):
         """
         :param str root: root folder path
-        :param read_func: read function for the actual file
         """
+        self._root = root
+
         stacks = next(os.walk(root))[1]
         stacks.sort()
         logger.debug("found {} stacks".format(len(stacks)))
         # add suffix
         stacks[:] = [os.path.join(root, fp) for fp in stacks]
 
-        self._raw_read_func = read_func
-
-        kwargs['sub_dir'] = True
-        ImageDatastore.__init__(
-            self,
-            root, read_func=self._load_to_buffer, **kwargs
-        )
-        BufferedDatastore.__init__(self)
-        self._root = root
+        # override, sub-dir scan is postponed
+        kwargs['sub_dir'] = False
+        kwargs['pattern'] = folder_pattern
+        kwargs['extensions'] = None
+        super().__init__(root, **kwargs)
         
-        # overwrite the original file list
-        self._inventory, self._raw_files = stacks, self._inventory
-
-        # update depth
-        self._nz = self._find_max_depth()
-
-    @property
-    def nz(self):
-        return self._nz
+        # expand the file list
+        for name, path in self._uri.items():
+            # treat each folder as a file datastore
+            fd = FileDatastore(
+                path, sub_dir=False,
+                pattern=file_pattern, extensions=extensions
+            )
+            # extract the detailed path
+            self._uri[name] = list(fd._uri.values())
 
     @property
     def root(self):
         return self._root
 
-    def _extract_depth(self, fn, pattern=r'.*_(\d{3,})\.'):
-        return int(re.search(pattern, fn).group(1))
 
-    def _find_max_depth(self):
-        """Determine depth by one of the stack."""
-        src_dir = self.files[0]
-        layers = [
-            self._extract_depth(fp)
-            for fp in filter(lambda x: x.startswith(src_dir), self._raw_files)
-        ]
-        return max(layers)-min(layers)+1
-
+class SparseTilesImageDatastore(FolderCollectionDatastore, BufferedDatastore):
     def _buffer_shape(self):
-        im = self._raw_read_func(self._raw_files[0])
-        (ny, nx), nz = im.shape, self.nz
+        pass
+    
+    def _deserialize_to_buffer(self, uri):
+        pass
 
-        return (nz, ny, nx), im.dtype
-
-    def _load_to_buffer(self, fn):
-        layers = list(filter(lambda x: x.startswith(fn), self._raw_files))
-        layers.sort()
-        for iz, fp in enumerate(layers):
-            self._buffer[iz, ...] = self._raw_read_func(fp)
-        return self._buffer
-
+'''
 class SparseTilesImageDatastore(SparseStackImageDatastore):
     """Each folder represents a tiled stack."""
     def __init__(self, root, read_func, tile_sz=None, **kwargs):
@@ -148,3 +128,4 @@ class SparseTilesImageDatastore(SparseStackImageDatastore):
                     #self._buffer[*sel] = im
 
                     break
+'''
