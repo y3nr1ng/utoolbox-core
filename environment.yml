@@ -11,9 +11,11 @@ dependencies:
     # build tools
     - bumpversion
     - twine
-    
+
     # linter
     - flake8
+    # formatter
+    - black
     
     # docs
     - sphinx
