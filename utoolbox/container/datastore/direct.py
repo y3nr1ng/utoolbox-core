@@ -11,15 +11,19 @@ from .error import InvalidDatastoreRootError
 
 logger = logging.getLogger(__name__)
 
-__all__ = [
-    'FileDatastore',
-    'ImageDatastore'
-]
+__all__ = ["FileDatastore", "ImageDatastore"]
 
 
 class FileDatastore(Datastore):
-    def __init__(self, root, sub_dir=False, pattern='*', extensions=None,
-                 create_new=True, **kwargs):
+    def __init__(
+        self,
+        root,
+        sub_dir=False,
+        pattern="*",
+        extensions=None,
+        create_new=True,
+        **kwargs
+    ):
         """
         :param str root: files or folders to include in the datastore
         :param bool sub_dir: scan nested folders
@@ -27,8 +31,8 @@ class FileDatastore(Datastore):
         :param str extensions: file extensions to include
         :param bool create_new: create datastore root if not exists
         """
-        if 'del_func' not in kwargs:
-            kwargs['del_func'] = os.unlink
+        if "del_func" not in kwargs:
+            kwargs["del_func"] = os.unlink
 
         super().__init__(**kwargs)
 
@@ -36,14 +40,12 @@ class FileDatastore(Datastore):
             if create_new:
                 os.mkdir(root)
             else:
-                raise InvalidDatastoreRootError(
-                    "unable to find \"{}\"".format(root)
-                )
+                raise InvalidDatastoreRootError('unable to find "{}"'.format(root))
         self._root = root
 
         if sub_dir:
             root = os.path.join(root, "**")
-        logger.debug("search under \"{}\"".format(root))
+        logger.debug('search under "{}"'.format(root))
 
         if extensions is None:
             extensions = [pattern]
@@ -73,15 +75,12 @@ class FileDatastore(Datastore):
         :param list(str) files: file list
         """
         # extract valid numbers from filenames
-        keys = [list(map(int, re.findall(r'[0-9]+', fn))) for fn in files]
+        keys = [list(map(int, re.findall(r"[0-9]+", fn))) for fn in files]
         # identify constant variables
-        flags = [
-            all(elem == elems[0] for elem in elems) 
-            for elems in zip(*keys)
-        ]
+        flags = [all(elem == elems[0] for elem in elems) for elems in zip(*keys)]
         # keep varying keys
         keys[:] = [[k for k, f in zip(key, flags) if not f] for key in keys]
-        
+
         # sort the file list based on extracted keys
         files[:] = [f for _, f in sorted(zip(keys, files))]
 
@@ -91,10 +90,10 @@ class FileDatastore(Datastore):
 
 
 class ImageDatastore(FileDatastore):
-    supported_extensions = ('tif', )
+    supported_extensions = ("tif",)
 
     def __init__(self, root, **kwargs):
-        if 'extensions' not in kwargs:
-            kwargs['extensions'] = ImageDatastore.supported_extensions
+        if "extensions" not in kwargs:
+            kwargs["extensions"] = ImageDatastore.supported_extensions
         super().__init__(root, **kwargs)
-            
+
