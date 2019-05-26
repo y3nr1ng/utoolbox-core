@@ -82,7 +82,7 @@ class SPIMDataset(MultiChannelDataset):
         return Settings(lines)
 
     def _find_channels(self):
-        return [channel.wavelength for channel in self.metadata.waveform.channels]
+        return [ch.wavelength for ch in self.metadata.waveform.channels]
 
     def _load_channel(self, channel):
         return ImageDatastore(
