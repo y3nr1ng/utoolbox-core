@@ -9,7 +9,9 @@ logger = logging.getLogger(__name__)
 
 
 class MicroManagerDataset(MultiChannelDataset):
-    """Representation of Micro-Manager dataset stored in sparse stack format."""
+    """
+    Representation of Micro-Manager dataset stored in sparse stack format.
+    """
 
     def __init__(self, root, tiled=True):
         """
