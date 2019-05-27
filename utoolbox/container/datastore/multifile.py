@@ -6,42 +6,32 @@ import os
 import re
 
 from . import FileDatastore
+from .direct import ImageDatastore
 from .base import BufferedDatastore
 
 logger = logging.getLogger(__name__)
 
-__all__ = [
-    'FolderCollectionDatastore'
-]
+__all__ = ["FolderCollectionDatastore", "VolumeTilesDatastore"]
 
 
 class FolderCollectionDatastore(FileDatastore):
     """Each folder represents a stack."""
-    def __init__(self, root, folder_pattern='*', file_pattern='*',
-                 extensions=None, **kwargs):
+
+    def __init__(
+        self, root, folder_pattern="*", file_pattern="*", extensions=None, **kwargs
+    ):
         """
         :param str root: root folder path
         """
-        self._root = root
-
-        stacks = next(os.walk(root))[1]
-        stacks.sort()
-        logger.debug("found {} stacks".format(len(stacks)))
-        # add suffix
-        stacks[:] = [os.path.join(root, fp) for fp in stacks]
-
         # override, sub-dir scan is postponed
-        kwargs['sub_dir'] = False
-        kwargs['pattern'] = folder_pattern
-        kwargs['extensions'] = None
+        kwargs.update({"sub_dir": False, "pattern": folder_pattern, "extensions": None})
         super().__init__(root, **kwargs)
-        
+
         # expand the file list
         for name, path in self._uri.items():
             # treat each folder as a file datastore
             fd = FileDatastore(
-                path, sub_dir=False,
-                pattern=file_pattern, extensions=extensions
+                path, sub_dir=False, pattern=file_pattern, extensions=extensions
             )
             # extract the detailed path
             self._uri[name] = list(fd._uri.values())
@@ -51,12 +41,52 @@ class FolderCollectionDatastore(FileDatastore):
         return self._root
 
 
-class SparseTilesImageDatastore(FolderCollectionDatastore, BufferedDatastore):
+class VolumeTilesDatastore(FolderCollectionDatastore, BufferedDatastore):
+    def __init__(self, *args, return_as="plane", tile_shape=None, **kwargs):
+        if ("read_func" not in kwargs) or (kwargs["read_func"] is None):
+            raise TypeError("read function must be provided to deduce buffer size")
+        super().__init__(*args, **kwargs)
+
+        self._return_as = return_as
+        self._tile_shape = tile_shape
+        if return_as == "stack":
+            # default scheme
+            pass
+        elif return_as in ("plane", "tiles"):
+            # axis swap
+            if tile_shape is None:
+                raise ValueError("unable to determine buffer size")
+
+            # an arbitrary stack to prime the new URI list
+            new_uri = {z: [] for z in range(len(next(iter(self._uri.values()))))}
+            # iterate over items to redistribute the paths
+            for paths in self._uri.values():
+                for z, path in enumerate(paths):
+                    # assuming the original path list is sorted
+                    new_uri[z].append(path)
+            self._uri = new_uri
+        else:
+            raise ValueError("unknown return format")
+
     def _buffer_shape(self):
-        pass
-    
+        # first layer of an arbitrary stack
+        paths = next(iter(self._uri.values()))
+        image = self._raw_read_func(paths[0])
+
+        if self._return_as == "stack":
+            shape = (len(paths),) + image.shape
+        elif self._return_as == "plane":
+            nty, ntx = self._tile_shape
+            ny, nx = image.shape
+            shape = (nty * ny, ntx * nx)
+        elif self._return_as == "tiles":
+            nty, ntx = self._tile_shape
+            shape = (ntx * nty,) + image.shape
+        return shape, image.dtype
+
     def _deserialize_to_buffer(self, uri):
         pass
+
 
 '''
 class SparseTilesImageDatastore(SparseStackImageDatastore):
