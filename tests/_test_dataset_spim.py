@@ -17,6 +17,8 @@ dataset = SPIMDataset("~/Documents/Sinica (Data)/Projects/Wen-Chen/20180807/cell
 
 pprint(dataset.metadata)
 
-for ch, data in dataset.keys():
+for ch, data in dataset.items():
     print(" << {} >>".format(ch))
-    pprint(list(data.items()))
+    pprint(list(data._uri.items())[:10])
+
+    break
