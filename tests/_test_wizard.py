@@ -2,7 +2,7 @@ import sys
 import PySide2
 from PySide2.QtWidgets import (
     QApplication, 
-    QLabel, QLineEdit, QHBoxLayout,
+    QButtonGroup, QComboBox, QHBoxLayout, QLabel, QLineEdit, QRadioButton, QVBoxLayout,
     QWizard, QWizardPage
 )
 
@@ -20,11 +20,27 @@ wizard.setPixmap(QWizard.BannerPixmap, "Banner.png")
 
 # CREATE PAGE 1, LINE EDIT, TITLES
 page1 = QWizardPage()
-page1.setTitle("Page 1 is best!")
-page1.setSubTitle("1111111111")
+page1.setTitle("Import dataset")
+page1.setSubTitle("Determine dataset format")
 lineEdit = QLineEdit()
-hLayout1 = QHBoxLayout(page1)
+button_group = QButtonGroup()
+button1 = QRadioButton("SPIM")
+button2 = QRadioButton("uManager")
+button3 = QRadioButton("Generic")
+button_group.addButton(button1)
+button_group.addButton(button2)
+button_group.addButton(button3)
+combo = QComboBox()
+combo.addItem("Image collection")
+combo.addItem("Volume tiles")
+hLayout1 = QVBoxLayout(page1)
 hLayout1.addWidget(lineEdit)
+hLayout1.addWidget(button3)
+hLayout1.addWidget(combo)
+hLayout1.addWidget(button1)
+hLayout1.addWidget(button2)
+
+
 
 page1.registerField("myField*", lineEdit, lineEdit.text(), "textChanged")
 
