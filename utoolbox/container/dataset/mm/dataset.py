@@ -55,4 +55,5 @@ class MicroManagerDataset(MultiChannelDataset):
         return self.metadata["ChNames"]
 
     def _load_channel(self, channel):
+        logger.debug("_load_channel={}".format(channel))
         pass
