@@ -114,13 +114,13 @@ class Settings(AttrDict):
         # NOTE exception, deal with multi-channel
         # TODO allow N/A filter
         ch_settings = re.findall(
-            r"^Excitation Filter, Laser, Power \(%\), Exp\(ms\) \((\d+)\) :\t(\D+)\t(\d+)\t(\d+)\t(\d+(?:\.\d+)?)",
+            r"^Excitation Filter, Laser, Power \(%\), Exp\(ms\) \((\d+)\) :\t([\w/]+)\t(\d+)\t(\d+)\t(\d+(?:\.\d+)?)",
             lines,
             re.MULTILINE,
         )
         # sort by channel id
         ch_settings.sort(key=lambda t: t[0])
-
+        
         ch_stacks = re.findall(r"^# of stacks \((\d+)\) :\t(\d+)", lines, re.MULTILINE)
         # sort by channel id
         ch_stacks.sort(key=lambda t: t[0])
