@@ -5,6 +5,8 @@ import logging
 import os
 import re
 
+import numpy as np
+
 from . import FileDatastore
 from .direct import ImageDatastore
 from .base import BufferedDatastore
@@ -42,50 +44,56 @@ class FolderCollectionDatastore(FileDatastore):
 
 
 class VolumeTilesDatastore(FolderCollectionDatastore, BufferedDatastore):
-    def __init__(self, *args, return_as="plane", tile_shape=None, **kwargs):
+    def __init__(self, *args, tile_shape=None, merge=True, **kwargs):
+        """
+        :param tile_shape: tile shape in 2D
+        :param bool merge: merge the tiles as one
+        """
         if ("read_func" not in kwargs) or (kwargs["read_func"] is None):
             raise TypeError("read function must be provided to deduce buffer size")
         super().__init__(*args, **kwargs)
 
-        self._return_as = return_as
-        self._tile_shape = tile_shape
-        if return_as == "stack":
-            # default scheme
-            pass
-        elif return_as in ("plane", "tiles"):
-            # axis swap
-            if tile_shape is None:
-                raise ValueError("unable to determine buffer size")
+        self._tile_shape, self._merge = tile_shape, merge
 
-            # an arbitrary stack to prime the new URI list
-            new_uri = {z: [] for z in range(len(next(iter(self._uri.values()))))}
-            # iterate over items to redistribute the paths
-            for paths in self._uri.values():
-                for z, path in enumerate(paths):
-                    # assuming the original path list is sorted
-                    new_uri[z].append(path)
-            self._uri = new_uri
-        else:
-            raise ValueError("unknown return format")
+        # an arbitrary stack to prime the new URI list
+        new_uri = {z: [] for z in range(len(next(iter(self._uri.values()))))}
+        # iterate over items to redistribute the paths
+        for paths in self._uri.values():
+            for z, path in enumerate(paths):
+                # assuming the original path list is sorted
+                new_uri[z].append(path)
+        self._uri = new_uri
 
     def _buffer_shape(self):
         # first layer of an arbitrary stack
         paths = next(iter(self._uri.values()))
         image = self._raw_read_func(paths[0])
 
-        if self._return_as == "stack":
-            shape = (len(paths),) + image.shape
-        elif self._return_as == "plane":
+        try:
             nty, ntx = self._tile_shape
+        except:
+            raise ValueError(
+                "unable to determine buffer size due to invalid tile shape"
+            )
+        if self._merge:
             ny, nx = image.shape
             shape = (nty * ny, ntx * nx)
-        elif self._return_as == "tiles":
-            nty, ntx = self._tile_shape
+        else:
             shape = (ntx * nty,) + image.shape
+
         return shape, image.dtype
 
-    def _deserialize_to_buffer(self, uri):
-        pass
+    def _deserialize_to_buffer(self, uri_list):
+        if self._merge:
+            it = np.unravel_index(list(range(len(uri_list))), self._tile_shape)
+            ny, nx = self._raw_read_func(uri_list[0]).shape
+            for (ity, itx), path in zip(it, uri_list):
+                im = self._raw_read_func(path)
+                self._buffer[ity * ny : (ity + 1) * ny, itx * nx : (itx + 1) * nx] = im
+        else:
+            np.concatenate(
+                [self._raw_read_func(path) for path in uri_list], out=self._buffer
+            )
 
 
 '''

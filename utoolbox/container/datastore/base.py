@@ -85,15 +85,20 @@ class Datastore(MutableMapping):
 
 
 class TransientDatastore(Datastore):
+    """Datastores that require explicit allocation and cleanup routines."""
+
     def __init__(self, **kwargs):
         super().__init__(*kwargs)
 
     def __enter__(self):
-        self._allocate_resources()
+        self.open()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
+
+    def open(self):
+        self._allocate_resources()
 
     def close(self):
         self._free_resources()
@@ -120,9 +125,11 @@ class BufferedDatastore(TransientDatastore):
         self._raw_read_func = read_func
         if read_func is not None:
             read_func = self._deserialize_to_buffer
+
         self._raw_write_func = write_func
         if write_func is not None:
             write_func = self._serialize_from_buffer
+
         super().__init__(read_func=read_func, write_func=write_func, **kwargs)
 
     @abstractmethod

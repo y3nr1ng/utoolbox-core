@@ -52,9 +52,9 @@ Direct access
     :members:
     :special-members:
     
-Sparse collection
-^^^^^^^^^^^^^^^^^
-.. automodule:: utoolbox.container.datastore.sparse
+Multifile
+^^^^^^^^^
+.. automodule:: utoolbox.container.datastore.multifile
     :members:
     :special-members:
 
