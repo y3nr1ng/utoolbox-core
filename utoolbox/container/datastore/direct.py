@@ -61,7 +61,9 @@ class FileDatastore(Datastore):
 
         # simple 1-1 mapping
         for path in files:
-            self._uri[os.path.basename(path)] = path
+            key = os.path.basename(path)
+            key, _ = os.path.splitext(key)
+            self._uri[key] = path
 
     @property
     def root(self):
