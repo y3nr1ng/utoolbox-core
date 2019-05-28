@@ -52,7 +52,7 @@ class FileDatastore(Datastore):
         else:
             extensions = ["{}.{}".format(pattern, ext) for ext in extensions]
         logger.debug("{} search patterns".format(len(extensions)))
-
+        
         files = []
         for ext in extensions:
             path = os.path.join(root, ext)
