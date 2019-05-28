@@ -1,13 +1,11 @@
-# pylint: disable=W1401
-
+from collections import OrderedDict
+import copy
 import logging
 import os
 import re
 
-from utoolbox.container import Datastore
-from .dataset import Dataset
 
-__all__ = ["Filename", "sort_by_timestamp"]
+__all__ = ["refactor_datastore_keys"]
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +26,7 @@ class Filename(object):
         r"stack(?P<stack>\d{4})_"
         r"(?P<wavelength>\d+)nm_"
         r"(?P<timestamp_rel>\d{7})msec_"
-        r"(?P<timestamp_abs>\d+)msecAbs"
-        r".tif{1,2}$"
+        r"(?P<timestamp_abs>\d+)msecAbs$"
     )
 
     def __init__(self, str_name):
@@ -42,47 +39,60 @@ class Filename(object):
             setattr(self, attr, value)
 
     def __str__(self):
-        return "{}_ch{}_stack{:04d}_{}nm_{:07d}msec_{:010d}msecAbs.tif".format(
+        return "{}_ch{}_stack{:04d}_{}nm_{:07d}msec_{:010d}msecAbs".format(
             *[getattr(self, attr) for attr in self.__slots__]
         )
 
 
-def _to_filename_objs(ds):
+def keys_to_filename_objs(keys):
     """
-    Convert a datastore file list to list of filename objects.
-
-    Parameter
-    ---------
-    ds : utoolbox.container.Datastore
-        Datastore to process.
+    Convert a datastore key list to list of filename objects.
     """
     filenames = []
-    for filename in ds.files:
-        basename = os.path.basename(filename)
+    for key in keys:
         try:
-            parsed = Filename(basename)
+            parsed = Filename(key)
             filenames.append(parsed)
         except:
             logger.warning('invalid format "{}", ignored'.format(basename))
     return filenames
 
 
-def _sort_datastore_by_timestamp(ds):
-    filename_objs = _to_filename_objs(ds)
-    ds.files = [
-        path
-        for _, path in sorted(
-            zip(filename_objs, ds.files),
-            key=lambda t: (t[0].channel, t[0].name, t[0].stack),
-        )
-    ]
+def merge_fragmented_timestamps(filenames):
+    """
+    Merge timestamps from consecutive acquisitions. The file sequence is 
+    assumed to be sorted accordingly!
+    """
+    ref_filename, name = None, None
+    for filename in filenames:
+        if ref_filename is None:
+            ref_filename, name = filename, filename.name
+        else:
+            filename.name = name
+            if ref_filename.channel == filename.channel:
+                # update rest of the info for same channel only
+                if filename.stack == 0:
+                    logger.debug("rewind")
+                filename.stack = ref_filename.stack + 1
+                assert (
+                    filename.timestamp_abs > ref_filename.timestamp_abs
+                ), "timestamp overflow occurred, no shit..."
+                filename.timestamp_rel = ref_filename.timestamp_rel + (
+                    filename.timestamp_abs - ref_filename.timestamp_abs
+                )
+            ref_filename = filename
 
 
-def sort_by_timestamp(source):
-    print(type(source))
-    if isinstance(source, Dataset):
-        # iterate over different channels
-        for datastore in source.datastore.values():
-            _sort_datastore_by_timestamp(datastore)
-    else:
-        _sort_datastore_by_timestamp(source)
+def refactor_datastore_keys(datastore):
+    old_fno = keys_to_filename_objs(datastore.keys())
+    old_fno.sort(key=lambda fno: (fno.channel, fno.name, fno.stack))
+
+    logger.info("refactoring {} entries".format(len(old_fno)))
+    new_fno = copy.deepcopy(old_fno)
+    merge_fragmented_timestamps(new_fno)
+
+    logger.info("remapping refactored keys")
+    new_uri = OrderedDict()
+    for new, old in zip(new_fno, old_fno):
+        new_uri[str(new)] = datastore[str(old)]
+    datastore._uri = new_uri
