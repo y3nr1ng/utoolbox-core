@@ -15,6 +15,8 @@ coloredlogs.install(
 
 dataset = SPIMDataset("~/Documents/Sinica (Data)/Projects/Wen-Chen/20180807/cell5")
 
+pprint(dataset.metadata)
+
 for ch, data in dataset.keys():
     print(" << {} >>".format(ch))
     pprint(list(data.items()))
