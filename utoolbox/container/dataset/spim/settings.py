@@ -45,10 +45,10 @@ class Settings(AttrDict):
                     "Waveform": Settings.parse_waveform,
                     "Camera": Settings.parse_camera,
                     "Advanced Timing": Settings.parse_timing,
-                    ".ini File": None,
+                    # ".ini File": None, # TODO analyze setup file
                 }[title](lines[start:end])
                 self[section] = parsed
-            except:
+            except KeyError:
                 logger.warning('unknown section "{}", ignored'.format(title))
 
     @property
@@ -69,14 +69,12 @@ class Settings(AttrDict):
     @staticmethod
     def parse_general(lines):
         patterns = {
-            "timestamp": r"^Date :\t(\d+/\d+/\d+ \d+:\d+:\d+ [A|P]M)",
+            "date": r"^Date :\t(\d+/\d+/\d+) .*",
+            "time": r"^Date :\t.* (\d+:\d+:\d+).*",
             "mode": r"^Acq Mode :\t(.*)",
         }
 
-        converter = {
-            "timestamp": lambda x: datetime.strptime(x, "%m/%d/%Y %I:%M:%S %p"),
-            "mode": AcquisitionMode,
-        }
+        converter = {"mode": AcquisitionMode}
 
         parsed = AttrDict()
         for field, pattern in patterns.items():
@@ -87,6 +85,12 @@ class Settings(AttrDict):
                 # no need to convert
                 pass
             parsed[field] = value
+
+        # merge timestamp
+        parsed["timestamp"] = datetime.strptime(
+            " ".join([parsed["date"], parsed["time"]]), "%Y/%m/%d %H:%M:%S"
+        )
+        del parsed["date"], parsed["time"]
 
         return "general", parsed
 
@@ -120,7 +124,7 @@ class Settings(AttrDict):
         )
         # sort by channel id
         ch_settings.sort(key=lambda t: t[0])
-        
+
         ch_stacks = re.findall(r"^# of stacks \((\d+)\) :\t(\d+)", lines, re.MULTILINE)
         # sort by channel id
         ch_stacks.sort(key=lambda t: t[0])
