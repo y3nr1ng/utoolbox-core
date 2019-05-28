@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 class SPIMDataset(MultiChannelDataset):
     """
-    Representation of an acquisition result from LatticeScope, containing
-    software setup and collected data.
+    Representation of an acquisition result from SPIM, containing software setup
+    and collected data.
     """
 
     SETTINGS_PATTERN = r"(?P<ds_name>.+)_Settings.txt$"
@@ -26,13 +26,9 @@ class SPIMDataset(MultiChannelDataset):
         :param str root: source directory of the dataset
         :param bool refactor: refactor filenames
         """
-        if not os.path.exists(root):
-            raise FileNotFoundError("invalid dataset root")
         super().__init__(root)
-
-    @property
-    def read_func(self):
-        return imageio.volread
+        if not os.path.exists(self.root):
+            raise FileNotFoundError("invalid dataset root")
 
     def _find_settings_file(self, extension="txt"):
         """
@@ -85,9 +81,11 @@ class SPIMDataset(MultiChannelDataset):
         return [ch.wavelength for ch in self.metadata.waveform.channels]
 
     def _load_channel(self, channel):
+        # NOTE
+        # `imageio.volread` can adapt for both 2D and 3D TIFF files.
         return ImageDatastore(
             self.root,
-            read_func=self.read_func,
+            read_func=imageio.volread,
             sub_dir=False,
             pattern="*_{}nm_*".format(channel),
         )

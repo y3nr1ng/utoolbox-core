@@ -1,15 +1,9 @@
 import logging
-from operator import attrgetter
 import os
 
 import tqdm
 
-from .utils import Filename, _to_filename_objs, sort_by_timestamp
-
-__all__ = [
-    'merge_fragmented_timestamps',
-    'rename_by_mapping'
-]
+__all__ = ["merge_fragmented_timestamps", "rename_by_mapping"]
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +16,16 @@ if refactor:
 
 # TODO create wrapper object for linked dataset
 
+
 def rename_by_mapping(root, old_filenames, new_filenames):
-    for old_fnobj, new_fnobj in tqdm(zip(old_filenames, new_filenames), total=len(new_filenames)):
+    for old_fnobj, new_fnobj in tqdm(
+        zip(old_filenames, new_filenames), total=len(new_filenames)
+    ):
         old_fnstr = os.path.join(root, str(old_fnobj))
         new_fnstr = os.path.join(root, str(new_fnobj))
         if old_fnstr != new_fnstr:
             os.rename(old_fnstr, new_fnstr)
+
 
 def merge_fragmented_timestamps(filenames, consolidate=False):
     """
@@ -51,8 +49,10 @@ def merge_fragmented_timestamps(filenames, consolidate=False):
                 if filename.stack == 0:
                     logger.debug("rewind")
                 filename.stack = ref_filename.stack + 1
-                assert filename.timestamp_abs > ref_filename.timestamp_abs, \
-                       "timestamp overflow occurred, no shit..."
-                filename.timestamp_rel = \
-                    ref_filename.timestamp_rel + (filename.timestamp_abs-ref_filename.timestamp_abs)
+                assert (
+                    filename.timestamp_abs > ref_filename.timestamp_abs
+                ), "timestamp overflow occurred, no shit..."
+                filename.timestamp_rel = ref_filename.timestamp_rel + (
+                    filename.timestamp_abs - ref_filename.timestamp_abs
+                )
             ref_filename = filename
