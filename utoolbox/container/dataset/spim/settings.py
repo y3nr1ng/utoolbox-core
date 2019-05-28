@@ -1,36 +1,37 @@
 from collections import namedtuple
-import configparser
 from datetime import datetime
 from enum import Enum
 import logging
-import os
 import re
 
 from utoolbox.container import AttrDict
 
 logger = logging.getLogger(__name__)
 
+
 class AcquisitionMode(Enum):
-    Z_STACK = 'Z stack'
-    SIM = 'SI Scan SLM comb'
+    Z_STACK = "Z stack"
+    SIM = "SI Scan SLM comb"
+
 
 class ScanType(Enum):
-    SAMPLE = 'Sample piezo'
-    OBJECTIVE = 'Z objective & galvo'
+    SAMPLE = "Sample piezo"
+    OBJECTIVE = "Z objective & galvo"
+
 
 class TriggerMode(Enum):
-    SLM = 'SLM -> Cam'
-    FPGA = 'FPGA'
+    SLM = "SLM -> Cam"
+    FPGA = "FPGA"
+
 
 Channel = namedtuple(
-    'Channel', 
-    ['id', 'filter', 'wavelength', 'power', 'exposure', 'stacks']
+    "Channel", ["id", "filter", "wavelength", "power", "exposure", "stacks"]
 )
+
 
 class Settings(AttrDict):
     section_pattern = re.compile(
-        r"^(?:\*{5}\s{1}){3}\s*(?P<title>[^\*]+)(?:\s{1}\*{5}){3}",
-        re.MULTILINE
+        r"^(?:\*{5}\s{1}){3}\s*(?P<title>[^\*]+)(?:\s{1}\*{5}){3}", re.MULTILINE
     )
 
     def __init__(self, lines):
@@ -40,15 +41,15 @@ class Settings(AttrDict):
         for title, start, end in sections:
             try:
                 section, parsed = {
-                    'General': Settings.parse_general,
-                    'Waveform': Settings.parse_waveform,
-                    'Camera': Settings.parse_camera,
-                    'Advanced Timing': Settings.parse_timing,
-                    '.ini File': None
+                    "General": Settings.parse_general,
+                    "Waveform": Settings.parse_waveform,
+                    "Camera": Settings.parse_camera,
+                    "Advanced Timing": Settings.parse_timing,
+                    ".ini File": None,
                 }[title](lines[start:end])
                 self[section] = parsed
             except:
-                logger.warning("unknown section \"{}\", ignored".format(title))
+                logger.warning('unknown section "{}", ignored'.format(title))
 
     @property
     def path(self):
@@ -59,24 +60,22 @@ class Settings(AttrDict):
         """Determine sections and their positions (line number) in file."""
         titles, starts, ends = [], [], None
         for match in Settings.section_pattern.finditer(lines):
-            titles.append(match.group('title').rstrip())
+            titles.append(match.group("title").rstrip())
             starts.append(match.start())
         ends = starts[1:] + [len(lines)]
 
-        return [
-            (s, i0, i1) for s, i0, i1 in zip(titles, starts, ends)
-        ]
+        return [(s, i0, i1) for s, i0, i1 in zip(titles, starts, ends)]
 
     @staticmethod
     def parse_general(lines):
         patterns = {
-            'timestamp': r"^Date :\t(\d+/\d+/\d+ \d+:\d+:\d+ [A|P]M)",
-            'mode': r"^Acq Mode :\t(.*)"
+            "timestamp": r"^Date :\t(\d+/\d+/\d+ \d+:\d+:\d+ [A|P]M)",
+            "mode": r"^Acq Mode :\t(.*)",
         }
 
         converter = {
-            'timestamp': lambda x: datetime.strptime(x, '%m/%d/%Y %I:%M:%S %p'),
-            'mode': AcquisitionMode
+            "timestamp": lambda x: datetime.strptime(x, "%m/%d/%Y %I:%M:%S %p"),
+            "mode": AcquisitionMode,
         }
 
         parsed = AttrDict()
@@ -89,21 +88,17 @@ class Settings(AttrDict):
                 pass
             parsed[field] = value
 
-        return 'general', parsed
+        return "general", parsed
 
     @staticmethod
     def parse_waveform(lines):
         patterns = {
-            'type': r"^Z motion :\t(.*)",
-            'obj_piezo_step':
-                r"^Z PZT .* Interval \(um\), .* :\t\d+\.*\d*\t(\d+\.*\d*)\t\d+$",
-            'sample_piezo_step':
-                r"^S PZT .* Interval \(um\), .* :\t\d+\.*\d*\t(\d+\.*\d*)\t\d+$",
+            "type": r"^Z motion :\t(.*)",
+            "obj_piezo_step": r"^Z PZT .* Interval \(um\), .* :\t\d+\.*\d*\t(\d+\.*\d*)\t\d+$",
+            "sample_piezo_step": r"^S PZT .* Interval \(um\), .* :\t\d+\.*\d*\t(\d+\.*\d*)\t\d+$",
         }
 
-        converter = {
-            'type': ScanType
-        }
+        converter = {"type": ScanType}
 
         parsed = AttrDict()
         for field, pattern in patterns.items():
@@ -117,26 +112,22 @@ class Settings(AttrDict):
             parsed[field] = value
 
         # NOTE exception, deal with multi-channel
-        #TODO allow N/A filter 
+        # TODO allow N/A filter
         ch_settings = re.findall(
             r"^Excitation Filter, Laser, Power \(%\), Exp\(ms\) \((\d+)\) :\t(\D+)\t(\d+)\t(\d+)\t(\d+(?:\.\d+)?)",
             lines,
-            re.MULTILINE
+            re.MULTILINE,
         )
         # sort by channel id
         ch_settings.sort(key=lambda t: t[0])
 
-        ch_stacks = re.findall(
-            r"^# of stacks \((\d+)\) :\t(\d+)",
-            lines,
-            re.MULTILINE
-        )
+        ch_stacks = re.findall(r"^# of stacks \((\d+)\) :\t(\d+)", lines, re.MULTILINE)
         # sort by channel id
         ch_stacks.sort(key=lambda t: t[0])
 
         # map number of stacks
         ch_settings[:] = [
-            settings + (n_stacks[1], )
+            settings + (n_stacks[1],)
             for settings, n_stacks in zip(ch_settings, ch_stacks)
         ]
 
@@ -146,23 +137,23 @@ class Settings(AttrDict):
             for id_, filter_, laser, power, exposure, stacks in ch_settings
         ]
 
-        parsed['channels'] = [Channel(*value) for value in ch_settings]
+        parsed["channels"] = [Channel(*value) for value in ch_settings]
 
-        return 'waveform', parsed
+        return "waveform", parsed
 
     @staticmethod
     def parse_camera(lines):
         patterns = {
-            'model': r"^Model :\t(.*)",
-            'exposure': r"^Exp\(s\)\D+([\d\.]+)",
-            'cycle': r"^Cycle\(s\)\D+([\d\.]+)",
-            'roi': r"^ROI :\tLeft=(\d+) Top=(\d+) Right=(\d+) Bot=(\d+)"
+            "model": r"^Model :\t(.*)",
+            "exposure": r"^Exp\(s\)\D+([\d\.]+)",
+            "cycle": r"^Cycle\(s\)\D+([\d\.]+)",
+            "roi": r"^ROI :\tLeft=(\d+) Top=(\d+) Right=(\d+) Bot=(\d+)",
         }
 
         converter = {
-            'exposure': lambda x: float(x),
-            'cycle': lambda x: float(x),
-            'roi': lambda x: tuple([int(i) for i in x])
+            "exposure": lambda x: float(x),
+            "cycle": lambda x: float(x),
+            "roi": lambda x: tuple([int(i) for i in x]),
         }
 
         parsed = AttrDict()
@@ -175,17 +166,13 @@ class Settings(AttrDict):
                 pass
             parsed[field] = value
 
-        return 'camera', parsed
+        return "camera", parsed
 
     @staticmethod
     def parse_timing(lines):
-        patterns = {
-            'mode': r"^Trigger Mode :\t(.*)"
-        }
+        patterns = {"mode": r"^Trigger Mode :\t(.*)"}
 
-        converter = {
-            'mode': TriggerMode
-        }
+        converter = {"mode": TriggerMode}
 
         parsed = AttrDict()
         for field, pattern in patterns.items():
@@ -197,7 +184,8 @@ class Settings(AttrDict):
                 pass
             parsed[field] = value
 
-        return 'timing', parsed
+        return "timing", parsed
+
 
 class HardwareSettings(object):
     def __init__(self, lines):

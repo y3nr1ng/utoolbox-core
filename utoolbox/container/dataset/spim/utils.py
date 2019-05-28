@@ -7,16 +7,19 @@ import re
 from utoolbox.container import Datastore
 from .dataset import Dataset
 
-__all__ = [
-    'Filename',
-    'sort_by_timestamp'
-]
+__all__ = ["Filename", "sort_by_timestamp"]
 
 logger = logging.getLogger(__name__)
 
+
 class Filename(object):
     __slots__ = (
-        'name', 'channel', 'stack', 'wavelength', 'timestamp_rel', 'timestamp_abs'
+        "name",
+        "channel",
+        "stack",
+        "wavelength",
+        "timestamp_rel",
+        "timestamp_abs",
     )
 
     _pattern = re.compile(
@@ -35,12 +38,14 @@ class Filename(object):
             raise ValueError
         for attr in self.__slots__:
             value = parsed_name.group(attr)
-            value = value if attr == 'name' else int(value)
+            value = value if attr == "name" else int(value)
             setattr(self, attr, value)
 
     def __str__(self):
-        return "{}_ch{}_stack{:04d}_{}nm_{:07d}msec_{:010d}msecAbs.tif" \
-               .format(*[getattr(self, attr) for attr in self.__slots__])
+        return "{}_ch{}_stack{:04d}_{}nm_{:07d}msec_{:010d}msecAbs.tif".format(
+            *[getattr(self, attr) for attr in self.__slots__]
+        )
+
 
 def _to_filename_objs(ds):
     """
@@ -58,18 +63,21 @@ def _to_filename_objs(ds):
             parsed = Filename(basename)
             filenames.append(parsed)
         except:
-            logger.warning("invalid format \"{}\", ignored".format(basename))
+            logger.warning('invalid format "{}", ignored'.format(basename))
     return filenames
+
 
 def _sort_datastore_by_timestamp(ds):
     filename_objs = _to_filename_objs(ds)
     ds.files = [
-        path for _, path in sorted(
-            zip(filename_objs, ds.files), 
-            key=lambda t: (t[0].channel, t[0].name, t[0].stack)
+        path
+        for _, path in sorted(
+            zip(filename_objs, ds.files),
+            key=lambda t: (t[0].channel, t[0].name, t[0].stack),
         )
     ]
-    
+
+
 def sort_by_timestamp(source):
     print(type(source))
     if isinstance(source, Dataset):
