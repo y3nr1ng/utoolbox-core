@@ -70,6 +70,7 @@ setup(
         # file io
         'imageio',
         'tifffile',
+        'ffmpeg-python',
 
         # gui
         'PySide2', 
