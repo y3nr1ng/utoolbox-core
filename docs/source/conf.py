@@ -24,9 +24,9 @@ copyright = '2019, Liu, Yen-Ting'
 author = 'Liu, Yen-Ting'
 
 # The short X.Y version
-version = '0.1.7.dev'
+version = '0.2.0.dev'
 # The full version, including alpha/beta/rc tags
-release = '0.1.7.dev'
+release = '0.2.0.dev'
 
 
 # -- General configuration ---------------------------------------------------
@@ -45,6 +45,7 @@ extensions = [
     'sphinx.ext.ifconfig',
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
+    'sphinx.ext.napoleon'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -188,3 +189,16 @@ intersphinx_mapping = {'https://docs.python.org/': None}
 
 # -- Options for autodoc extension -------------------------------------------
 autodoc_member_order = 'groupwise'
+
+# -- Options for sphinx.ext.napoleon extension -------------------------------
+napoleon_google_docstring = True
+napoleon_numpy_docstring = False
+napoleon_include_init_with_doc = False
+napoleon_include_private_with_doc = False
+napoleon_include_special_with_doc = True
+napoleon_use_admonition_for_examples = False
+napoleon_use_admonition_for_notes = False
+napoleon_use_admonition_for_references = False
+napoleon_use_ivar = False
+napoleon_use_param = True
+napoleon_use_rtype = True

@@ -3,3 +3,14 @@ requires = [
     'setuptools',
     'wheel'
 ]
+
+[tool.black]
+line-length = 88
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | build
+  | dist
+)/
+'''

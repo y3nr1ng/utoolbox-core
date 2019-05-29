@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from collections.abc import Mapping
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +11,7 @@ class Dataset(Mapping):
         """
         :param str root: source of the dataset, flat layout
         """
-        self._root = root
+        self._root = os.path.abspath(os.path.expanduser(root))
         self._metadata = self._load_metadata()
         self._datastore = self._load_datastore()
 
