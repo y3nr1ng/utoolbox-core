@@ -7,16 +7,21 @@ import imageio
 
 from utoolbox.container import ImageDatastore
 from ..base import MultiChannelDataset
-from .error import MultipleSettingsError, SettingsNotFoundError
+from .error import (
+    MultipleSettingsError,
+    SettingsNotFoundError,
+    MissingFilenameComponentError,
+)
 from .settings import Settings
+from .utils import refactor_datastore_keys
 
 logger = logging.getLogger(__name__)
 
 
 class SPIMDataset(MultiChannelDataset):
     """
-    Representation of an acquisition result from LatticeScope, containing
-    software setup and collected data.
+    Representation of an acquisition result from SPIM, containing software setup
+    and collected data.
     """
 
     SETTINGS_PATTERN = r"(?P<ds_name>.+)_Settings.txt$"
@@ -26,13 +31,11 @@ class SPIMDataset(MultiChannelDataset):
         :param str root: source directory of the dataset
         :param bool refactor: refactor filenames
         """
-        if not os.path.exists(root):
-            raise FileNotFoundError("invalid dataset root")
-        super().__init__(root)
+        self._refactor = refactor
 
-    @property
-    def read_func(self):
-        return imageio.volread
+        super().__init__(root)
+        if not os.path.exists(self.root):
+            raise FileNotFoundError("invalid dataset root")
 
     def _find_settings_file(self, extension="txt"):
         """
@@ -74,6 +77,7 @@ class SPIMDataset(MultiChannelDataset):
             return ds_names[0][1]
 
     def _load_metadata(self):
+        # TODO process all settings and compare for differences
         settings_file = self._find_settings_file()
         logger.debug('settings file "{}"'.format(settings_file))
         # NOTE some files have corrupted timestamp causing utf-8 decode error
@@ -82,12 +86,18 @@ class SPIMDataset(MultiChannelDataset):
         return Settings(lines)
 
     def _find_channels(self):
-        return [ch.wavelength for ch in self.metadata.waveform.channels]
+        return [ch.id for ch in self.metadata.waveform.channels]
 
     def _load_channel(self, channel):
-        return ImageDatastore(
+        # NOTE
+        # `imageio.volread` can adapt for both 2D and 3D TIFF files.
+        ds = ImageDatastore(
             self.root,
-            read_func=self.read_func,
+            read_func=imageio.volread,
             sub_dir=False,
-            pattern="*_{}nm_*".format(channel),
+            pattern="*_ch{}_*".format(channel),
         )
+
+        if self._refactor:
+            refactor_datastore_keys(ds)
+        return ds

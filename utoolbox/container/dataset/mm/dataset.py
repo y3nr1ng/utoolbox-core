@@ -56,4 +56,4 @@ class MicroManagerDataset(MultiChannelDataset):
 
     def _load_channel(self, channel):
         logger.debug("_load_channel={}".format(channel))
-        pass
+        raise NotImplementedError()
