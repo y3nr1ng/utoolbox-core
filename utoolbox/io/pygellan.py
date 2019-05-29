@@ -1,5 +1,5 @@
 """
-Library for reading multiresolution micro-magellan
+Library for reading multiresolution micro-magellan.
 """
 import os
 import mmap
@@ -8,9 +8,14 @@ import sys
 import json
 
 
-class MagellanMultipageTiffReader:
-    # Class corresponsing to a single multipage tiff file in a Micro-Magellan dataset. Pass the full path of the TIFF to
-    # instantiate and call close() when finished
+class MagellanMultipageTiffReader():
+    """
+    Class representing a single multipage tiff file in a Micro-Magellan 
+    dataset. 
+    
+    Pass the full path of the TIFF to instantiate and call `close` when 
+    finished.
+    """
     # TIFF constants
     WIDTH = 256
     HEIGHT = 257
@@ -36,7 +41,8 @@ class MagellanMultipageTiffReader:
         self.file = open(tiff_path, 'r+b')
         # memory map the entire file
         self.mmap_file = mmap.mmap(self.file.fileno(), 0)
-        self.summary_md, self.index_tree, self.first_ifd_offset = self._read_header()
+        self.summary_md, self.index_tree, self.first_ifd_offset = \
+            self._read_header()
         # get important metadata fields
         self.width = self.summary_md['Width']
         self.height = self.summary_md['Height']
@@ -47,8 +53,8 @@ class MagellanMultipageTiffReader:
 
     def _read_header(self):
         """
-        :param file:
-        :return: dictionary with summary metadata, nested dictionary of byte offsets of TIFF Image File Directories with
+        :return: dictionary with summary metadata, nested dictionary of byte 
+        offsets of TIFF Image File Directories with
         keys [channel_index][z_index][frame_index][position_index], int byte offset of first image IFD
         """
         # read standard tiff header

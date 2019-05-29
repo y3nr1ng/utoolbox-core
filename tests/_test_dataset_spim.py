@@ -1,3 +1,4 @@
+import logging
 import os
 from pprint import pprint
 
@@ -5,27 +6,16 @@ import coloredlogs
 
 from utoolbox.container.dataset import SPIMDataset
 
+logging.getLogger("tifffile").setLevel(logging.ERROR)
 coloredlogs.install(
-    level='DEBUG',
-    fmt='%(asctime)s %(module)s[%(process)d] %(levelname)s %(message)s',
-    datefmt='%H:%M:%S'
+    level="DEBUG", fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
 )
 
-test_dir = os.path.dirname(os.path.realpath(__file__))
-path = os.path.join(test_dir, "../data/20170112_RFiSHp2aLFCYC/raw")
+dataset = SPIMDataset("~/Documents/Sinica (Data)/Projects/Wen-Chen/20180807/cell5")
 
-dataset = SPIMDataset(path)
-pprint(dataset.metadata.waveform.channels)
+pprint(dataset.metadata)
 
 for ch, data in dataset.items():
     print(" << {} >>".format(ch))
-    pprint(list(data.items()))
-
-"""
-##### SORT #####
-sort_by_timestamp(ds)
-pprint(ds.datastore)
-for k, v in ds.datastore.items():
-    print(" << {} >>".format(k))
-    pprint(v.files)
-"""
+    for i, array in enumerate(list(data._uri.values())[:5]):
+        print("[{}], {}, {}".format(i, array.shape, array.dtype))
