@@ -6,7 +6,7 @@ formats:
 
 python:
     version: 3
-    install: [].
+    install: []
     system_packages: true
 
 conda:
