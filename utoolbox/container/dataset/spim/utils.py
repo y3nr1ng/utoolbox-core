@@ -86,8 +86,8 @@ def merge_fragmented_timestamps(filenames):
 def refactor_datastore_keys(datastore):
     old_fno = keys_to_filename_objs(datastore.keys())
     old_fno.sort(key=lambda fno: (fno.channel, fno.name, fno.stack))
-
-    logger.info("refactoring {} entries".format(len(old_fno)))
+    logger.info("found {} entries to refactor".format(len(old_fno)))
+    
     new_fno = copy.deepcopy(old_fno)
     merge_fragmented_timestamps(new_fno)
 
