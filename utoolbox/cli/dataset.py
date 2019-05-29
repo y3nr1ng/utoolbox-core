@@ -9,7 +9,6 @@ import coloredlogs
 import ffmpeg
 import imageio
 
-logging.getLogger("tifffile").setLevel(logging.ERROR)
 import numpy as np
 
 import utoolbox.container.dataset as dataset
@@ -18,6 +17,7 @@ import utoolbox.container.dataset.spim.error as spim_error
 import utoolbox.container.datastore as datastore
 from utoolbox.transform.projections import Orthogonal
 
+logging.getLogger("tifffile").setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
 
 
@@ -54,7 +54,7 @@ def analyze(ctx, root):
         raise RuntimeError("unable to determine dataset flavor")
 
     ds = _try_dataset_flavors(root)
-
+    print(ds.metadata)
 
 @main.command("preview", short_help="generate preview")
 @click.argument("root", type=click.Path(exists=True))
