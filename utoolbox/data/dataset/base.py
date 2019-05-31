@@ -5,12 +5,20 @@ import os
 
 logger = logging.getLogger(__name__)
 
+__all__ = ["Dataset", "MultiChannelDataset"]
+
 
 class Dataset(Mapping):
+    """
+    Dataset base class.
+
+    Parameters
+    ----------
+    root : str
+        Source of the dataset.
+    """
+
     def __init__(self, root):
-        """
-        :param str root: source of the dataset, flat layout
-        """
         self._root = os.path.abspath(os.path.expanduser(root))
         self._metadata = self._load_metadata()
         self._datastore = self._load_datastore()
@@ -26,10 +34,12 @@ class Dataset(Mapping):
 
     @property
     def metadata(self):
+        """Extracted metadata of this dataset."""
         return self._metadata
 
     @property
     def root(self):
+        """Root of the dataset, need not to be a file object."""
         return self._root
 
     def to_hdf(self, dst_root=None, virtual=True):
@@ -37,6 +47,7 @@ class Dataset(Mapping):
 
     @abstractmethod
     def _load_datastore(self):
+        """Load actual data as datastore object."""
         raise NotImplementedError
 
     def _load_metadata(self):
@@ -44,6 +55,15 @@ class Dataset(Mapping):
 
 
 class MultiChannelDataset(Dataset):
+    """
+    Dataset with multi-color channels.
+
+    Parameters
+    ----------
+    root : str
+        Source of the dataset.
+    """
+
     def __init__(self, root):
         super().__init__(root)
 
@@ -62,7 +82,4 @@ class MultiChannelDataset(Dataset):
         """Override for multi-channel setup."""
         channels = self._find_channels()
         logger.info("{} channel(s)".format(len(channels)))
-        return {
-            channel: self._load_channel(channel)
-            for channel in channels
-        }
+        return {channel: self._load_channel(channel) for channel in channels}
