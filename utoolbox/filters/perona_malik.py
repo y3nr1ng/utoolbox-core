@@ -10,7 +10,7 @@ import os
 import cupy as cp
 import numpy as np
 
-from utoolbox.container import RawKernelFile
+from utoolbox.parallel import RawKernelFile
 
 logger = logging.getLogger(__name__)
 
