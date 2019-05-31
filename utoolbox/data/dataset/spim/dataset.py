@@ -7,11 +7,7 @@ import imageio
 
 from utoolbox.container import ImageDatastore
 from ..base import MultiChannelDataset
-from .error import (
-    MultipleSettingsError,
-    SettingsNotFoundError,
-    MissingFilenameComponentError,
-)
+from .error import MultipleSettingsError, SettingsNotFoundError
 from .settings import Settings
 from .utils import refactor_datastore_keys
 
