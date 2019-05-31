@@ -5,7 +5,7 @@ Transform
 
 
 Projections
----------
+-----------
 .. automodule:: utoolbox.transform.projections
     :members:
     :private-members:

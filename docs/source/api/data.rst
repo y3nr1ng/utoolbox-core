@@ -13,18 +13,15 @@ Base class
 .. automodule:: utoolbox.data.dataset.base 
     :members:
     :private-members:
-    :special-members:
 
 SPIM
 ^^^^
-.. automodule:: utoolbox.data.dataset.spim
+.. automodule:: utoolbox.data.dataset.spim.dataset
     :members:
-    :private-members:
-    :special-members:
 
 Micro-Manager
 ^^^^^^^^^^^^^
-.. automodule:: utoolbox.data.dataset.mm
+.. automodule:: utoolbox.data.dataset.mm.dataset
     :members:
     :private-members:
     :special-members:
