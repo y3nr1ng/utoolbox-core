@@ -2,13 +2,10 @@
 Datastores that use multiple files to composite a single data entry.
 """
 import logging
-import os
-import re
 
 import numpy as np
 
-from . import FileDatastore
-from .direct import ImageDatastore
+from .direct import FileDatastore
 from .base import BufferedDatastore
 
 logger = logging.getLogger(__name__)

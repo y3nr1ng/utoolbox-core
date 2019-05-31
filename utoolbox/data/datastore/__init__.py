@@ -5,5 +5,4 @@ Datastore is a respository for collections of data that may be too large to fit 
     Datastore imitates and expands upon the MATLAB equivalent.
 """
 from .direct import *
-from .hdf5 import *
 from .multifile import *
