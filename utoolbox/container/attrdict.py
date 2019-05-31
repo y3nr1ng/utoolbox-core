@@ -1,6 +1,6 @@
-import abc
 from collections import OrderedDict
 import re
+
 
 class AttrDict(OrderedDict):
     """
@@ -12,17 +12,19 @@ class AttrDict(OrderedDict):
     ---------
     imageio.core.util.Dict
     """
+
     __reserved_names__ = dir(OrderedDict())
     __pure_names__ = dir(dict())
 
     def __getattribute__(self, key):
         try:
             return object.__getattribute__(self, key)
-        except AttributeError:
-            if key in self:
+        except AttributeError as err:
+            try:
                 return self[key]
-            else:
-                raise
+            except KeyError:
+                # override by original error
+                raise err
 
     def __setattr__(self, key, val):
         if key in AttrDict.__reserved_names__:
@@ -30,15 +32,12 @@ class AttrDict(OrderedDict):
                 return OrderedDict.__setattr__(self, key, val)
             else:
                 raise AttributeError(
-                    "reserved name can only be set via dictionary interface" \
-                    .format(key)
+                    "reserved name can only be set via dictionary interface".format(key)
                 )
         else:
             self[key] = val
 
     def __dir__(self):
-        is_identifier = lambda x: bool(re.match(r'[a-z_]\w*$', x, re.I))
-        names = [
-            k for k in self.keys() if isinstance(k, str) and is_identifier(k)
-        ]
+        is_identifier = lambda x: bool(re.match(r"[a-z_]\w*$", x, re.I))
+        names = [k for k in self.keys() if isinstance(k, str) and is_identifier(k)]
         return AttrDict.__reserved_names__ + names
