@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 TILE_WIDTH = 16
 
 cu_file = os.path.join(os.path.dirname(__file__), "rmlp2.cu")
-
 with open(cu_file, "r") as fd:
     template = Template(fd.read())
     source = template.render(tile_width=TILE_WIDTH)
