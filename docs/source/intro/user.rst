@@ -14,7 +14,7 @@ Some of the codes require CUDA dependency, please download the binary release fr
 
 Quick start
 -----------
-Create an empty workspace named `demo`, if you have your preferred environment, feel free to skip to next part.
+Create an empty workspace named `demo`, if you have your preferred environment, feel free to skip the following two lines.
 
 .. code-block:: none
 
@@ -36,6 +36,7 @@ or try out pre-release by
 
 .. _uToolbox: https://pypi.org/project/utoolbox/
 
+Congratz! You can now try out stuff in the guides section.
 
 Frequently Asked Questions
 ==========================
