@@ -24,7 +24,6 @@ Micro-Manager
 .. automodule:: utoolbox.data.dataset.mm.dataset
     :members:
     :private-members:
-    :special-members:
 
 
 Datastore 
@@ -41,7 +40,6 @@ Direct access
 ^^^^^^^^^^^^^
 .. automodule:: utoolbox.data.datastore.direct
     :members:
-    :special-members:
     
 Multifile
 ^^^^^^^^^
