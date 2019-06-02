@@ -11,13 +11,13 @@ logger = logging.getLogger(__name__)
 class MicroManagerDataset(MultiChannelDataset):
     """
     Representation of Micro-Manager dataset stored in sparse stack format.
+
+    Args:
+        root (str): Source directory of the dataset.
+        tiled (bool, optional): Dataset contains multiple tiles.
     """
 
     def __init__(self, root, tiled=True):
-        """
-        :param str root: source directory of the dataset
-        :param bool tiled: dataset contains multiple tiles
-        """
         if not os.path.exists(root):
             raise FileNotFoundError("invalid dataset root")
         self._tiled = tiled
@@ -25,7 +25,7 @@ class MicroManagerDataset(MultiChannelDataset):
 
     @property
     def tiled(self):
-        """Whether dataset is composed of multiple tiles."""
+        """bool: Dataset contains mulitple tiles."""
         return self._tiled
 
     def _load_metadata(self):
