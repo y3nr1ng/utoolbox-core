@@ -1,4 +1,3 @@
-# pylint: disable=E1101
 import logging
 import numpy as np
 import pycuda.driver as cuda
@@ -6,11 +5,10 @@ from pycuda.elementwise import ElementwiseKernel
 
 from utoolbox.container import AbstractAlgorithm, ImplTypes, interface
 
-__all__ = [
-    'RescaleIntensity'
-]
+__all__ = ["RescaleIntensity"]
 
 logger = logging.getLogger(__name__)
+
 
 class RescaleIntensity(metaclass=AbstractAlgorithm):
     def __call__(self, image, in_range=None, out_range=None):
@@ -20,7 +18,7 @@ class RescaleIntensity(metaclass=AbstractAlgorithm):
         imin, imax = self._intensity_range(image, in_range)
         if out_range is None:
             out_range = dtype
-        omin, omax = self._intensity_range(image, out_range, clip=(imin>=0))
+        omin, omax = self._intensity_range(image, out_range, clip=(imin >= 0))
         logger.debug("in={}, out={}".format((imin, imax), (omin, omax)))
 
         image = self._scale_by_range(image, (imin, imax), (omin, omax), dtype)
@@ -41,15 +39,15 @@ class RescaleIntensity(metaclass=AbstractAlgorithm):
         elif np.issubdtype(range_values, np.integer):
             imin, imax = np.iinfo(range_values).min, np.iinfo(range_values).max
         elif np.issubdtype(range_values, np.inexact):
-            imin, imax = -1., 1.
+            imin, imax = -1.0, 1.0
         else:
             raise TypeError("unknown range definition")
-        
+
         if clip:
             imin = 0
 
         return imin, imax
-    
+
     @interface
     def _scale_by_range(self, image, in_range, out_range, dtype):
         pass
@@ -57,6 +55,7 @@ class RescaleIntensity(metaclass=AbstractAlgorithm):
     @interface
     def _download(self, image):
         return image
+
 
 class RescaleIntensity_CPU(RescaleIntensity):
     _strategy = ImplTypes.CPU_ONLY
@@ -76,6 +75,7 @@ class RescaleIntensity_CPU(RescaleIntensity):
     def _download(self, image):
         return image
 
+
 class RescaleIntensity_GPU(RescaleIntensity):
     _strategy = ImplTypes.GPU
 
@@ -89,14 +89,14 @@ class RescaleIntensity_GPU(RescaleIntensity):
         )
         image_g[:] = image_h
         return image_g
-    
+
     def _scale_by_range(self, image, in_range, out_range, dtype):
         imin, imax = in_range
         omin, omax = out_range
 
         rescale = ElementwiseKernel(
             "float *dst, float *src, float imin, float imax, float omin, float omax",
-            "dst[i] = (((src[i] < imin) ? imin : (src[i] > imax) ? imax : src[i])-imin)/(imax-imin)"
+            "dst[i] = (((src[i] < imin) ? imin : (src[i] > imax) ? imax : src[i])-imin)/(imax-imin)",
         )
         rescale(image, image, imin, imax, omin, omax)
 
