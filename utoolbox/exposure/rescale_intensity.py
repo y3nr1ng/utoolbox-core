@@ -1,109 +1,122 @@
 import logging
-import numpy as np
-import pycuda.driver as cuda
-from pycuda.elementwise import ElementwiseKernel
 
-from utoolbox.container import AbstractAlgorithm, ImplTypes, interface
+import cupy as cp
+import numpy as np
 
 __all__ = ["RescaleIntensity"]
 
 logger = logging.getLogger(__name__)
 
 
-class RescaleIntensity(metaclass=AbstractAlgorithm):
-    def __call__(self, image, in_range=None, out_range=None):
-        dtype = image.dtype
-        image = self._upload(image)
+class RescaleIntensity(object):
+    """
+    Return image after stretching or shrinking its intensity levels. The algorithm is 
+    based on the implementation in `skimage`_.
 
-        imin, imax = self._intensity_range(image, in_range)
-        if out_range is None:
-            out_range = dtype
-        omin, omax = self._intensity_range(image, out_range, clip=(imin >= 0))
-        logger.debug("in={}, out={}".format((imin, imax), (omin, omax)))
+    .. _skimage: 
+        https://scikit-image.org/docs/dev/api/skimage.exposure.html
+    """
 
-        image = self._scale_by_range(image, (imin, imax), (omin, omax), dtype)
-        image = self._download(image)
+    def __call__(self, data, in_range="image", out_range="dtype"):
+        on_device, dtype = isinstance(data, cp.ndarray), data.dtype
+        data = cp.asarray(data)
 
-        return image.astype(dtype)
+        im, iM = RescaleIntensity.as_min_max(data, in_range)
+        om, oM = RescaleIntensity.as_min_max(data, out_range, clip_neg=(im >= 0))
 
-    @interface
-    def _upload(self, image):
-        """Upload data to processing unit."""
-        pass
+        data = data.clip(im, iM)
 
-    def _intensity_range(self, image, range_values=None, clip=False):
-        if range_values is None:
-            imin, imax = image.min(), image.max()
-        elif isinstance(range_values, tuple):
-            imin, imax = range_values
-        elif np.issubdtype(range_values, np.integer):
-            imin, imax = np.iinfo(range_values).min, np.iinfo(range_values).max
-        elif np.issubdtype(range_values, np.inexact):
-            imin, imax = -1.0, 1.0
+        @cp.fuse
+        def _normalize(data, m, M):
+            return (data - m) / (M - m)
+
+        data = _normalize(data, im, iM)
+
+        @cp.fuse
+        def _scale_to_range(data, m, M):
+            return data * (M - m) + m
+
+        data = _scale_to_range(data, om, oM)
+
+        data = data if on_device else cp.asnumpy(data)
+        return data.astype(dtype)
+
+    @staticmethod
+    def as_min_max(data, range_value, clip_neg=False):
+        """
+        Return intensity range based based on desired value type.
+
+        Args:
+            data (np.ndarray): Input data.
+            range_value (str/np.dtype/(float, float)): The image range is configured by 
+                this parameter.
+            clip_neg (bool, optional): If True, clip the negative range. 
+        
+        Returns:
+            :rtype: (float, float)
+
+        Raises:
+            TypeError: If this function cannot resolve the intensity range pair.
+        """
+        if range_value == "image":
+            m, M = data.min(), data.max()
+            m, M = m.astype(cp.float32), M.astype(cp.float32)
+        elif range_value == "dtype":
+            dtype = np.dtype(data.dtype).type
+            if issubclass(dtype, np.integer):
+                info = np.iinfo(dtype)
+                m, M = info.min, info.max
+            elif issubclass(dtype, np.floating):
+                m, M = -1.0, 1.0
+            else:
+                raise TypeError("unknown data type")
+            m = 0 if clip_neg else m
+            m, M = cp.float32(m), cp.float32(M)
         else:
-            raise TypeError("unknown range definition")
-
-        if clip:
-            imin = 0
-
-        return imin, imax
-
-    @interface
-    def _scale_by_range(self, image, in_range, out_range, dtype):
-        pass
-
-    @interface
-    def _download(self, image):
-        return image
+            # force extraction tuple
+            m, M = range_value
+            m, M = cp.float32(m), cp.float32(M)
+        # guarantee they are floats
+        return m, M
 
 
-class RescaleIntensity_CPU(RescaleIntensity):
-    _strategy = ImplTypes.CPU_ONLY
+if __name__ == "__main__":
+    rescale_intensity = RescaleIntensity()
+    arr = cp.array([51, 102, 153], dtype=np.uint8)
+    print(arr)
+    print(type(arr))
+    out = rescale_intensity(arr)
+    print(out)
+    print(type(out))
+    print()
 
-    def _upload(self, image):
-        return image
+    arr = 1.0 * arr
+    print(arr)
+    print(type(arr))
+    out = rescale_intensity(arr)
+    print(out)
+    print(type(out))
+    print()
 
-    def _scale_by_range(self, image, in_range, out_range, dtype):
-        imin, imax = in_range
-        omin, omax = out_range
+    print(arr)
+    print(type(arr))
+    out = rescale_intensity(arr, in_range=(0, 255))
+    print(out)
+    print(type(out))
+    print()
 
-        image = np.clip(image, imin, imax)
+    print(arr)
+    print(type(arr))
+    out = rescale_intensity(arr, in_range=(0, 102))
+    print(out)
+    print(type(out))
+    print()
 
-        image = (image - imin) / float(imax - imin)
-        return np.array(image * (omax - omin) + omin, dtype=dtype)
+    arr = np.array([51, 102, 153], dtype=np.uint8)
+    print(arr)
+    print(type(arr))
+    out = rescale_intensity(arr, out_range=(0, 127))
+    print(out)
+    print(type(out))
+    print()
 
-    def _download(self, image):
-        return image
-
-
-class RescaleIntensity_GPU(RescaleIntensity):
-    _strategy = ImplTypes.GPU
-
-    def __init__(self):
-        self.image_h = None
-
-    def _upload(self, image_h):
-        self.image_h = image_h
-        image_g = cuda.pagelocked_empty_like(
-            image_h, mem_flags=cuda.host_alloc_flags.DEVICEMAP
-        )
-        image_g[:] = image_h
-        return image_g
-
-    def _scale_by_range(self, image, in_range, out_range, dtype):
-        imin, imax = in_range
-        omin, omax = out_range
-
-        rescale = ElementwiseKernel(
-            "float *dst, float *src, float imin, float imax, float omin, float omax",
-            "dst[i] = (((src[i] < imin) ? imin : (src[i] > imax) ? imax : src[i])-imin)/(imax-imin)",
-        )
-        rescale(image, image, imin, imax, omin, omax)
-
-        return image
-
-    def _download(self, image_g):
-        image_h = self.image_h[:]
-        image_h[:] = image_g
-        self.image_h = None
-        return image_h
