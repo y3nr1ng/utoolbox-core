@@ -33,7 +33,7 @@ class PeronaMalik2D(object):
     def __exit__(self, exc_type, exc_value, traceback):
         self._buffer = None
 
-    def __call__(self, x):
+    def __call__(self, x, niter=16):
         """
         void (
             float *dst,
@@ -44,12 +44,23 @@ class PeronaMalik2D(object):
         """
         ny, nx = self._buffer.shape
         grid_sz = (int(ceil(nx / self._tile_width)), int(ceil(ny / self._tile_width)))
-        self._kernels["perona_malik_2d_kernel"](
-            grid_sz,
-            (self._tile_width,) * 2,
-            (self._buffer, cp.asarray(x), np.float32(self.threshold), np.float32(self.lamb), nx, ny),
-        )
-        return cp.asnumpy(self._buffer)
+
+        in_buf, out_buf = cp.asarray(x), self._buffer
+        for _ in range(niter):
+            self._kernels["perona_malik_2d_kernel"](
+                grid_sz,
+                (self._tile_width,) * 2,
+                (
+                    out_buf,
+                    in_buf,
+                    np.float32(self.threshold),
+                    np.float32(self.lamb),
+                    nx,
+                    ny,
+                ),
+            )
+            in_buf, out_buf = out_buf, in_buf
+        return cp.asnumpy(in_buf)
 
     @property
     def threshold(self):
@@ -111,16 +122,14 @@ if __name__ == "__main__":
             print(iz)
 
             in_data_ = in_data[iz, ...]
-            
+
             in_data_ = in_data_.astype(np.float32)
-            #in_data_ /= in_data_.max()
-            
-            for _ in range(32):
-                out_data_ = pm(in_data_)
-                out_data_, in_data_ = in_data_, out_data_
-            
-            #out_data_ /= out_data_.max()
-            #out_data_ *= 255
+            # in_data_ /= in_data_.max()
+
+            out_data_ = pm(in_data_, niter=32)
+
+            # out_data_ /= out_data_.max()
+            # out_data_ *= 255
 
             out_data_ = out_data_.astype(np.uint16)
             out_data.append(out_data_)
