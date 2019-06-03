@@ -6,13 +6,13 @@ extern "C" {
 #define CACHE_WIDTH     (TILE_WIDTH+KERNEL_WIDTH-1)  
 
 __device__
-float quadric(int norm, float thre) {
+float quadric(float norm, float thre) {
     return 1.f / (1.f + norm*norm / (thre*thre));
 }
 
 __device__
-float exponential(int norm, float thre) {
-    return exp(- norm*norm / (thre*thre));
+float exponential(float norm, float thre) {
+    return exp(-norm*norm / (thre*thre));
 }
 
 __global__
@@ -76,10 +76,10 @@ void perona_malik_2d_kernel(
 
     // apply function
     // TODO use function pointer, assume quadric for now
-    float cu = quadric(abs(du), thre);
-    float cd = quadric(abs(dd), thre);
-    float cr = quadric(abs(dr), thre);
-    float cl = quadric(abs(dl), thre);
+    float cu = exponential(abs(du), thre);
+    float cd = exponential(abs(dd), thre);
+    float cr = exponential(abs(dr), thre);
+    float cl = exponential(abs(dl), thre);
 
     // global linear index
     dst[nx*gy+gx] = pc + lambda * (cu*du + cd*dd + cr*dr + cl*dl);
