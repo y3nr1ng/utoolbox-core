@@ -81,6 +81,7 @@ class RescaleIntensity(object):
 
 
 if __name__ == "__main__":
+    """
     rescale_intensity = RescaleIntensity()
     arr = cp.array([51, 102, 153], dtype=np.uint8)
     print(arr)
@@ -119,4 +120,36 @@ if __name__ == "__main__":
     print(out)
     print(type(out))
     print()
+    """
+
+    import imageio
+    image = imageio.volread('cell_in.tif')
+    print(image.shape)
+
+    from utoolbox.util.decorator import timeit
+    
+    @timeit
+    def cpu(image):
+        from skimage.exposure import rescale_intensity
+        for _ in range(10):
+            result = rescale_intensity(image, out_range=(0, 1))
+            result, image = image, result
+        return image
+    result1 = cpu(image)
+    
+    @timeit
+    def gpu(image):
+        rescale_intensity = RescaleIntensity()
+        image = cp.asarray(image)
+        for _ in range(10):
+            result = rescale_intensity(image, out_range=(0, 1))
+            result, image = image, result
+        return cp.asnumpy(image)
+    result2 = gpu(image)
+
+    mempool = cp.get_default_memory_pool()
+    pinned_mempool = cp.get_default_pinned_memory_pool()
+    print(mempool.used_bytes())              
+    print(mempool.total_bytes())             
+    print(pinned_mempool.n_free_blocks())    
 
