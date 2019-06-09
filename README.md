@@ -4,6 +4,21 @@
 
 A Python image processing package for LLSM.
 
+**TODO** intro
+
+For more information, refer to the documentation.
+
+## Installation
+uToolbox is published on PyPI and can be installed from there:
+`pip install -U utoolbox`
+Beta releases are also published:
+`pip install -U --pre utoolbox`
+If you wish to install uToolbox for development purposes, refer to [the developer guide](https://utoolbox.readthedocs.io/en/latest/intro/developer.html).
+
+## Documentation
+Documentation is available from [readthedocs.io](https://utoolbox.readthedocs.io/en/latest/index.html).
+
+**TODO** migrate platform support info
 
 #### macOS
 - High Sierra 10.13.6, Darwin 17.7.0
@@ -22,7 +37,7 @@ A Python image processing package for LLSM.
 - Liu, Yen-Ting
 
 ## License
-This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details
+This project is licensed under the Apache 2.0 License - see the [LICENSE.md](LICENSE.md) file for details
 
 ## Acknowledgments
 - [LLSpy](https://github.com/tlambert03/LLSpy) by Talley Lambert.
