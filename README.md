@@ -10,9 +10,13 @@ For more information, refer to [the documentation](https://utoolbox.readthedocs.
 
 ## Installation
 uToolbox is published on [PyPI](https://pypi.org/project/utoolbox/) and can be installed from there:
+
 `pip install -U utoolbox`
+
 Beta releases are also published:
+
 `pip install -U --pre utoolbox`
+
 If you wish to install uToolbox for development purposes, refer to [the developer guide](https://utoolbox.readthedocs.io/en/latest/intro/developer.html).
 
 ## Documentation
