@@ -6,10 +6,10 @@ A Python image processing package for LLSM.
 
 **TODO** intro
 
-For more information, refer to the documentation.
+For more information, refer to [the documentation](https://utoolbox.readthedocs.io/en/latest/index.html).
 
 ## Installation
-uToolbox is published on PyPI and can be installed from there:
+uToolbox is published on [PyPI](https://pypi.org/project/utoolbox/) and can be installed from there:
 `pip install -U utoolbox`
 Beta releases are also published:
 `pip install -U --pre utoolbox`
