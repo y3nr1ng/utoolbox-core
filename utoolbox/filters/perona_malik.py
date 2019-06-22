@@ -91,7 +91,5 @@ if __name__ == "__main__":
         out_data_ = out_data_.astype(np.uint8)
         out_data.append(out_data_)
 
-        print()
-
     out_data = np.stack(out_data, axis=-1)
     imwrite("heli_out.png", out_data)
