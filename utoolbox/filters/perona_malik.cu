@@ -16,10 +16,98 @@ float exponential(float norm, float thre) {
 }
 
 __global__
+void perona_malik_3d_kernel(
+    float *dst,
+    const float *src,
+    const float thre, 
+    const int nx, const int ny, const int nz
+) {
+    __shared__
+    float cache[CACHE_WIDTH*CACHE_WIDTH*CACHE_WIDTH];
+
+    // cache linear index
+    int ic = TILE_WIDTH*(TILE_WIDTH*threadIdx.z + threadIdx.y) + threadIdx.x;
+    // load padded data to cache
+    for (
+        int i = ic; 
+        i < CACHE_WIDTH*CACHE_WIDTH*CACHE_WIDTH; 
+        i+= TILE_WIDTH*TILE_WIDTH*TILE_WIDTH
+    ) {
+        // cache index
+        int cx = i%CACHE_WIDTH;
+        int cy = (i/CACHE_WIDTH)%CACHE_WIDTH;
+        int cz = (i/CACHE_WIDTH)/CACHE_WIDTH;
+
+        // padded global index
+        int pgx = TILE_WIDTH*blockIdx.x + cx - KERNEL_RADIUS;
+        int pgy = TILE_WIDTH*blockIdx.y + cy - KERNEL_RADIUS;
+        int pgz = TILE_WIDTH*blockIdx.z + cz - KERNEL_RADIUS;
+
+        // mirror padding
+        if (
+            (pgx < 0) || (pgx >= nx) 
+            || (pgy < 0) || (pgy >= ny) 
+            || (pgz < 0) || (pgz >= nz)
+        ) {
+            cache[i] = 0.f;
+        } else {
+            cache[i] = src[nx*ny*pgz + nx*pgy + pgx];
+        }
+    }
+
+    __syncthreads();
+
+    // global index
+    int gx = TILE_WIDTH*blockIdx.x + threadIdx.x;
+    int gy = TILE_WIDTH*blockIdx.y + threadIdx.y;
+    int gz = TILE_WIDTH*blockIdx.z + threadIdx.z;
+    if ((gx >= nx) || (gy >= ny) || (gz >= nz)) {
+        return;
+    }
+
+    // local index
+    int lx = threadIdx.x+KERNEL_RADIUS;
+    int ly = threadIdx.y+KERNEL_RADIUS;
+    int lz = threadIdx.z+KERNEL_RADIUS;
+
+    // data grid
+    //   x x x   x u x   x x x
+    //   x t x   l c r   x b x
+    //   x x x   x d x   x x x
+    float pc = cache[CACHE_WIDTH*(CACHE_WIDTH*lz + ly) + lx];
+    float pu = cache[CACHE_WIDTH*(CACHE_WIDTH*lz + (ly+1)) + lx];
+    float pd = cache[CACHE_WIDTH*(CACHE_WIDTH*lz + (ly-1)) + lx];
+    float pr = cache[CACHE_WIDTH*(CACHE_WIDTH*lz + ly) + (lx+1)];
+    float pl = cache[CACHE_WIDTH*(CACHE_WIDTH*lz + ly) + (lx-1)]; 
+    float pt = cache[CACHE_WIDTH*(CACHE_WIDTH*(lz+1) + ly) + lx];
+    float pb = cache[CACHE_WIDTH*(CACHE_WIDTH*(lz-1) + ly) + lx];
+
+    // delta
+    float du = pu-pc;
+    float dd = pd-pc;
+    float dr = pr-pc;
+    float dl = pl-pc;
+    float dt = pt-pc;
+    float db = pt-pb;
+
+    // apply function
+    // TODO use function pointer, assume quadric for now
+    float cu = quadric(abs(du), thre);
+    float cd = quadric(abs(dd), thre);
+    float cr = quadric(abs(dr), thre);
+    float cl = quadric(abs(dl), thre);
+    float ct = quadric(abs(dt), thre);
+    float cb = quadric(abs(db), thre);
+
+    // global linear index
+    dst[nx*ny*gz+nx*gy+gx] = pc + (cu*du + cd*dd + cr*dr + cl*dl + ct*dt + cb*db) / 6.f;
+}
+
+__global__
 void perona_malik_2d_kernel(
     float *dst,
     const float *src,
-    const float thre, const float lambda,
+    const float thre,
     const int nx, const int ny
 ) {
     __shared__ 
@@ -76,13 +164,13 @@ void perona_malik_2d_kernel(
 
     // apply function
     // TODO use function pointer, assume quadric for now
-    float cu = exponential(abs(du), thre);
-    float cd = exponential(abs(dd), thre);
-    float cr = exponential(abs(dr), thre);
-    float cl = exponential(abs(dl), thre);
+    float cu = quadric(abs(du), thre);
+    float cd = quadric(abs(dd), thre);
+    float cr = quadric(abs(dr), thre);
+    float cl = quadric(abs(dl), thre);
 
     // global linear index
-    dst[nx*gy+gx] = pc + lambda * (cu*du + cd*dd + cr*dr + cl*dl);
+    dst[nx*gy+gx] = pc + (cu*du + cd*dd + cr*dr + cl*dl) / 4.f;
 }
 
 }
