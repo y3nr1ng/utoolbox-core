@@ -92,12 +92,12 @@ void perona_malik_3d_kernel(
 
     // apply function
     // TODO use function pointer, assume quadric for now
-    float cu = exponential(abs(du), thre);
-    float cd = exponential(abs(dd), thre);
-    float cr = exponential(abs(dr), thre);
-    float cl = exponential(abs(dl), thre);
-    float ct = exponential(abs(dt), thre);
-    float cb = exponential(abs(db), thre);
+    float cu = quadric(abs(du), thre);
+    float cd = quadric(abs(dd), thre);
+    float cr = quadric(abs(dr), thre);
+    float cl = quadric(abs(dl), thre);
+    float ct = quadric(abs(dt), thre);
+    float cb = quadric(abs(db), thre);
 
     // global linear index
     dst[nx*ny*gz+nx*gy+gx] = pc + (cu*du + cd*dd + cr*dr + cl*dl + ct*dt + cb*db) / 6.f;
@@ -164,10 +164,10 @@ void perona_malik_2d_kernel(
 
     // apply function
     // TODO use function pointer, assume quadric for now
-    float cu = exponential(abs(du), thre);
-    float cd = exponential(abs(dd), thre);
-    float cr = exponential(abs(dr), thre);
-    float cl = exponential(abs(dl), thre);
+    float cu = quadric(abs(du), thre);
+    float cd = quadric(abs(dd), thre);
+    float cr = quadric(abs(dr), thre);
+    float cl = quadric(abs(dl), thre);
 
     // global linear index
     dst[nx*gy+gx] = pc + (cu*du + cd*dd + cr*dr + cl*dl) / 4.f;
