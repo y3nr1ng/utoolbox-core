@@ -1,18 +1,15 @@
-import os
 from pprint import pprint
 
 import coloredlogs
+import numpy as np
 
-from utoolbox.container.dataset import MicroManagerDataset
+from utoolbox.data.dataset import MicroManagerDataset
 
 coloredlogs.install(
-    level='DEBUG',
-    fmt='%(asctime)s %(levelname)s %(message)s',
-    datefmt='%H:%M:%S'
+    level="DEBUG", fmt="%(asctime)s  %(levelname)s %(message)s", datefmt="%H:%M:%S"
 )
 
-test_dir = os.path.dirname(os.path.realpath(__file__))
-path = os.path.join(test_dir, "mm_dataset")
+ds = MicroManagerDataset("perfuse_lectin594_poststain_lectin647_5")
 
-dataset = MicroManagerDataset(path)
-pprint(dataset.metadata)
+for name, im in ds["640_10X"].items():
+    pprint(im)
