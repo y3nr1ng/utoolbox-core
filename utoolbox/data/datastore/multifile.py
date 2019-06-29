@@ -91,7 +91,8 @@ class VolumeTilesDatastore(FolderCollectionDatastore, BufferedDatastore):
             np.concatenate(
                 [self._raw_read_func(path) for path in uri_list], out=self._buffer
             )
-
+        return self._buffer
+        
 
 '''
 class SparseTilesImageDatastore(SparseStackImageDatastore):
