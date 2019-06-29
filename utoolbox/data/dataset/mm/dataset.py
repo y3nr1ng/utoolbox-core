@@ -46,7 +46,10 @@ class MicroManagerDataset(MultiChannelDataset):
 
         # use 'InitialPositionList' to determine tiling config
         grids = metadata["InitialPositionList"]
-        self._tiled = len(grids) > 1
+        try:
+            self._tiled = len(grids) > 1
+        except TypeError:
+            self._tiled = False
         if self._tiled:
             # extract tile shape
             tx, ty = -1, -1
