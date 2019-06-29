@@ -75,7 +75,7 @@ setup(
         'PySide2',
 
         # parallel
-        'cupy>=0.0dev0',
+        'cupy-cuda101',
         'dask',
 
         # utils
