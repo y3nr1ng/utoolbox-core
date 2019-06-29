@@ -45,10 +45,10 @@ class MicroManagerDataset(MultiChannelDataset):
             metadata = json.load(fd)["Summary"]
 
         # use 'InitialPositionList' to determine tiling config
-        grids = metadata["InitialPositionList"]
         try:
+            grids = metadata["InitialPositionList"]
             self._tiled = len(grids) > 1
-        except TypeError:
+        except (KeyError, TypeError):
             self._tiled = False
         if self._tiled:
             # extract tile shape
@@ -61,13 +61,13 @@ class MicroManagerDataset(MultiChannelDataset):
             self._tile_shape = (tx + 1, ty + 1)
             logger.info('dataset is a {} grid'.format(self._tile_shape))
 
-        # extract prefix without position info
-        prefix = os.path.commonprefix([grid["Label"] for grid in grids])
-        i = prefix.rfind('_')
-        if i > 0:
-            prefix = prefix[:i]
-        logger.debug('folder prefix "{}"'.format(prefix))
-        self._folder_prefix = prefix
+            # extract prefix without position info
+            prefix = os.path.commonprefix([grid["Label"] for grid in grids])
+            i = prefix.rfind('_')
+            if i > 0:
+                prefix = prefix[:i]
+            logger.debug('folder prefix "{}"'.format(prefix))
+            self._folder_prefix = prefix
 
         try:
             return metadata
