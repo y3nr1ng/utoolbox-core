@@ -28,25 +28,28 @@ class MicroManagerDataset(MultiChannelDataset):
         super().__init__(root)
 
     def _load_metadata(self):
-        path = self.root
+        meta_dir = self.root
         # select the first folder that contains `metadata.txt`
         for _path in os.listdir(self.root):
-            _path = os.path.join(path, _path)
+            _path = os.path.join(meta_dir, _path)
             if os.path.isdir(_path):
-                path = _path
+                meta_dir = _path
                 break
-        if path == self.root:
+        if meta_dir == self.root:
             raise NoMetadataInTileFolderError()
-        logger.debug('using metadata from "{}"'.format(path))
-        path = os.path.join(path, "metadata.txt")
+        logger.debug('using metadata from "{}"'.format(meta_dir))
+        meta_path = os.path.join(meta_dir, "metadata.txt")
 
-        with open(path, "r") as fd:
+        with open(meta_path, "r") as fd:
             # discard frame specific info
             metadata = json.load(fd)["Summary"]
 
         # use 'InitialPositionList' to determine tiling config
-        grids = metadata["InitialPositionList"]
-        self._tiled = len(grids) > 1
+        try:
+            grids = metadata["InitialPositionList"]
+            self._tiled = len(grids) > 1
+        except (KeyError, TypeError):
+            self._tiled = False
         if self._tiled:
             # extract tile shape
             tx, ty = -1, -1
@@ -58,14 +61,17 @@ class MicroManagerDataset(MultiChannelDataset):
             self._tile_shape = (tx + 1, ty + 1)
             logger.info('dataset is a {} grid'.format(self._tile_shape))
 
-        # extract prefix without position info
-        prefix = os.path.commonprefix([grid["Label"] for grid in grids])
-        i = prefix.rfind('_')
-        if i > 0:
-            prefix = prefix[:i]
-        logger.debug('folder prefix "{}"'.format(prefix))
-        self._folder_prefix = prefix
-
+            # extract prefix without position info
+            prefix = os.path.commonprefix([grid["Label"] for grid in grids])
+            i = prefix.rfind('_')
+            if i > 0:
+                prefix = prefix[:i]
+            logger.debug('folder prefix "{}"'.format(prefix))
+            self._folder_prefix = prefix
+        else:
+            # shortcut to the actual data source
+            self._root = meta_dir
+            
         try:
             return metadata
         except KeyError:
