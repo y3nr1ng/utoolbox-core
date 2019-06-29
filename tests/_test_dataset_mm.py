@@ -35,22 +35,8 @@ class DummyImage(object):
 def dummy_read(path):
     return DummyImage(path)
 
+
 ds = MicroManagerDataset("perfuse_lectin594_poststain_lectin647_5")
-pprint(ds.metadata)
 
-with VolumeTilesDatastore(
-    "perfuse_lectin594_poststain_lectin647_5",
-    read_func=dummy_read,
-    folder_pattern="1-Pos_*",
-    file_pattern="*_561_*",
-    tile_shape=(3, 4),
-    return_as="plane",
-) as ds:
-    pprint(ds._uri)
-    # pprint(ds.metadata)
-
-    # print("\n=== objgraph ===")
-    # objgraph.show_growth(limit=30)
-    # print()
-
-# objgraph.show_growth(limit=30)
+for name, im in ds["640_10X"].items():
+    pprint(im)

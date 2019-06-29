@@ -2,6 +2,9 @@ import json
 import logging
 import os
 
+import imageio
+
+from utoolbox.data.datastore import ImageDatastore, VolumeTilesDatastore
 from ..base import MultiChannelDataset
 from .error import NoMetadataInTileFolderError, NoSummarySectionError
 
@@ -14,40 +17,57 @@ class MicroManagerDataset(MultiChannelDataset):
 
     Args:
         root (str): Source directory of the dataset.
-        tiled (bool, optional): Dataset contains multiple tiles.
+        merge (bool, optional): Return merged result for tiled dataset.
     """
 
-    def __init__(self, root, tiled=True):
+    def __init__(self, root, merge=True):
         if not os.path.exists(root):
             raise FileNotFoundError("invalid dataset root")
-        self._tiled = tiled
+        self._tiled = None
+        self._merge = merge
         super().__init__(root)
 
-    @property
-    def tiled(self):
-        """bool: Dataset contains mulitple tiles."""
-        return self._tiled
-
     def _load_metadata(self):
-        # determine root
         path = self.root
-        if self.tiled:
-            # select the first folder that contains `metadata.txt`
-            for _path in os.listdir(self.root):
-                _path = os.path.join(path, _path)
-                if os.path.isdir(_path):
-                    path = _path
-                    break
-            if path == self.root:
-                raise NoMetadataInTileFolderError()
-            logger.debug('using metadata from "{}"'.format(path))
+        # select the first folder that contains `metadata.txt`
+        for _path in os.listdir(self.root):
+            _path = os.path.join(path, _path)
+            if os.path.isdir(_path):
+                path = _path
+                break
+        if path == self.root:
+            raise NoMetadataInTileFolderError()
+        logger.debug('using metadata from "{}"'.format(path))
         path = os.path.join(path, "metadata.txt")
 
         with open(path, "r") as fd:
-            metadata = json.load(fd)
-        # return summary only, discard frame specific info
+            # discard frame specific info
+            metadata = json.load(fd)["Summary"]
+
+        # use 'InitialPositionList' to determine tiling config
+        grids = metadata["InitialPositionList"]
+        self._tiled = len(grids) > 1
+        if self._tiled:
+            # extract tile shape
+            tx, ty = -1, -1
+            for grid in grids:
+                if grid["GridColumnIndex"] > tx:
+                    tx = grid["GridColumnIndex"]
+                if grid["GridRowIndex"] > ty:
+                    ty = grid["GridRowIndex"]
+            self._tile_shape = (tx + 1, ty + 1)
+            logger.info('dataset is a {} grid'.format(self._tile_shape))
+
+        # extract prefix without position info
+        prefix = os.path.commonprefix([grid["Label"] for grid in grids])
+        i = prefix.rfind('_')
+        if i > 0:
+            prefix = prefix[:i]
+        logger.debug('folder prefix "{}"'.format(prefix))
+        self._folder_prefix = prefix
+
         try:
-            return metadata["Summary"]
+            return metadata
         except KeyError:
             raise NoSummarySectionError()
 
@@ -55,5 +75,19 @@ class MicroManagerDataset(MultiChannelDataset):
         return self.metadata["ChNames"]
 
     def _load_channel(self, channel):
-        logger.debug("_load_channel={}".format(channel))
-        raise NotImplementedError()
+        if self._tiled:
+            return VolumeTilesDatastore(
+                self.root,
+                read_func=imageio.imread,
+                folder_pattern="{}*".format(self._folder_prefix),
+                file_pattern="*_{}_*".format(channel),
+                tile_shape=self._tile_shape,
+                merge=self._merge,
+            )
+        else:
+            return ImageDatastore(
+                self.root,
+                read_func=imageio.imread,
+                sub_dir=False,
+                pattern="*_{}_*".format(channel),
+            )
