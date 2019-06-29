@@ -28,19 +28,19 @@ class MicroManagerDataset(MultiChannelDataset):
         super().__init__(root)
 
     def _load_metadata(self):
-        path = self.root
+        meta_dir = self.root
         # select the first folder that contains `metadata.txt`
         for _path in os.listdir(self.root):
-            _path = os.path.join(path, _path)
+            _path = os.path.join(meta_dir, _path)
             if os.path.isdir(_path):
-                path = _path
+                meta_dir = _path
                 break
-        if path == self.root:
+        if meta_dir == self.root:
             raise NoMetadataInTileFolderError()
-        logger.debug('using metadata from "{}"'.format(path))
-        path = os.path.join(path, "metadata.txt")
+        logger.debug('using metadata from "{}"'.format(meta_dir))
+        meta_path = os.path.join(meta_dir, "metadata.txt")
 
-        with open(path, "r") as fd:
+        with open(meta_path, "r") as fd:
             # discard frame specific info
             metadata = json.load(fd)["Summary"]
 
@@ -68,7 +68,10 @@ class MicroManagerDataset(MultiChannelDataset):
                 prefix = prefix[:i]
             logger.debug('folder prefix "{}"'.format(prefix))
             self._folder_prefix = prefix
-
+        else:
+            # shortcut to the actual data source
+            self._root = meta_dir
+            
         try:
             return metadata
         except KeyError:
