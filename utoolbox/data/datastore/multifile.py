@@ -68,8 +68,8 @@ class VolumeTilesDatastore(FolderCollectionDatastore, BufferedDatastore):
 
         try:
             nty, ntx = self._tile_shape
-        except:
-            raise ValueError(
+        except TypeError:
+            raise TypeError(
                 "unable to determine buffer size due to invalid tile shape"
             )
         if self._merge:
@@ -91,6 +91,7 @@ class VolumeTilesDatastore(FolderCollectionDatastore, BufferedDatastore):
             np.concatenate(
                 [self._raw_read_func(path) for path in uri_list], out=self._buffer
             )
+        return self._buffer
 
 
 '''
