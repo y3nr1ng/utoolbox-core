@@ -60,7 +60,6 @@ setup(
     install_requires=[
         # core
         'cython',
-        'ipykernel',
 
         # numeric and processing
         'numpy',
@@ -70,10 +69,10 @@ setup(
         # file io
         'imageio',
         'tifffile',
-        'ffmpeg-python',
+        'av',
 
         # gui
-        'PySide2', 
+        'PySide2',
 
         # parallel
         'cupy>=0.0dev0',
