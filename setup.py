@@ -17,7 +17,7 @@ setup(
     #   bumpversion release
     # to next version
     #   bump patch/minor/major
-    version='0.2.1.dev',
+    version='0.2.2.dev',
 
     # one-line description for the summary field
     description="A Python image processing package for LLSM.",
@@ -60,7 +60,6 @@ setup(
     install_requires=[
         # core
         'cython',
-        'ipykernel',
 
         # numeric and processing
         'numpy',
@@ -70,10 +69,10 @@ setup(
         # file io
         'imageio',
         'tifffile',
-        'ffmpeg-python',
+        'av',
 
         # gui
-        'PySide2', 
+        'PySide2',
 
         # parallel
         'cupy>=0.0dev0',

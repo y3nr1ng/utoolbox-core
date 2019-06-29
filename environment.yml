@@ -26,9 +26,8 @@ dependencies:
     - coverage
     - pytest-cov
 
-    # numpy dependency
-    # NOTE Pre-install numpy until upstream pycuda can incorporate
-    # https://stackoverflow.com/q/27021270/ in its aksetup_helper.py
-    - numpy
-
     # native libraries
+    #  numpy from conda has mkl support
+    - numpy
+    #  av libraries is easier to install using conda
+    - av
