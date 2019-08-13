@@ -58,9 +58,6 @@ setup(
     #   install_requires -> necessity
     #   requirements.txt
     install_requires=[
-        # core
-        'cython',
-
         # numeric and processing
         'numpy',
         'scipy',
@@ -75,7 +72,8 @@ setup(
         'PySide2',
 
         # parallel
-        'cupy-cuda101',
+        'cupy-cuda101 ; platform_system!="Darwin"',
+        'cupy ; platform_system=="Darwin"',
         'dask',
 
         # utils
@@ -107,7 +105,7 @@ setup(
             'zpatch=utoolbox.cli.zpatch:main',
             'dataset=utoolbox.cli.dataset:main'
         ]
-    }, 
+    },
 
     # contains c source, cannot safely run in compressed form
     zip_safe=False
