@@ -69,9 +69,7 @@ class VolumeTilesDatastore(FolderCollectionDatastore, BufferedDatastore):
         try:
             nty, ntx = self._tile_shape
         except TypeError:
-            raise TypeError(
-                "unable to determine buffer size due to invalid tile shape"
-            )
+            raise TypeError("unable to determine buffer size due to invalid tile shape")
         if self._merge:
             ny, nx = image.shape
             shape = (nty * ny, ntx * nx)
