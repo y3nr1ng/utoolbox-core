@@ -6,7 +6,7 @@ import av
 import imageio
 import numpy as np
 
-from utoolbox.container.datastore import FileDatastore
+from utoolbox.container.datastore import FolderDatastore
 
 logging.getLogger("tifffile").setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ framerate = 23.976
 
 ##
 
-ds = FileDatastore(
+ds = FolderDatastore(
     root, read_func=imageio.imread, extensions=["tif"]
 )
 
