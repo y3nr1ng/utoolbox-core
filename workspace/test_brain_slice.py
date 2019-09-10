@@ -73,8 +73,10 @@ def func(
     # bases = cp.float32(bits**16)
     # im_gamma = bases * ((im_in/bases) ** factor)
 
-    im_out = cp.asnumpy(im_zoom).astype(np.uint16)
+    # type cast to 8-bit for movies
+    im_bit = im_zoom / 65535 * 255
 
+    im_out = cp.asnumpy(im_bit).astype(np.uint16)
     return im_out
 
 
