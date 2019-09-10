@@ -90,7 +90,7 @@ void sml_kernel(
         int pgx = TILE_WIDTH*blockIdx.x + cx - KERNEL_RADIUS;
         int pgy = TILE_WIDTH*blockIdx.y + cy - KERNEL_RADIUS;
         
-        // mirror padding
+        // clamping
         if ((pgx < 0) || (pgx >= nx) || (pgy < 0) || (pgy >= ny)) {
             cache[i] = 0.f;
         } else {

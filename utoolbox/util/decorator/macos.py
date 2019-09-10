@@ -13,18 +13,17 @@ import sys
 
 logger = logging.getLogger(__name__)
 
-__all__ = [
-    'prelaunch_cocoa'
-]
+__all__ = ["prelaunch_cocoa"]
 
-#TODO wrap with stub
-if not sys.platform.startswith('darwin'):
+# TODO wrap with stub
+if not sys.platform.startswith("darwin"):
     raise RuntimeError("unable to import on non-macOS system")
 
 import objc
 from Foundation import *
 from AppKit import *
 from PyObjCTools import AppHelper
+
 
 class AppDelegate(NSObject):
     def initWrappedFunc_(self, wrapped_func):
@@ -45,6 +44,7 @@ class AppDelegate(NSObject):
         # terminate explicitly, or it hangs when the wrapped code exits
         NSApp().terminate_(self)
 
+
 def prelaunch_cocoa(func):
     def _launcher(*args, **kwargs):
         app = NSApplication.sharedApplication()
@@ -52,6 +52,7 @@ def prelaunch_cocoa(func):
         # wrap the function in a delegate
         def _func():
             func(*args, **kwargs)
+
         delegate = AppDelegate.alloc().initWrappedFunc_(_func)
         NSApp().setDelegate_(delegate)
 
@@ -59,4 +60,5 @@ def prelaunch_cocoa(func):
         NSApp.setActivationPolicy_(NSApplicationActivationPolicyRegular)
 
         AppHelper.runEventLoop()
+
     return _launcher

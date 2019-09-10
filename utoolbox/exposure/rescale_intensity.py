@@ -1,109 +1,149 @@
-# pylint: disable=E1101
 import logging
+
+import cupy as cp
 import numpy as np
-import pycuda.driver as cuda
-from pycuda.elementwise import ElementwiseKernel
 
-from utoolbox.container import AbstractAlgorithm, ImplTypes, interface
-
-__all__ = [
-    'RescaleIntensity'
-]
+__all__ = ["RescaleIntensity"]
 
 logger = logging.getLogger(__name__)
 
-class RescaleIntensity(metaclass=AbstractAlgorithm):
-    def __call__(self, image, in_range=None, out_range=None):
-        dtype = image.dtype
-        image = self._upload(image)
 
-        imin, imax = self._intensity_range(image, in_range)
-        if out_range is None:
-            out_range = dtype
-        omin, omax = self._intensity_range(image, out_range, clip=(imin>=0))
-        logger.debug("in={}, out={}".format((imin, imax), (omin, omax)))
+class RescaleIntensity(object):
+    """
+    Return image after stretching or shrinking its intensity levels. The algorithm is
+    based on the implementation in `skimage`_.
 
-        image = self._scale_by_range(image, (imin, imax), (omin, omax), dtype)
-        image = self._download(image)
+    .. _skimage:
+        https://scikit-image.org/docs/dev/api/skimage.exposure.html
+    """
 
-        return image.astype(dtype)
+    def __call__(self, data, in_range="image", out_range="dtype"):
+        im, iM = RescaleIntensity.as_min_max(data, in_range)
+        om, oM = RescaleIntensity.as_min_max(data, out_range, clip_neg=(im >= 0))
 
-    @interface
-    def _upload(self, image):
-        """Upload data to processing unit."""
-        pass
+        data = data.clip(im, iM)
 
-    def _intensity_range(self, image, range_values=None, clip=False):
-        if range_values is None:
-            imin, imax = image.min(), image.max()
-        elif isinstance(range_values, tuple):
-            imin, imax = range_values
-        elif np.issubdtype(range_values, np.integer):
-            imin, imax = np.iinfo(range_values).min, np.iinfo(range_values).max
-        elif np.issubdtype(range_values, np.inexact):
-            imin, imax = -1., 1.
-        else:
-            raise TypeError("unknown range definition")
+        @cp.fuse
+        def _ops(data, im, iM, om, oM):
+            # normalize
+            data = (data - im) / (iM - im)
+            # scale to range
+            data = data * (oM - om) + om
+            return data
+
+        return _ops(data, im, iM, om, oM)
+
+    @staticmethod
+    def as_min_max(data, range_value, clip_neg=False):
+        """
+        Return intensity range based based on desired value type.
+
+        Args:
+            data (np.ndarray): Input data.
+            range_value (str/np.dtype/(float, float)): The image range is configured by 
+                this parameter.
+            clip_neg (bool, optional): If True, clip the negative range. 
         
-        if clip:
-            imin = 0
+        Returns:
+            :rtype: (cp.float32, cp.float32)
 
-        return imin, imax
-    
-    @interface
-    def _scale_by_range(self, image, in_range, out_range, dtype):
-        pass
+        Raises:
+            TypeError: If this function cannot resolve the intensity range pair.
+        """
+        if range_value == "image":
+            m, M = np.asscalar(data.min()), np.asscalar(data.max())    
+        else:
+            if isinstance(range_value, tuple):
+                # force extraction tuple
+                m, M = range_value
+            else:
+                if range_value == "dtype":
+                    dtype = np.dtype(data.dtype).type
+                else:
+                    dtype = range_value
+                if issubclass(dtype, np.integer):
+                    info = np.iinfo(dtype)
+                    m, M = info.min, info.max
+                elif issubclass(dtype, np.floating):
+                    m, M = -1.0, 1.0
+                else:
+                    raise TypeError("unknown data type")
+                m = 0 if clip_neg else m
+        m, M = np.float32(m), np.float32(M)
+        return m, M
 
-    @interface
-    def _download(self, image):
+
+if __name__ == "__main__":
+    """
+    rescale_intensity = RescaleIntensity()
+    arr = cp.array([51, 102, 153], dtype=np.uint8)
+    print(arr)
+    print(type(arr))
+    out = rescale_intensity(arr)
+    print(out)
+    print(type(out))
+    print()
+
+    arr = 1.0 * arr
+    print(arr)
+    print(type(arr))
+    out = rescale_intensity(arr)
+    print(out)
+    print(type(out))
+    print()
+
+    print(arr)
+    print(type(arr))
+    out = rescale_intensity(arr, in_range=(0, 255))
+    print(out)
+    print(type(out))
+    print()
+
+    print(arr)
+    print(type(arr))
+    out = rescale_intensity(arr, in_range=(0, 102))
+    print(out)
+    print(type(out))
+    print()
+
+    arr = np.array([51, 102, 153], dtype=np.uint8)
+    print(arr)
+    print(type(arr))
+    out = rescale_intensity(arr, out_range=(0, 127))
+    print(out)
+    print(type(out))
+    print()
+    """
+
+    import imageio
+    from numpy.testing import assert_array_almost_equal
+
+    image = imageio.volread("cell_in.tif")
+    print("{}, {}".format(image.shape, image.dtype))
+
+    from utoolbox.util.decorator import timeit
+
+    @timeit
+    def cpu(image):
+        from skimage.exposure import rescale_intensity
+
+        for _ in range(10):
+            result = rescale_intensity(image, out_range=(0, 1))
+            result, image = image, result
         return image
 
-class RescaleIntensity_CPU(RescaleIntensity):
-    _strategy = ImplTypes.CPU_ONLY
+    result1 = cpu(image)
 
-    def _upload(self, image):
-        return image
+    @timeit
+    def gpu(image):
+        rescale_intensity = RescaleIntensity()
+        image = cp.asarray(image)
+        for _ in range(10):
+            result = rescale_intensity(image, out_range=(0, 1))
+            result, image = image, result
+        return cp.asnumpy(image)
 
-    def _scale_by_range(self, image, in_range, out_range, dtype):
-        imin, imax = in_range
-        omin, omax = out_range
+    result2 = gpu(image)
+    imageio.volwrite("cell_out.tif", result2)
 
-        image = np.clip(image, imin, imax)
-
-        image = (image - imin) / float(imax - imin)
-        return np.array(image * (omax - omin) + omin, dtype=dtype)
-
-    def _download(self, image):
-        return image
-
-class RescaleIntensity_GPU(RescaleIntensity):
-    _strategy = ImplTypes.GPU
-
-    def __init__(self):
-        self.image_h = None
-
-    def _upload(self, image_h):
-        self.image_h = image_h
-        image_g = cuda.pagelocked_empty_like(
-            image_h, mem_flags=cuda.host_alloc_flags.DEVICEMAP
-        )
-        image_g[:] = image_h
-        return image_g
-    
-    def _scale_by_range(self, image, in_range, out_range, dtype):
-        imin, imax = in_range
-        omin, omax = out_range
-
-        rescale = ElementwiseKernel(
-            "float *dst, float *src, float imin, float imax, float omin, float omax",
-            "dst[i] = (((src[i] < imin) ? imin : (src[i] > imax) ? imax : src[i])-imin)/(imax-imin)"
-        )
-        rescale(image, image, imin, imax, omin, omax)
-
-        return image
-
-    def _download(self, image_g):
-        image_h = self.image_h[:]
-        image_h[:] = image_g
-        self.image_h = None
-        return image_h
+    assert_array_almost_equal(result1, result2)
