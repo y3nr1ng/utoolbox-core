@@ -15,6 +15,16 @@ __all__ = ["FolderDatastore", "ImageDatastore"]
 
 
 class FolderDatastore(Datastore):
+    """
+    Using a folder containing numerous files to represet a datastore.
+    
+    Args:
+        root (str): root folder of the datastore
+        sub_dir (bool): scan nested folders for files
+        pattern (str): filename pattern
+        extensions (:obj:`list` of str): file extensions to include
+        create_new (bool): create the root folder if not exists
+    """
     def __init__(
         self,
         root,
@@ -24,13 +34,6 @@ class FolderDatastore(Datastore):
         create_new=True,
         **kwargs
     ):
-        """
-        :param str root: files or folders to include in the datastore
-        :param bool sub_dir: scan nested folders
-        :param str pattern: filename pattern
-        :param str extensions: file extensions to include
-        :param bool create_new: create datastore root if not exists
-        """
         if "del_func" not in kwargs:
             kwargs["del_func"] = os.unlink
 
@@ -52,7 +55,7 @@ class FolderDatastore(Datastore):
         else:
             extensions = ["{}.{}".format(pattern, ext) for ext in extensions]
         logger.debug("{} search patterns".format(len(extensions)))
-        
+
         files = []
         for ext in extensions:
             path = os.path.join(root, ext)
@@ -74,7 +77,8 @@ class FolderDatastore(Datastore):
         """
         Sort the file list based on numebers that are constantly changing.
         
-        :param list(str) files: file list
+        Args:
+            files (:obj:`list` of str): file list
         """
         # extract valid numbers from filenames
         keys = [list(map(int, re.findall(r"[0-9]+", fn))) for fn in files]
