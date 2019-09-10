@@ -14,7 +14,7 @@ import numpy as np
 from utoolbox.data import MicroManagerDataset, SPIMDataset
 import utoolbox.data.dataset.mm.error as mm_error
 import utoolbox.data.dataset.spim.error as spim_error
-from utoolbox.data.datastore import FileDatastore
+from utoolbox.data.datastore import FolderDatastore
 from utoolbox.transform.projections import Orthogonal
 
 logging.getLogger("tifffile").setLevel(logging.ERROR)
@@ -62,7 +62,7 @@ def analyze(ctx, root):
 # @click.option("--format", type=click.Choice(["mp4", "tif"]))
 @click.pass_context
 def preview(ctx, root, shrink):
-    ds = FileDatastore(
+    ds = FolderDatastore(
         root, read_func=imageio.volread, pattern="*5a_ch0_*", extensions=["tif"]
     )
     # dummy read
