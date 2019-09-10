@@ -76,7 +76,7 @@ def func(
     # type cast to 8-bit for movies
     im_bit = im_zoom / 65535 * 255
 
-    im_out = cp.asnumpy(im_bit).astype(np.uint16)
+    im_out = cp.asnumpy(im_bit).astype(np.uint8)
     return im_out
 
 
@@ -99,7 +99,7 @@ def main(path, framerate=23.976):
         print(f"z={i}")
         im = func(im)
 
-        frame = av.VideoFrame.from_ndarray(im, format="yuv420p")
+        frame = av.VideoFrame.from_ndarray(im, format="gray")
         packet = stream.encode(frame)
         out.mux(packet)
 
