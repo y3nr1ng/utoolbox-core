@@ -88,7 +88,7 @@ def main(path, framerate=23.976):
 
     # create new container
     out = av.open(out_path, "w")
-    stream = out.add_stream("h264", framerate)
+    stream = out.add_stream("h264", str(framerate))
     stream.bit_rate = 8000000
 
     im_in = imageio.volread(path)
