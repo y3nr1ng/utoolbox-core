@@ -6,7 +6,7 @@ import ffmpeg
 import imageio
 import numpy as np
 
-from utoolbox.container.datastore import FileDatastore
+from utoolbox.container.datastore import FolderDatastore
 
 logging.getLogger("tifffile").setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ coloredlogs.install(
 
 root = "~/nas/hive_archive_ytliu/20190528_Cornea/G"
 
-ds = FileDatastore(
+ds = FolderDatastore(
     root, read_func=imageio.imread, extensions=["tif"]
 )
 

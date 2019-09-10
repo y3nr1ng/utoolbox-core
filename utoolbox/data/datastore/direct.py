@@ -11,10 +11,10 @@ from .error import InvalidDatastoreRootError
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["FileDatastore", "ImageDatastore"]
+__all__ = ["FolderDatastore", "ImageDatastore"]
 
 
-class FileDatastore(Datastore):
+class FolderDatastore(Datastore):
     def __init__(
         self,
         root,
@@ -57,7 +57,7 @@ class FileDatastore(Datastore):
         for ext in extensions:
             path = os.path.join(root, ext)
             files.extend(glob.glob(path, recursive=sub_dir))
-        FileDatastore._sort_numerically(files)
+        FolderDatastore._sort_numerically(files)
 
         # simple 1-1 mapping
         for path in files:
@@ -91,7 +91,7 @@ class FileDatastore(Datastore):
         return os.path.join(self.root, key)
 
 
-class ImageDatastore(FileDatastore):
+class ImageDatastore(FolderDatastore):
     supported_extensions = ("tif",)
 
     def __init__(self, root, **kwargs):
