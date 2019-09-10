@@ -5,7 +5,7 @@ import logging
 
 import numpy as np
 
-from .direct import FileDatastore
+from .direct import FolderDatastore
 from .base import BufferedDatastore
 
 logger = logging.getLogger(__name__)
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 __all__ = ["FolderCollectionDatastore", "VolumeTilesDatastore"]
 
 
-class FolderCollectionDatastore(FileDatastore):
+class FolderCollectionDatastore(FolderDatastore):
     """Each folder represents a stack."""
 
     def __init__(
@@ -29,7 +29,7 @@ class FolderCollectionDatastore(FileDatastore):
         # expand the file list
         for name, path in self._uri.items():
             # treat each folder as a file datastore
-            fd = FileDatastore(
+            fd = FolderDatastore(
                 path, sub_dir=False, pattern=file_pattern, extensions=extensions
             )
             # extract the detailed path
