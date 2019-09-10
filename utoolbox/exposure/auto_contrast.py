@@ -18,6 +18,9 @@ logger = logging.getLogger(__name__)
 
 
 class AutoContrast(object):
+    """
+    Implements ImageJ1-style auto contrast adjustment.
+    """
     def __init__(self, n_bins=256, auto_threshold=5000, block_sz=(512,)):
         self._n_bins = n_bins
         self._auto_threshold = auto_threshold

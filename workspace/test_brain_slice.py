@@ -109,5 +109,9 @@ def main(path, framerate=23.976):
     out.close()
 
 
-path = "E:\\Nature COPY\\Chia-Ming\\BigSheet_DS\\TIF_ch1s.tif"
-main(path)
+path = [
+    "E:\\Nature COPY\\Chia-Ming\\BigSheet_DS\\TIF_ch2s.tif",
+    "E:\\Nature COPY\\Chia-Ming\\BigSheet_DS\\TIF_ch3s.tif"
+]
+for p in path:
+    main(p)
