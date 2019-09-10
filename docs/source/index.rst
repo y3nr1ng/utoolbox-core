@@ -26,7 +26,8 @@ This document aims to help you start processing acquired datasets with common op
    :glob: 
    :caption: User Documentation
 
-   guides/*
+   guides/preview
+   guides/deskew
 
 
 .. toctree::

@@ -2,13 +2,10 @@
 Datastores that use multiple files to composite a single data entry.
 """
 import logging
-import os
-import re
 
 import numpy as np
 
-from . import FileDatastore
-from .direct import ImageDatastore
+from .direct import FileDatastore
 from .base import BufferedDatastore
 
 logger = logging.getLogger(__name__)
@@ -71,8 +68,8 @@ class VolumeTilesDatastore(FolderCollectionDatastore, BufferedDatastore):
 
         try:
             nty, ntx = self._tile_shape
-        except:
-            raise ValueError(
+        except TypeError:
+            raise TypeError(
                 "unable to determine buffer size due to invalid tile shape"
             )
         if self._merge:
@@ -94,6 +91,7 @@ class VolumeTilesDatastore(FolderCollectionDatastore, BufferedDatastore):
             np.concatenate(
                 [self._raw_read_func(path) for path in uri_list], out=self._buffer
             )
+        return self._buffer
 
 
 '''

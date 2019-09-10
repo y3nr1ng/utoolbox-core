@@ -4,9 +4,9 @@ Transform
     :caption: Transform
 
 
-Deskew
----------
-.. automodule:: utoolbox.transform.deskew
+Projections
+-----------
+.. automodule:: utoolbox.transform.projections
     :members:
     :private-members:
     :special-members:

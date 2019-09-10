@@ -17,7 +17,7 @@ setup(
     #   bumpversion release
     # to next version
     #   bump patch/minor/major
-    version='0.2.0.dev',
+    version='0.2.2.dev',
 
     # one-line description for the summary field
     description="A Python image processing package for LLSM.",
@@ -58,10 +58,6 @@ setup(
     #   install_requires -> necessity
     #   requirements.txt
     install_requires=[
-        # core
-        'cython',
-        'ipykernel',
-
         # numeric and processing
         'numpy',
         'scipy',
@@ -70,13 +66,14 @@ setup(
         # file io
         'imageio',
         'tifffile',
-        'ffmpeg-python',
+        'av',
 
         # gui
-        'PySide2', 
+        'PySide2',
 
         # parallel
-        'cupy>=0.0dev0',
+        'cupy-cuda101 ; platform_system!="Darwin"',
+        'cupy ; platform_system=="Darwin"',
         'dask',
 
         # utils
@@ -108,7 +105,7 @@ setup(
             'zpatch=utoolbox.cli.zpatch:main',
             'dataset=utoolbox.cli.dataset:main'
         ]
-    }, 
+    },
 
     # contains c source, cannot safely run in compressed form
     zip_safe=False
