@@ -70,7 +70,7 @@ def func(im_in, out_res=(2160, 3840), p0=(876, 144), shape=(4096, 5592), bits=16
 
     return im_out
 
-path = 'brain_slice.tif'
+path = 'E:\\Nature COPY\\Chia-Ming\\BigSheet_DS\\TIF_ch1s.tif'
 
 im_in = imageio.volread(path)
 im_out = None
