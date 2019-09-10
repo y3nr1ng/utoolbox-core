@@ -80,6 +80,6 @@ for i, im in enumerate(im_in):
     try:
         im_out[i, ...] = im
     except TypeError:
-        im_out = np.empty([im_in.shape[0]] + im.shape)
+        im_out = np.empty((im_in.shape[0], ) + im.shape)
         im_out[i, ...] = im
 imwrite('output.tif', im_out)
