@@ -7,6 +7,7 @@ import numpy as np
 
 from utoolbox.util.decorator import timeit
 
+@timeit
 def func(im_in, out_res=(2160, 3840), p0=(876, 144), shape=(4096, 5592), bits=16, factor=0.5):
     im_in = cp.asarray(im_in)
 
