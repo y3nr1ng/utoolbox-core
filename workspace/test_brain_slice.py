@@ -89,7 +89,7 @@ def main(path, framerate=23.976):
     # create new container
     out = av.open(out_path, "w")
     stream = out.add_stream("h264", framerate)
-    stream.bit_rate = 8e6
+    stream.bit_rate = 8000000
 
     im_in = imageio.volread(path)
     im_out = None
@@ -97,7 +97,7 @@ def main(path, framerate=23.976):
         print(f"z={i}")
         im = func(im)
 
-        frame = av.VideoFrame.from_ndarray(im, format="gray")
+        frame = av.VideoFrame.from_ndarray(im, format="yuv420p")
         packet = stream.encode(frame)
         out.mux(packet)
 
