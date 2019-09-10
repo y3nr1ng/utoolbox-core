@@ -3,8 +3,18 @@ import logging
 import cupy as cp
 import numpy as np
 
-__all__ = ["AutoContrast"]
+__all__ = ["AutoContrast", "auto_contrast"]
+
 logger = logging.getLogger(__name__)
+
+
+###
+# region: Kernel definitions
+###
+
+###
+# endregion
+###
 
 
 class AutoContrast(object):
@@ -43,7 +53,26 @@ class AutoContrast(object):
         vmin, vmax = edges[hmin], edges[hmax]
         logger.info(f"auto adjust contrast to [{vmin}, {vmax}]")
 
-        #TODO lookup kernel
+        # create adaptive lookup kernel
+        try:
+            dtype_max = np.iinfo(data.dtype).max
+        except ValueError:
+            # floating point data type, normalize
+            dtype_max = 1
+        lookup_kernel = cp.ElementwiseKernel(
+            "T in",
+            "T out",
+            f"""
+            float fin = ((float)in - {vmin}) / ({vmax} - {vmin});
+            if (fin < 0) {{ fin = 0; }}
+            else if (fin > 1) {{ fin = 1; }}
+            out = (T)(fin * {dtype_max});
+            """,
+            "lookup_kernel",
+        )
+
+        return lookup_kernel(data)
+
     @property
     def n_bins(self):
         return self._n_bins
@@ -51,3 +80,8 @@ class AutoContrast(object):
     @property
     def auto_threshold(self):
         return self._auto_threshold
+
+
+def auto_contrast(data, n_bins=256, auto_threshold=5000):
+    return AutoContrast(n_bins, auto_threshold)(data)
+
