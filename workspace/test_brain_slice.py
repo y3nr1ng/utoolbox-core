@@ -71,15 +71,18 @@ def func(im_in, out_res=(2160, 3840), p0=(876, 144), shape=(4096, 5592), bits=16
 
     return im_out
 
-path = 'E:\\Nature COPY\\Chia-Ming\\BigSheet_DS\\TIF_ch1s.tif'
+@timeit
+def main(path):
+    im_in = imageio.volread(path)
+    im_out = None
+    for i, im in enumerate(im_in):
+        im = func(im)
+        try:
+            im_out[i, ...] = im
+        except TypeError:
+            im_out = np.empty((im_in.shape[0], ) + im.shape)
+            im_out[i, ...] = im
+    imageio.volwrite('output.tif', im_out)
 
-im_in = imageio.volread(path)
-im_out = None
-for i, im in enumerate(im_in):
-    im = func(im)
-    try:
-        im_out[i, ...] = im
-    except TypeError:
-        im_out = np.empty((im_in.shape[0], ) + im.shape)
-        im_out[i, ...] = im
-imwrite('output.tif', im_out)
+
+main('E:\\Nature COPY\\Chia-Ming\\BigSheet_DS\\TIF_ch1s.tif')
