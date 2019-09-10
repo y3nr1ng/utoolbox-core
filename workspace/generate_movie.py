@@ -2,7 +2,7 @@ import logging
 import os
 
 import coloredlogs
-import ffmpeg
+import av
 import imageio
 import numpy as np
 
@@ -15,7 +15,12 @@ coloredlogs.install(
     level="INFO", fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
 )
 
+##
+
 root = "~/nas/hive_archive_ytliu/20190528_Cornea/G"
+framerate = 23.976
+
+##
 
 ds = FileDatastore(
     root, read_func=imageio.imread, extensions=["tif"]
@@ -29,34 +34,19 @@ root = os.path.abspath(root)
 parent, basename = os.path.dirname(root), os.path.basename(root)
 out_path = os.path.join(parent, "{}.mp4".format(basename))
 
-# invoke ffmpeg
-ffmpeg_process = (
-    ffmpeg.input(
-        "pipe:", format="rawvideo", pix_fmt="gray", s="{}x{}".format(nx, ny)
-    )
-    .output(out_path, pix_fmt="gray")
-    .overwrite_output()
-    .run_async(pipe_stdin=True)
-)
+# create new container
+out = av.open(out_path, 'w')
+stream = out.add_stream('h264', framerate)
+stream.bit_rate = 8e6
 
-u8_max = np.iinfo(np.uint8).max
 for key, im in ds.items():
     logger.info(key)
 
-    # in
-    data = im.astype(np.float32)
+    frame = av.VideoFrame.from_ndarray(, format=)
+    packet = stream.encode(frame)
+    out.mux(packet)
 
-    # normalize
-    m, M = data.min(), data.max()
-    data = (data - m) / (M - m)
-    data *= u8_max
-
-    print(data.dtype)
-
-    # out
-    data = data.astype(np.uint8)
-
-    ffmpeg_process.stdin.write(data.tobytes())
-
-ffmpeg_process.stdin.close()
-ffmpeg_process.wait()
+# flush
+packet = stream.encode(None)
+out.mux(packet)
+out.close()
