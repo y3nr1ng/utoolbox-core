@@ -1,13 +1,12 @@
 """
 Decorators related to reshaping program execution flows.
 """
-__all__ = [
-    'lazy_property',
-    'run_once'
-]
+__all__ = ["lazy_property", "run_once"]
+
 
 class lazy_property(object):
     """Monkey patch the wrapped function after evaluation."""
+
     def __init__(self, func):
         self._func = func
 
@@ -22,6 +21,7 @@ class lazy_property(object):
         setattr(instance, self._func.__name__, value)
         return value
 
+
 class run_once(object):
     """
     Both unbound and bound methods will run only once.
@@ -30,7 +30,8 @@ class run_once(object):
     ---------
     http://code.activestate.com/recipes/425445-once-decorator/
     """
-    __slots__ = ('_func', '_result', '_methods')
+
+    __slots__ = ("_func", "_result", "_methods")
 
     def __init__(self, func):
         self._func = func
