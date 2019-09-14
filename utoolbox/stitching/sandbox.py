@@ -3,8 +3,7 @@ from pprint import pprint
 
 import networkx as nx
 
-from .fusion import rmlp2
-from .error import NotConsolidatedError
+from utoolbox.stitching.error import NotConsolidatedError
 
 __all__ = ["Sandbox"]
 
@@ -12,18 +11,19 @@ logger = logging.getLogger(__name__)
 
 
 class Sandbox(object):
-    def __init__(self, ds):
-        self._datastore = ds
+    def __init__(self, datastore):
+        self._datastore = datastore
         self._links = nx.Graph()
 
         # populate the graph
-        self._links.add_nodes_from(ds.keys())
+        self._links.add_nodes_from(datastore.keys())
 
         # only exists after consolidation
         self._sequence = None
 
     @property
     def shape(self):
+        """Current full extent of the sandbox."""
         pass
 
     @property
@@ -32,6 +32,7 @@ class Sandbox(object):
 
     @property
     def sequence(self):
+        # TODO raise error until not None
         return self._sequence
 
     def link(self, ref, target, shift, weight=1.0):

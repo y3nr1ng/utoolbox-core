@@ -8,7 +8,7 @@ import imageio
 from mako.template import Template
 import numpy as np
 
-from utoolbox.container.datastore import ImageDatastore
+from utoolbox.container.datastore import ImageFolderDatastore
 from utoolbox.stitching.fusion import rmlp2
 from utoolbox.util.decorator import timeit
 
@@ -33,7 +33,7 @@ coloredlogs.install(
 # print(I)
 # imageio.imwrite("I.tif", I)
 
-ds = ImageDatastore(
+ds = ImageFolderDatastore(
     #'/Users/Andy/Documents/utoolbox/data/fusion/crop',
     #'/Users/Andy/Documents/Sinica (Data)/Projects/ExM SIM/20181224_Expan_Tub_Tiling_SIM',
     "field_test_data",
