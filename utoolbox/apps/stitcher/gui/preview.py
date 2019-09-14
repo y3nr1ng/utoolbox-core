@@ -1,6 +1,5 @@
 from collections import OrderedDict
 import logging
-import sys
 
 from PySide2.QtWidgets import QWidget, QGridLayout, QPushButton
 import vispy.app
@@ -13,13 +12,13 @@ logger = logging.getLogger(__name__)
 
 
 class Preview(QWidget):
-    def __init__(self, datastore):
+    def __init__(self, sandbox):
         super().__init__()
 
         self._setup_canvas()
         self._images = OrderedDict()
 
-        self._load_datastore(datastore)
+        self._init_from_sandbox(sandbox)
 
     ##
 
@@ -37,12 +36,11 @@ class Preview(QWidget):
 
     ##
 
-    def _load_datastore(self, datastore):
+    def _init_from_sandbox(self, sandbox):
         """
         Load all the images in a datastore and spread them out.
         """
-        for name, image in datastore.items():
-            self.add_image(image, name=name)
+        raise RuntimeError("DEBUG")
 
     def _setup_canvas(self):
         self.setLayout(QGridLayout(self))

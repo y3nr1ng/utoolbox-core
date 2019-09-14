@@ -16,7 +16,9 @@ class MainWindow(QMainWindow):
 
         # load the datastore to sandbox
         self.sandbox = Sandbox(datastore)
-        self._preview = Preview()
+        self._preview = Preview(self.sandbox)
+
+        # TODO link algorithm with sandbox
 
         # default view
         self.setCentralWidget(self._preview)
@@ -25,14 +27,23 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     from pprint import pprint
 
+    import coloredlogs
+    import imageio
+
     from utoolbox.data.datastore import ImageFolderDatastore
 
-    imfds = ImageFolderDatastore("/scratch/20170606_ExM_cell7", pattern="cell7*")
-    pprint(list(imfds.values()))
+    logging.getLogger("tifffile").setLevel(logging.ERROR)
+    coloredlogs.install(
+        level="DEBUG",
+        fmt="%(asctime)s %(module)s[%(process)d] %(levelname)s %(message)s",
+        datefmt="%H:%M:%S",
+    )
 
-    raise RuntimeError("DEBUG")
+    imfds = ImageFolderDatastore(
+        "/scratch/20170606_ExM_cell7", pattern="cell7*", read_func=imageio.volread
+    )
 
     app = QApplication()
-    mw = MainWindow()
+    mw = MainWindow(imfds)
     mw.show()
     sys.exit(app.exec_())
