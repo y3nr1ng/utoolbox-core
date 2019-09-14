@@ -5,7 +5,7 @@ import re
 
 import imageio
 
-from utoolbox.data.datastore import ImageDatastore
+from utoolbox.data.datastore import ImageFolderDatastore
 from ..base import MultiChannelDataset
 from .error import MultipleSettingsError, SettingsNotFoundError
 from .settings import Settings
@@ -89,7 +89,7 @@ class SPIMDataset(MultiChannelDataset):
     def _load_channel(self, channel):
         # NOTE
         # `imageio.volread` can adapt for both 2D and 3D TIFF files.
-        ds = ImageDatastore(
+        ds = ImageFolderDatastore(
             self.root,
             read_func=imageio.volread,
             sub_dir=False,
