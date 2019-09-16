@@ -1,0 +1,4 @@
+
+
+class PSFAverage(object):
+    pass
