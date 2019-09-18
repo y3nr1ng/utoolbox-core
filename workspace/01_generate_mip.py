@@ -5,7 +5,7 @@ import coloredlogs
 import imageio
 from tqdm import tqdm
 
-from utoolbox.container.datastore import ImageDatastore
+from utoolbox.container.datastore import ImageFolderDatastore
 from utoolbox.transform.projections import Orthogonal
 from utoolbox.util.logging import TqdmLoggingHandler
 
@@ -27,7 +27,7 @@ coloredlogs.install(
 ###
 
 data_dir = 'data'
-src_ds = ImageDatastore(
+src_ds = ImageFolderDatastore(
     os.path.join(data_dir, 'raw'),
     read_func=imageio.volread
 )
@@ -36,7 +36,7 @@ logger.info("create output directories")
 projs = ('xy', 'xz', 'yz')
 
 mip_ds = [
-    ImageDatastore(os.path.join(
+    ImageFolderDatastore(os.path.join(
         data_dir, view), 
         write_func=imageio.imwrite
     )

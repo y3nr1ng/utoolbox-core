@@ -5,7 +5,7 @@ import coloredlogs
 import imageio
 from tqdm import tqdm
 
-from utoolbox.container.datastore import ImageDatastore
+from utoolbox.container.datastore import ImageFolderDatastore
 from utoolbox.exposure import histogram
 from utoolbox.util.logging import TqdmLoggingHandler
 
@@ -16,24 +16,19 @@ from utoolbox.util.logging import TqdmLoggingHandler
 logger = logging.getLogger(__name__)
 logger.addHandler(TqdmLoggingHandler())
 
-logging.getLogger('tifffile').setLevel(logging.ERROR)
+logging.getLogger("tifffile").setLevel(logging.ERROR)
 
 coloredlogs.install(
-    level='DEBUG',
-    fmt='%(asctime)s %(levelname)s %(message)s',
-    datefmt='%H:%M:%S'
+    level="DEBUG", fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
 )
 
 ###
 # endregion
 ###
 
-data_dir = 'data'
+data_dir = "data"
 
-imds = ImageDatastore(
-    os.path.join(data_dir, 'raw'),
-    imageio.volread
-)
+imds = ImageFolderDatastore(os.path.join(data_dir, "raw"), imageio.volread)
 
 for im in imds:
     h = histogram(im, 256)

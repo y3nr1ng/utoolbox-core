@@ -6,7 +6,7 @@ import imageio
 import numpy as np
 
 from utoolbox.container.datastore import (
-    ImageDatastore
+    ImageFolderDatastore
 )
 from utoolbox.stitching import Sandbox
 from utoolbox.stitching.fusion import rmlp2
@@ -27,7 +27,7 @@ coloredlogs.install(
 # endregion
 ##
 
-#ds = ImageDatastore('data/xy', imageio.imread)
+#ds = ImageFolderDatastore('data/xy', imageio.imread)
 
 #sb = Sandbox(ds)
 
@@ -37,7 +37,7 @@ try:
 except:
     pass
 
-ds = ImageDatastore('data/raw', imageio.volread)
+ds = ImageFolderDatastore('data/raw', imageio.volread)
 
 fn_list = [fn for fn in ds.keys()]
 
