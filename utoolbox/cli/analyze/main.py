@@ -1,8 +1,11 @@
 import logging
 
+import click
 import coloredlogs
 
-logging.getLogger("tifffile").setLevel(logging.ERROR)
+from utoolbox.cli.analyze.psf import analyze_psf
+
+__all__ = ["main"]
 
 
 @click.group()
@@ -13,16 +16,14 @@ def main(ctx, verbose):
     if verbose >= len(verbosity):
         verbose = len(verbosity) - 1
     coloredlogs.install(
-        level=verbosity[verbosity],
+        level=verbosity[verbose],
         fmt="%(asctime)s %(levelname)s %(message)s",
         datefmt="%H:%M:%S",
     )
 
-@main.command('psf', short_help='analyze PSF info from a beads-coated slide')
-@click.argument('path', type=click.Path(exists=True))
-@click.pass_context
-def analyze(path):
-    pass
+
+main.add_command(analyze_psf, "psf")
+
 
 if __name__ == "__main__":
     main(obj={})
