@@ -11,12 +11,25 @@ from .error import InvalidDatastoreRootError
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["FolderDatastore", "ImageDatastore"]
+__all__ = ["FileDatastore", "FolderDatastore", "ImageFolderDatastore"]
+
+
+class FileDatastore(Datastore):
+    """
+    A datastore represents by a single file.
+
+    Args:
+        path (str): path to the file
+        create_new (bool): create the file if not exists
+    """
+
+    def __init__(self, path, create_new=False, **kwargs):
+        super().__init__(**kwargs)
 
 
 class FolderDatastore(Datastore):
     """
-    Using a folder containing numerous files to represet a datastore.
+    A datastore represents by a folder that contains numerous files.
     
     Args:
         root (str): root folder of the datastore
@@ -25,6 +38,7 @@ class FolderDatastore(Datastore):
         extensions (:obj:`list` of str): file extensions to include
         create_new (bool): create the root folder if not exists
     """
+
     def __init__(
         self,
         root,
@@ -95,11 +109,11 @@ class FolderDatastore(Datastore):
         return os.path.join(self.root, key)
 
 
-class ImageDatastore(FolderDatastore):
+class ImageFolderDatastore(FolderDatastore):
     supported_extensions = ("tif",)
 
     def __init__(self, root, **kwargs):
         if "extensions" not in kwargs:
-            kwargs["extensions"] = ImageDatastore.supported_extensions
+            kwargs["extensions"] = ImageFolderDatastore.supported_extensions
         super().__init__(root, **kwargs)
 
