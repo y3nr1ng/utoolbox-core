@@ -93,7 +93,7 @@ class VolumeTilesDatastore(FolderCollectionDatastore, BufferedDatastore):
 
 
 '''
-class SparseTilesImageDatastore(SparseStackImageDatastore):
+class SparseTilesImageFolderDatastore(SparseStackImageFolderDatastore):
     """Each folder represents a tiled stack."""
     def __init__(self, root, read_func, tile_sz=None, **kwargs):
         """
@@ -103,7 +103,7 @@ class SparseTilesImageDatastore(SparseStackImageDatastore):
 
         .. note:: Currently, only 2D tiling is supported.
         """
-        super(SparseTilesImageDatastore, self).__init__(
+        super(SparseTilesImageFolderDatastore, self).__init__(
             root, read_func, **kwargs
         )
         self._tile_sz = tile_sz if tile_sz else self._find_tile_sz()

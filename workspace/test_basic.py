@@ -1,24 +1,21 @@
-
 import coloredlogs
 import imageio
 import numpy as np
 
-from utoolbox.data.datastore import ImageDatastore
+from utoolbox.data.datastore import ImageFolderDatastore
 
 coloredlogs.install(
-    level='DEBUG',
-    fmt='%(asctime)s %(module)s[%(process)d] %(levelname)s %(message)s',
-    datefmt='%H:%M:%S'
+    level="DEBUG",
+    fmt="%(asctime)s %(module)s[%(process)d] %(levelname)s %(message)s",
+    datefmt="%H:%M:%S",
 )
 
 ## scan valid files ##
-ds = ImageDatastore(
-    'data/brain_slice/gray',
-    read_func=imageio.imread,
-    pattern="*"
+ds = ImageFolderDatastore(
+    "data/brain_slice/gray", read_func=imageio.imread, pattern="*"
 )
 
-## probe data size 
+## probe data size
 im = next(iter(ds.values()))
 ny, nx = im.shape
 nz = len(ds)

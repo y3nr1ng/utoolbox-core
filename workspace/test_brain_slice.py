@@ -7,6 +7,7 @@ from cupyx.scipy.ndimage import rotate, zoom
 import imageio
 import numpy as np
 
+from utoolbox.exposure import auto_contrast
 from utoolbox.util.decorator import timeit
 
 
@@ -16,50 +17,7 @@ def func(
 ):
     im_in = cp.asarray(im_in)
 
-    # histogram
-    hist, edges = cp.histogram(im_in, bins=256)
-    edges = ((edges[:-1] + edges[1:]) / 2).astype(im_in.dtype)
-    hist = cp.asnumpy(hist)
-
-    nelem = im_in.size
-    limit = nelem / 10
-    autothreshold = 5000
-    threshold = nelem / autothreshold
-
-    hmin = -1
-    for i, cnt in enumerate(hist):
-        if cnt > limit:
-            continue
-        if cnt > threshold:
-            hmin = i
-            break
-
-    hmax = -1
-    for i, cnt in reversed(list(enumerate(hist))):
-        if cnt > limit:
-            continue
-        if cnt > threshold:
-            hmax = i
-            break
-
-    vmin, vmax = edges[hmin], edges[hmax]
-    print(f"min={vmin}, max={vmax}")
-
-    lookup = cp.ElementwiseKernel(
-        "T in",
-        "T out",
-        f"""
-        float fin = ((float)in - {vmin}) / ({vmax}-{vmin});
-        if (fin < 0) {{
-            fin = 0;
-        }} else if (fin > 1) {{
-            fin = 1;
-        }}
-        out = (T)(fin * 65535);
-        """,
-        "lookup",
-    )
-    im_hist = lookup(im_in)
+    im_hist = auto_contrast(im_in)
 
     # rotate to horizontal view
     im_rot = rotate(im_hist, 103)
