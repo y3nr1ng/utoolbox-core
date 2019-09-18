@@ -83,6 +83,7 @@ setup(
             "deskew=utoolbox.cli.deskew:main",
             "zpatch=utoolbox.cli.zpatch:main",
             "dataset=utoolbox.cli.dataset:main",
+            "analyze=utoolbox.cli.analyze:main",
         ]
     },
     # contains c source, cannot safely run in compressed form
