@@ -4,7 +4,7 @@ import os
 
 import imageio
 
-from utoolbox.data.datastore import ImageDatastore, VolumeTilesDatastore
+from utoolbox.data.datastore import ImageFolderDatastore, VolumeTilesDatastore
 from ..base import MultiChannelDataset
 from .error import NoMetadataInTileFolderError, NoSummarySectionError
 
@@ -91,7 +91,7 @@ class MicroManagerDataset(MultiChannelDataset):
                 merge=self._merge,
             )
         else:
-            return ImageDatastore(
+            return ImageFolderDatastore(
                 self.root,
                 read_func=imageio.imread,
                 sub_dir=False,

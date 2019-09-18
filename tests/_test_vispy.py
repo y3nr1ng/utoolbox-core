@@ -1,141 +1,68 @@
-# pylint: disable=invalid-name, no-member, unused-argument
-""" passing varyings to fragment """
+# -*- coding: utf-8 -*-
+# Copyright (c) Vispy Development Team. All Rights Reserved.
+# Distributed under the (new) BSD License. See LICENSE.txt for more info.
+
+"""
+Simple demonstration of ImageVisual.
+"""
+
 import numpy as np
-from vispy import app, gloo
-from vispy.util.transforms import translate, perspective, rotate
-
-# note the 'color' and 'v_color' in vertex
-vertex = """
-uniform mat4   u_model;         // Model matrix
-uniform mat4   u_view;          // View matrix
-uniform mat4   u_projection;    // Projection matrix
-uniform vec4   u_color;         // mask color for edge plotting
-attribute vec3 a_position;
-attribute vec4 a_color;
-varying vec4   v_color;
-
-void main()
-{
-    gl_Position = u_projection * u_view * u_model * vec4(a_position, 1.0);
-    v_color = a_color * u_color;
-}
-"""
-
-# note the varying 'v_color', it must has the same name as in the vertex.
-fragment = """
-varying vec4 v_color;
-
-void main()
-{
-    gl_FragColor = v_color;
-}
-"""
+import vispy.app
+from vispy import gloo
+from vispy import visuals
+from vispy.visuals.transforms import STTransform
 
 
-class Canvas(app.Canvas):
-    """ build canvas class for this demo """
-
+class Canvas(vispy.app.Canvas):
     def __init__(self):
-        """ initialize the canvas """
-        app.Canvas.__init__(self,
-                            size=(512, 512),
-                            title='scaling quad',
-                            keys='interactive')
+        vispy.app.Canvas.__init__(self, keys="interactive", size=(800, 800))
+        self.image = visuals.ImageVisual(get_image(), method="subdivide")
 
-        # shader program
-        tet = gloo.Program(vert=vertex, frag=fragment)
+        # scale and center image in canvas
+        s = 700.0 / max(self.image.size)
+        t = 0.5 * (700.0 - (self.image.size[0] * s)) + 50
+        self.image.transform = STTransform(scale=(s, s), translate=(t, 50))
 
-        # vertices
-        V = np.array([(0, 0, 0),
-                      (1, 0, 0),
-                      (1.0/2.0, np.sqrt(3.0)/2.0, 0),
-                      (1.0/2.0, np.sqrt(3.0)/6.0, np.sqrt(2.0/3.0))],
-                     dtype=np.float32)
-        # triangles specified by connecting matrix,
-        # it can also be initialized using itertools
-        I = np.array([(0, 1, 2),
-                      (0, 3, 1),
-                      (0, 2, 3),
-                      (1, 3, 2)], dtype=np.uint32)
-        # edges, used for drawing outline
-        E = np.array([(0, 1), (1, 2), (2, 0), (1, 3), (2, 3), (0, 3)],
-                     dtype=np.uint32)
-        # colors of vertices
-        C = np.array([(1, 0, 0, 1),
-                      (0, 1, 0, 1),
-                      (0, 0, 1, 1),
-                      (1, 1, 0, 1)], dtype=np.float32)
-
-        # bind to data
-        tet['a_position'] = V
-        tet['a_color'] = C
-        self.I = gloo.IndexBuffer(I)
-        self.E = gloo.IndexBuffer(E)
-
-        # intialize transformation matrix
-        view = np.eye(4, dtype=np.float32)
-        model = np.eye(4, dtype=np.float32)
-        projection = np.eye(4, dtype=np.float32)
-
-        # set view
-        view = translate((0, 0, -5))
-        tet['u_model'] = model
-        tet['u_view'] = view
-        tet['u_projection'] = projection
-
-        # bind your program
-        self.program = tet
-
-        # config and set viewport
-        gloo.set_viewport(0, 0, *self.physical_size)
-        gloo.set_clear_color('white')
-        gloo.set_state('translucent')
-        gloo.set_polygon_offset(1.0, 1.0)
-
-        # bind a timer
-        self.timer = app.Timer('auto', self.on_timer)
-        self.theta = 0.0
-        self.phi = 0.0
-        self.timer.start()
-
-        # show the canvas
         self.show()
 
+    def on_draw(self, ev):
+        gloo.clear(color="black", depth=True)
+        self.image.draw()
+
     def on_resize(self, event):
-        """ canvas resize callback """
-        ratio = event.physical_size[0] / float(event.physical_size[1])
-        self.program['u_projection'] = perspective(45.0, ratio, 2.0, 10.0)
-        gloo.set_viewport(0, 0, *event.physical_size)
+        # Set canvas viewport and reconfigure visual transforms to match.
+        vp = (0, 0, self.physical_size[0], self.physical_size[1])
+        self.context.set_viewport(*vp)
+        self.image.transforms.configure(canvas=self, viewport=vp)
 
-    def on_draw(self, event):
-        """ canvas update callback """
-        gloo.clear()
 
-        # Filled cube
-        gloo.set_state(blend=True, depth_test=False,
-                       polygon_offset_fill=True)
-        self.program['u_color'] = [1.0, 1.0, 1.0, 0.8]
-        self.program.draw('triangles', self.I)
+def get_image():
+    """Load an image from the demo-data repository if possible. Otherwise,
+    just return a randomly generated image.
+    """
+    from vispy.io import load_data_file, read_png
 
-        # draw outline
-        gloo.set_state(blend=False, depth_test=False,
-                       polygon_offset_fill=True)
-        self.program['u_color'] = [0.0, 0.0, 0.0, 1.0]
-        self.program.draw('lines', self.E)
+    try:
+        return read_png(load_data_file("mona_lisa/mona_lisa_sm.png"))
+    except Exception as exc:
+        # fall back to random image
+        print("Error loading demo image data: %r" % exc)
 
-    def on_timer(self, event):
-        """ canvas time-out callback """
-        self.theta += .5
-        self.phi += .5
-        # note the convention is, theta is applied first and then phi
-        # see vispy.utils.transforms,
-        # python is row-major and opengl is column major,
-        # so the rotate function transposes the output.
-        model = np.dot(rotate(self.theta, (0, 1, 0)),
-                       rotate(self.phi, (0, 0, 1)))
-        self.program['u_model'] = model
-        self.update()
+    # generate random image
+    image = np.random.normal(size=(100, 100, 3))
+    image[20:80, 20:80] += 3.0
+    image[50] += 3.0
+    image[:, 50] += 3.0
+    image = ((image - image.min()) * (253.0 / (image.max() - image.min()))).astype(
+        np.ubyte
+    )
 
-# Finally, we show the canvas and we run the application.
-c = Canvas()
-app.run()
+    return image
+
+
+if __name__ == "__main__":
+    win = Canvas()
+    import sys
+
+    if sys.flags.interactive != 1:
+        vispy.app.run()
