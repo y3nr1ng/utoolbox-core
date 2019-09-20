@@ -3,7 +3,7 @@ import os
 import coloredlogs
 
 from utoolbox.imagej import run_macro as _run_macro
-from utoolbox.util.decorator.macos import prelaunch_cocoa
+from utoolbox.utils.decorator.macos import prelaunch_cocoa
 
 coloredlogs.install(
     level='DEBUG',
