@@ -25,7 +25,7 @@ class Orthogonal(object):
 
         try:
             self._data = cp.asarray(data)
-            self._poject = self._project_whole
+            self._project = self._project_whole
         except OutOfMemoryError:
             logging.info("unable to fit in memory, slicing...")
             # process data in slabs
@@ -52,12 +52,11 @@ class Orthogonal(object):
 
     def _project_whole(self, axis):
         func = getattr(self._data, self._mode)
-        return func(axis=axis)
+        return cp.asnumpy(func(axis=axis))
 
     def _project_slab(self, axis):
         proj = []
         for data in self._load_slab():
-            logger.debug(data.shape)
             func = getattr(data, self._mode)
             proj.append(func(axis=axis))
             # release the reference in this loop
