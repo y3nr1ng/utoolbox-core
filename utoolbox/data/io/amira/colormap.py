@@ -8,13 +8,16 @@ __all__ = ["AmiraColormap"]
 
 logger = logging.getLogger(__name__)
 
+
 class AmiraColormap(Amira):
+    """Load Amira ASCII colormap format."""
+
     def __init__(self, path):
         super().__init__(path)
 
         # load data stream
-        tag, array = self.data['Lattice']
-        with open(path, 'r') as fd:
+        tag, array = self.data["Lattice"]
+        with open(path, "r") as fd:
             # search until tag
             for line in fd:
                 if line.startswith(tag):
@@ -24,10 +27,12 @@ class AmiraColormap(Amira):
                 line = line.strip()
                 if not line:
                     continue
-                array[i, :] = np.array([float(v) for v in line.split(' ')], dtype=array.dtype)
-                
+                array[i, :] = np.array(
+                    [float(v) for v in line.split(" ")], dtype=array.dtype
+                )
+
         # overwrite data
-        logger.debug(f'replace internal data as a {array.shape} array')
+        logger.debug(f"replace internal data as a {array.shape} array")
         self._data = array
 
     def __len__(self):
@@ -35,6 +40,7 @@ class AmiraColormap(Amira):
 
     def __getitem__(self, index):
         return self.data[index, :]
+
 
 if __name__ == "__main__":
     cm = AmiraColormap("pureGreen.col")

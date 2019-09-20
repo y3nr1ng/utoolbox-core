@@ -1,9 +1,14 @@
+import logging
+
 import cupy as cp
+from cupy.cuda.memory import OutOfMemoryError
 from mako.template import Template
 
 from utoolbox.algorithm import AttrDict
 
 __all__ = ["RawKernelFile"]
+
+logger = logging.getLogger(__name__)
 
 
 class RawKernelFile(AttrDict):
