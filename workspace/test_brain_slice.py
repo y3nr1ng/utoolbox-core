@@ -8,7 +8,7 @@ import imageio
 import numpy as np
 
 from utoolbox.exposure import auto_contrast
-from utoolbox.util.decorator import timeit
+from utoolbox.utils.decorator import timeit
 
 
 @timeit

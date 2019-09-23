@@ -1,33 +1,18 @@
-import logging
+from math import floor
 import os
 
-import coloredlogs
 import av
 import imageio
-import numpy as np
 
-from utoolbox.container.datastore import FolderDatastore
+from utoolbox.data.datastore import FolderDatastore
 
-logging.getLogger("tifffile").setLevel(logging.ERROR)
-logger = logging.getLogger(__name__)
-
-coloredlogs.install(
-    level="INFO", fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
-)
-
-##
-
-root = "~/nas/hive_archive_ytliu/20190528_Cornea/G"
-framerate = 23.976
-
-##
-
-ds = FolderDatastore(
-    root, read_func=imageio.imread, extensions=["tif"]
-)
+root = 'Movie_decon'
+ds = FolderDatastore(root, read_func=imageio.imread, extensions=['tif'])
+framerate = 24
 
 # dummy read
-ny, nx = next(iter(ds.values())).max(axis=0).shape
+ny, nx = next(iter(ds.values())).shape[:2]
+ny, nx = floor(ny/2)*2, floor(nx/2)*2
 
 # expand path
 root = os.path.abspath(root)
@@ -36,13 +21,15 @@ out_path = os.path.join(parent, "{}.mp4".format(basename))
 
 # create new container
 out = av.open(out_path, 'w')
-stream = out.add_stream('h264', framerate)
+stream = out.add_stream('h264', str(framerate))
+stream.width = nx
+stream.height = ny
 stream.bit_rate = 8e6
 
 for key, im in ds.items():
-    logger.info(key)
+    print(key)
 
-    frame = av.VideoFrame.from_ndarray(, format=)
+    frame = av.VideoFrame.from_ndarray(im[:ny, :nx], format='rgb24')
     packet = stream.encode(frame)
     out.mux(packet)
 
