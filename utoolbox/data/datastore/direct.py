@@ -1,6 +1,7 @@
 """
 Datastores that can direct access the files.
 """
+from abc import abstractmethod
 import glob
 import logging
 import os
@@ -16,7 +17,7 @@ __all__ = ["FileDatastore", "FolderDatastore", "ImageFolderDatastore"]
 
 class FileDatastore(Datastore):
     """
-    A datastore represents by a single file.
+    A datastore represents by a single file, such as HDF5.
 
     Args:
         path (str): path to the file
@@ -25,6 +26,10 @@ class FileDatastore(Datastore):
 
     def __init__(self, path, create_new=False, **kwargs):
         super().__init__(**kwargs)
+
+    @abstractmethod
+    def _enumerate_entries(self):
+        """Enumerate what are stored in this file."""
 
 
 class FolderDatastore(Datastore):

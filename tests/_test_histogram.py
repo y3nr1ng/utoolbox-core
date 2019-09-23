@@ -5,7 +5,7 @@ import coloredlogs
 import numpy as np
 
 from utoolbox.exposure.histogram import histogram
-from utoolbox.util.decorator import timeit
+from utoolbox.utils.decorator import timeit
 
 coloredlogs.install(
     level='DEBUG',

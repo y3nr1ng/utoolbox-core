@@ -128,10 +128,28 @@ class DftRegister(object):
             # normalization
             cross_corr /= self.norm_factor
 
+            import matplotlib.pyplot as plt
+            plt.imshow(cp.asnumpy(cp.abs(cross_corr))) # DEBUG
+
             # local maxima
+            """
             maxima = np.unravel_index(
                 cp.asnumpy(cp.argmax(cp.abs(cross_corr))), cross_corr.shape
             )
+            
+            print(maxima)
+            plt.plot(*(maxima[::-1]), 'k+') # DEBUG
+            """
+            # peak local max
+            from skimage.feature import peak_local_max
+            maxima = peak_local_max(cp.asnumpy(cp.abs(cross_corr)))[0]
+            maxima = tuple(maxima[::-1])
+            """
+            print(maxima2)
+            plt.plot(*maxima2, 'ko') # DEBUG
+            
+            plt.show()
+            """
             # wrap around
             shifts = tuple(
                 shift + float(ax_max - dft_shift) / self.upsample_factor

@@ -2,6 +2,7 @@ import logging
 from operator import itemgetter
 from pprint import pprint
 
+import matplotlib.pyplot as plt
 import networkx as nx
 
 from utoolbox.stitching.error import NotConsolidatedError
@@ -46,7 +47,13 @@ class Sandbox(object):
             similarity (float): similarity between the two images, [0, 1]
         """
         self._links.add_edge(reference, target, shift=shift, weight=similarity)
-        self._update_fused_shape()
+
+    def update(self):
+        self.preview()
+
+    def preview(self):
+        nx.draw(self._links)
+        plt.show()
 
     def consolidate(self):
         """Fix edge weights into fusion sequence."""
@@ -80,9 +87,3 @@ class Sandbox(object):
             raise RuntimeError("the sandbox is not consolidated yet")
         return self._sequence
 
-    ##
-
-    def _update_fused_shape(self):
-        # TODO retrieve sequence
-        # TODO iterate over everyone, update shape+shift
-        pass
