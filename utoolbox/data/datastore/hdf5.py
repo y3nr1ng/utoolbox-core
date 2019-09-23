@@ -1,9 +1,13 @@
 import h5py
 
-from .base import TransientDatastore
+from utoolbox.data.datastore import FileDatastore, TransientDatastore
 
-class HDF5Datastore(TransientDatastore):
-    def __init__(self, root):
+class HDF5Datastore(FileDatastore, TransientDatastore):
+    """
+    Args:
+        path (str): 
+    """
+    def __init__(self, path):
         """
         :param h5py.Dataset root: dataset handle
         """
@@ -14,6 +18,12 @@ class HDF5Datastore(TransientDatastore):
             read_func=lambda zt: self._root[zt, ...], 
             immutable=True
         )
+
+    def _allocate_resources(self):
+        pass 
+
+    def _free_resources(self):
+        pass
 
     @property
     def filename(self):

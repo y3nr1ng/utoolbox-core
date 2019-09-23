@@ -5,7 +5,7 @@ import os
 import cupy as cp
 import numpy as np
 
-from utoolbox.util.decorator import run_once
+from utoolbox.utils.decorator import run_once
 
 __all__ = ["Histogram", "histogram"]
 

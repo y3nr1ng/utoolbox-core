@@ -10,12 +10,12 @@ import numpy as np
 
 from skimage.feature import register_translation
 
-from utoolbox.container.datastore import ImageDatastore
+from utoolbox.container.datastore import ImageFolderDatastore
 from utoolbox.stitching import Sandbox
 #from utoolbox.feature import DftRegister
-#from utoolbox.util.logging import TqdmLoggingHandler
+#from utoolbox.utils.logging import TqdmLoggingHandler
 
-from utoolbox.util.decorator import timeit
+from utoolbox.utils.decorator import timeit
 
 ###
 # region: Configure logging facilities
@@ -42,7 +42,7 @@ def tuple_float_to_str(t, digits=4):
 data_dir = 'data'
 projs = ('xy', 'xz', 'yz')
 
-ds = ImageDatastore(
+ds = ImageFolderDatastore(
     os.path.join(data_dir, projs[0]),
     read_func=imageio.imread
 )

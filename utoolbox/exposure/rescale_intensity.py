@@ -121,7 +121,7 @@ if __name__ == "__main__":
     image = imageio.volread("cell_in.tif")
     print("{}, {}".format(image.shape, image.dtype))
 
-    from utoolbox.util.decorator import timeit
+    from utoolbox.utils.decorator import timeit
 
     @timeit
     def cpu(image):

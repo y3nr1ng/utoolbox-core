@@ -23,7 +23,7 @@ print(im_path)
 String = jnius.autoclass('java.lang.String')
 im_path = String(im_path)
 
-from utoolbox.util.decorator.macos import prelaunch_cocoa
+from utoolbox.utils.decorator.macos import prelaunch_cocoa
 
 @prelaunch_cocoa
 def run_ij():
