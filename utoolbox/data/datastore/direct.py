@@ -1,6 +1,7 @@
 """
 Datastores that can direct access the files.
 """
+from abc import abstractmethod
 import glob
 import logging
 import os
@@ -11,10 +12,38 @@ from .error import InvalidDatastoreRootError
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["FileDatastore", "ImageDatastore"]
+__all__ = ["FileDatastore", "FolderDatastore", "ImageFolderDatastore"]
 
 
 class FileDatastore(Datastore):
+    """
+    A datastore represents by a single file, such as HDF5.
+
+    Args:
+        path (str): path to the file
+        create_new (bool): create the file if not exists
+    """
+
+    def __init__(self, path, create_new=False, **kwargs):
+        super().__init__(**kwargs)
+
+    @abstractmethod
+    def _enumerate_entries(self):
+        """Enumerate what are stored in this file."""
+
+
+class FolderDatastore(Datastore):
+    """
+    A datastore represents by a folder that contains numerous files.
+    
+    Args:
+        root (str): root folder of the datastore
+        sub_dir (bool): scan nested folders for files
+        pattern (str): filename pattern
+        extensions (:obj:`list` of str): file extensions to include
+        create_new (bool): create the root folder if not exists
+    """
+
     def __init__(
         self,
         root,
@@ -24,13 +53,6 @@ class FileDatastore(Datastore):
         create_new=True,
         **kwargs
     ):
-        """
-        :param str root: files or folders to include in the datastore
-        :param bool sub_dir: scan nested folders
-        :param str pattern: filename pattern
-        :param str extensions: file extensions to include
-        :param bool create_new: create datastore root if not exists
-        """
         if "del_func" not in kwargs:
             kwargs["del_func"] = os.unlink
 
@@ -52,12 +74,12 @@ class FileDatastore(Datastore):
         else:
             extensions = ["{}.{}".format(pattern, ext) for ext in extensions]
         logger.debug("{} search patterns".format(len(extensions)))
-        
+
         files = []
         for ext in extensions:
             path = os.path.join(root, ext)
             files.extend(glob.glob(path, recursive=sub_dir))
-        FileDatastore._sort_numerically(files)
+        FolderDatastore._sort_numerically(files)
 
         # simple 1-1 mapping
         for path in files:
@@ -74,7 +96,8 @@ class FileDatastore(Datastore):
         """
         Sort the file list based on numebers that are constantly changing.
         
-        :param list(str) files: file list
+        Args:
+            files (:obj:`list` of str): file list
         """
         # extract valid numbers from filenames
         keys = [list(map(int, re.findall(r"[0-9]+", fn))) for fn in files]
@@ -91,11 +114,11 @@ class FileDatastore(Datastore):
         return os.path.join(self.root, key)
 
 
-class ImageDatastore(FileDatastore):
+class ImageFolderDatastore(FolderDatastore):
     supported_extensions = ("tif",)
 
     def __init__(self, root, **kwargs):
         if "extensions" not in kwargs:
-            kwargs["extensions"] = ImageDatastore.supported_extensions
+            kwargs["extensions"] = ImageFolderDatastore.supported_extensions
         super().__init__(root, **kwargs)
 

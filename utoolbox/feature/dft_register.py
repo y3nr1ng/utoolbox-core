@@ -8,15 +8,10 @@ https://github.com/scikit-image/scikit-image/blob/master/skimage/feature/registe
 import logging
 from math import ceil, floor
 
-import pdb
-
 import cupy as cp
 import numpy as np
 
-__all__ = [
-    'DftRegister',
-    'dft_register'
-]
+__all__ = ["DftRegister", "dft_register"]
 
 logger = logging.getLogger(__name__)
 
@@ -25,19 +20,13 @@ logger = logging.getLogger(__name__)
 ###
 
 ushort_to_float = cp.ElementwiseKernel(
-    'uint16 src', 'float32 dst',
-    'dst = (float)src',
-    'ushort_to_float'
+    "uint16 src", "float32 dst", "dst = (float)src", "ushort_to_float"
 )
-
-#cu_file = os.path.join(os.path.dirname(__file__), 'dft_register.cu')
-#
-#with open(cu_file, 'r') as fd:
-#    source = fd.read()
 
 ###
 # endregion
 ###
+
 
 class DftRegister(object):
     def __init__(self, template, upsample_factor=1, return_error=True):
@@ -50,12 +39,12 @@ class DftRegister(object):
         _real_tpl = cp.empty(self.real_tpl.shape, dtype=cp.float32)
         ushort_to_float(cp.asarray(self.real_tpl), _real_tpl)
         self._real_tpl = _real_tpl
-        
+
         # forward FT
         self._cplx_tpl = cp.fft.fft2(self.real_tpl)
 
         # normalization factor
-        self._norm_factor = self.cplx_tpl.size * self.upsample_factor**2
+        self._norm_factor = self.cplx_tpl.size * self.upsample_factor ** 2
 
         # intensity of the template
         if self._return_error:
@@ -63,18 +52,16 @@ class DftRegister(object):
                 # using upsampled intensity
                 self._int_tpl = cp.asnumpy(
                     self._upsampled_dft(
-                        self.cplx_tpl * self.cplx_tpl.conj(),
-                        1,
-                        self.upsample_factor
+                        self.cplx_tpl * self.cplx_tpl.conj(), 1, self.upsample_factor
                     )
                 )[0, 0]
                 self._int_tpl /= np.float32(self.norm_factor)
             else:
-                self._int_tpl = cp.asnumpy(cp.sum(cp.abs(self.cplx_tpl)**2))
+                self._int_tpl = cp.asnumpy(cp.sum(cp.abs(self.cplx_tpl) ** 2))
                 self._int_tpl /= self.cplx_tpl.size
-        
+
         return self
-    
+
     def __exit__(self, exc_type, exc_value, traceback):
         # restore and empty
         self._real_tpl = cp.asnumpy(self.real_tpl)
@@ -83,7 +70,7 @@ class DftRegister(object):
     @property
     def cplx_tpl(self):
         return self._cplx_tpl
-    
+
     @property
     def norm_factor(self):
         return self._norm_factor
@@ -91,7 +78,7 @@ class DftRegister(object):
     @property
     def real_tpl(self):
         return self._real_tpl
-    
+
     @property
     def upsample_factor(self):
         return self._upsample_factor
@@ -112,18 +99,17 @@ class DftRegister(object):
 
         # local maxima
         maxima = np.unravel_index(
-            cp.asnumpy(cp.argmax(cp.abs(cross_corr))),
-            cross_corr.shape
+            cp.asnumpy(cp.argmax(cp.abs(cross_corr))), cross_corr.shape
         )
-        # coarse shifts, wrap around 
+        # coarse shifts, wrap around
         shifts = tuple(
-            (ax_max-ax_sz) if ax_max > ax_sz//2 else ax_max
+            (ax_max - ax_sz) if ax_max > ax_sz // 2 else ax_max
             for ax_max, ax_sz in zip(maxima, target.shape)
         )
-        #logger.debug("coarse_shifts={}".format(shifts))
+        # logger.debug("coarse_shifts={}".format(shifts))
 
         if self.upsample_factor == 1:
-            if return_error:    
+            if return_error:
                 cross_corr_max = cp.asnumpy(cross_corr[maxima])
                 int_tar = cp.asnumpy(cp.sum(cp.abs(target) ** 2))
                 int_tar /= target.size
@@ -132,40 +118,50 @@ class DftRegister(object):
             region_sz = ceil(self.upsample_factor * 1.5)
 
             # center the output array at dft_shift+1
-            dft_shift = region_sz//2
+            dft_shift = region_sz // 2
             region_offset = tuple(
-                dft_shift - shift * self.upsample_factor
-                for shift in shifts
+                dft_shift - shift * self.upsample_factor for shift in shifts
             )
-            
+
             # refine shift estimate by matrix multiply DFT
-            cross_corr = self._upsampled_dft(
-                _product, 
-                region_sz, 
-                region_offset
-            )
+            cross_corr = self._upsampled_dft(_product, region_sz, region_offset)
             # normalization
             cross_corr /= self.norm_factor
 
+            import matplotlib.pyplot as plt
+            plt.imshow(cp.asnumpy(cp.abs(cross_corr))) # DEBUG
+
             # local maxima
+            """
             maxima = np.unravel_index(
-                cp.asnumpy(cp.argmax(cp.abs(cross_corr))),
-                cross_corr.shape
+                cp.asnumpy(cp.argmax(cp.abs(cross_corr))), cross_corr.shape
             )
+            
+            print(maxima)
+            plt.plot(*(maxima[::-1]), 'k+') # DEBUG
+            """
+            # peak local max
+            from skimage.feature import peak_local_max
+            maxima = peak_local_max(cp.asnumpy(cp.abs(cross_corr)))[0]
+            maxima = tuple(maxima[::-1])
+            """
+            print(maxima2)
+            plt.plot(*maxima2, 'ko') # DEBUG
+            
+            plt.show()
+            """
             # wrap around
             shifts = tuple(
-                shift + float(ax_max-dft_shift) / self.upsample_factor
+                shift + float(ax_max - dft_shift) / self.upsample_factor
                 for shift, ax_max in zip(shifts, maxima)
             )
-            #logger.debug("fine_shifts={}".format(shifts))
+            # logger.debug("fine_shifts={}".format(shifts))
 
             if return_error:
                 cross_corr_max = cp.asnumpy(cross_corr[maxima])
                 int_tar = cp.asnumpy(
                     self._upsampled_dft(
-                        cplx_tar * cplx_tar.conj(),
-                        1,
-                        self.upsample_factor
+                        cplx_tar * cplx_tar.conj(), 1, self.upsample_factor
                     )
                 )[0, 0]
                 int_tar /= self.norm_factor
@@ -180,11 +176,11 @@ class DftRegister(object):
         """
         Compute RMS error metric between template, and target.
 
-        :param np.complex64 cross_corr_max: complex value of the cross correlation at its maximum point
-        :param np.complex64 int_tar: normalized maximum intensity of the target array
+        Args:
+            cross_corr_max (np.complex64): complex value of the cross correlation at its maximum point
+            int_tar (np.complex64): normalized maximum intensity of the target array
         """
-        error = \
-            1. - cross_corr_max*cross_corr_max.conj() / (self._int_tpl*int_tar)
+        error = 1.0 - cross_corr_max * cross_corr_max.conj() / (self._int_tpl * int_tar)
         return np.sqrt(np.abs(error))
 
     def _upsampled_dft(self, array, region_sz, offsets=None):
@@ -199,48 +195,51 @@ class DftRegister(object):
         
         It achieves this result by computing the DFT in the output array without the need to zeropad. Much faster and memroy efficient than the zero-padded FFT approach if region_sz is much smaller than array.size * upsample_factor.
 
-        :param cupy.ndarray array: DFT of the data to be upsampled
-        :param int region_sz: size of the region to be sampled
-        :param integers offsets: offsets to the sampling region
-        :return: upsampled DFT of the specified region
-        :rtype: cupy.ndarray
+        Args:
+            array (cp.ndarray): DFT of the data to be upsampled
+            region_sz (int or tuple of int): size of the region to be sampled
+            offsets (int or tuple of int): offsets to the sampling region
+        
+        Returns:
+            (cp.ndarray): upsampled DFT of the specified region
         """
         try:
             if len(region_sz) != array.ndim:
-                raise ValueError(
-                    "upsampled region size must match array dimension"
-                )
+                raise ValueError("upsampled region size must match array dimension")
         except TypeError:
             # expand integer to list
-            region_sz = (region_sz, ) * array.ndim
+            region_sz = (region_sz,) * array.ndim
 
-        try: 
+        try:
             if len(offsets) != array.ndim:
-                raise ValueError(
-                    "axis offsets must match array dimension"
-                )
+                raise ValueError("axis offsets must match array dimension")
         except TypeError:
             # expand integer to list
-            offsets = (offsets, ) * array.ndim
+            offsets = (offsets,) * array.ndim
 
-        dim_props = zip(
-            reversed(array.shape), reversed(region_sz), reversed(offsets)
-        )
+        dim_props = zip(reversed(array.shape), reversed(region_sz), reversed(offsets))
         for ax_sz, up_ax_sz, ax_offset in dim_props:
             # float32 sample frequencies
-            fftfreq = cp.hstack((
-                cp.arange(0, (ax_sz-1)//2 + 1, dtype=cp.float32),
-                cp.arange(-(ax_sz//2), 0, dtype=cp.float32)
-            )) / ax_sz / self.upsample_factor
+            fftfreq = (
+                cp.hstack(
+                    (
+                        cp.arange(0, (ax_sz - 1) // 2 + 1, dtype=cp.float32),
+                        cp.arange(-(ax_sz // 2), 0, dtype=cp.float32),
+                    )
+                )
+                / ax_sz
+                / self.upsample_factor
+            )
             # upsampling kernel
             kernel = cp.exp(
                 (1j * 2 * np.pi)
-                * (cp.arange(up_ax_sz, dtype=np.float32) - ax_offset)[:, None] \
+                * (cp.arange(up_ax_sz, dtype=np.float32) - ax_offset)[:, None]
                 * fftfreq
             )
             # convolve
             array = cp.tensordot(kernel, array, axes=(1, -1))
         return array
+
 
 def dft_register(template, target, upsample_factor=1):
     with DftRegister(template, upsample_factor=upsample_factor) as dft_reg:

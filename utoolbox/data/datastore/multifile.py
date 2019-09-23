@@ -5,7 +5,7 @@ import logging
 
 import numpy as np
 
-from .direct import FileDatastore
+from .direct import FolderDatastore
 from .base import BufferedDatastore
 
 logger = logging.getLogger(__name__)
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 __all__ = ["FolderCollectionDatastore", "VolumeTilesDatastore"]
 
 
-class FolderCollectionDatastore(FileDatastore):
+class FolderCollectionDatastore(FolderDatastore):
     """Each folder represents a stack."""
 
     def __init__(
@@ -29,7 +29,7 @@ class FolderCollectionDatastore(FileDatastore):
         # expand the file list
         for name, path in self._uri.items():
             # treat each folder as a file datastore
-            fd = FileDatastore(
+            fd = FolderDatastore(
                 path, sub_dir=False, pattern=file_pattern, extensions=extensions
             )
             # extract the detailed path
@@ -69,9 +69,7 @@ class VolumeTilesDatastore(FolderCollectionDatastore, BufferedDatastore):
         try:
             nty, ntx = self._tile_shape
         except TypeError:
-            raise TypeError(
-                "unable to determine buffer size due to invalid tile shape"
-            )
+            raise TypeError("unable to determine buffer size due to invalid tile shape")
         if self._merge:
             ny, nx = image.shape
             shape = (nty * ny, ntx * nx)
@@ -95,7 +93,7 @@ class VolumeTilesDatastore(FolderCollectionDatastore, BufferedDatastore):
 
 
 '''
-class SparseTilesImageDatastore(SparseStackImageDatastore):
+class SparseTilesImageFolderDatastore(SparseStackImageFolderDatastore):
     """Each folder represents a tiled stack."""
     def __init__(self, root, read_func, tile_sz=None, **kwargs):
         """
@@ -105,7 +103,7 @@ class SparseTilesImageDatastore(SparseStackImageDatastore):
 
         .. note:: Currently, only 2D tiling is supported.
         """
-        super(SparseTilesImageDatastore, self).__init__(
+        super(SparseTilesImageFolderDatastore, self).__init__(
             root, read_func, **kwargs
         )
         self._tile_sz = tile_sz if tile_sz else self._find_tile_sz()
