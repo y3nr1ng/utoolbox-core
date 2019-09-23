@@ -54,8 +54,8 @@ setup(
         "pandas",
         # file io
         "imageio",
+        "imageio-ffmpeg",
         "tifffile",
-        "av",
         # gui
         "PySide2",
         "vispy",
