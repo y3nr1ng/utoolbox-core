@@ -8,6 +8,8 @@ import numpy as np
 
 from utoolbox.utils.decorator import timeit
 
+from utoolbox.stitching.findpeak import FindPeak3D
+
 
 class PhaseCorrelation(object):
     """
@@ -54,14 +56,15 @@ class PhaseCorrelation(object):
         # phase correlation spectrum
         pcm = fft1 * fft2
         pcm = ifftn(pcm, overwrite_x=True, plan=plan)
-
         pcm = cp.real(pcm)
 
-        import imageio
-
-        imageio.volwrite("pcm.tif", cp.asnumpy(pcm))
-
-        peak_list = self._extract_correlation_peaks(pcm, fft1, fft2)
+        from skimage.morphology import disk
+        from skimage.filters import median
+        pcm = cp.asnumpy(pcm)
+        pcm = median(pcm, disk(3))
+        pcm = cp.asarray(pcm)
+        
+        peak_list = self._extract_correlation_peaks(pcm)
 
     ##
 
@@ -80,6 +83,10 @@ class PhaseCorrelation(object):
             max(ax1, ax2) for ax1, ax2 in zip(self.image1.shape, self.image2.shape)
         )
 
-    def _extract_correlation_peaks(self, pcm, fft1, fft2):
-        peak_list = []
+    def _extract_correlation_peaks(self, pcm):
+        finder = FindPeak3D()
+        peak_list = finder(pcm)
 
+        from pprint import pprint
+
+        pprint(peak_list)
