@@ -5,7 +5,7 @@ import imageio
 import numpy as np
 
 from vispy import app, scene
-from vispy.color.colormap import BaseColormap, Colormap
+from vispy.color.colormap import BaseColormap, Colormap, ColorArray
 from vispy.visuals.transforms import STTransform
 
 from utoolbox.analysis.psf_average import PSFAverage
@@ -23,34 +23,25 @@ def preview_volume(vol, scale=(0.101, 0.101, 0.1)):
     view = canvas.central_widget.add_view()
 
     # genereate colormap
-    
-    n_colors = 256
-    alphas = np.linspace(0., 1., n_colors)
-    color = np.c_[
-        np.zeros((n_colors)), np.ones((n_colors,)), np.ones((n_colors,)), alphas
-    ]
-    cmap2 = Colormap(color)
-
-    
-    class TransGrays(BaseColormap):
-        glsl_map = """
-        vec4 translucent_grays(float t) {
-            return vec4(t, t, t, t*0.05);
-        }
-        """
-    cmap = TransGrays()
 
     """
+    n_colors = 256
+    alphas = np.linspace(0.0, 1.0, n_colors)
+    color = np.c_[
+       alphas, alphas, alphas, alphas
+    ]
+    cmap = Colormap(color)
+    """
+
     from utoolbox.data.io.amira import AmiraColormap
 
     color = AmiraColormap("volrenGlow.am")
     color = np.array(color)
-    print(color.shape)
+    color[:, 3] /= 100
     cmap = Colormap(color)
-    """
 
     volume = scene.visuals.Volume(
-        vol, cmap=cmap, parent=view.scene, clim=(5000, 50000), emulate_texture=False
+        vol, cmap=cmap, clim=(2000, 50000), parent=view.scene, emulate_texture=False
     )
     volume.method = "translucent"
 
@@ -138,22 +129,25 @@ if __name__ == "__main__":
 
     """
     from vispy import io
+
     vol = np.load(io.load_data_file("brain/mri.npz"))["data"]
     print(vol.dtype)
     """
 
     import imageio
-    vol = imageio.volread('fusion_exm/sample9_zp6um_561_2.tif')
-    vol = vol[:, ::4, ::4]
-    print(vol.shape)
+    vol = imageio.volread('fusion_kidney/Pos_7.tif')
+    vol = vol[:, 0, ::4, ::4]
 
     import cupy as cp
+
     vol = cp.asarray(vol)
     from utoolbox.exposure import auto_contrast
-    vol = auto_contrast(vol, auto_threshold=100000000)
+
+    vol = auto_contrast(vol)
     vol = cp.asnumpy(vol)
     print(vol.dtype)
 
     preview_volume(vol)
     
     #main()
+
