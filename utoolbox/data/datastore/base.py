@@ -31,7 +31,7 @@ class Datastore(MutableMapping):
 
         self._read_func, self._write_func = read_func, write_func
         self._immutable = immutable
-
+    
         # short circuit if immutable
         self._del_func = None if immutable else del_func
 
@@ -88,7 +88,7 @@ class TransientDatastore(Datastore):
     """Datastores that require explicit allocation and cleanup routines."""
 
     def __init__(self, **kwargs):
-        super().__init__(*kwargs)
+        super().__init__(**kwargs)
 
     def __enter__(self):
         self.open()
