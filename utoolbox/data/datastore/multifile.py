@@ -40,6 +40,35 @@ class FolderCollectionDatastore(FolderDatastore):
         return self._root
 
 
+class SparseVolumeDatastore(FolderCollectionDatastore, BufferedDatastore):
+    """
+    Args:
+        tile_shape (tuple): tile shape
+        tile_order (str): order of the tiles, in 'C' or 'F'
+    """
+
+    def __init__(self, *args, tile_shape=None, tile_order="C", **kwargs):
+        if ("read_func" not in kwargs) or (kwargs["read_func"] is None):
+            raise TypeError("read function must be provided to deduce buffer size")
+        super().__init__(*args, **kwargs)
+
+        self._tile_shape, self._tile_order = tile_shape, tile_order
+
+    def _buffer_shape(self):
+        # first layer of an arbitrary stack
+        paths = next(iter(self._uri.values()))
+        image = self._raw_read_func(paths[0])
+
+        nz, (ny, nx) = len(paths), image.shape
+        return (nz, ny, nx), image.dtype
+
+    def _deserialize_to_buffer(self, uri_list):
+        np.stack(
+            [self._raw_read_func(path) for path in uri_list], axis=0, out=self._buffer
+        )
+        return self._buffer
+
+
 class VolumeTilesDatastore(FolderCollectionDatastore, BufferedDatastore):
     """
     Args:
