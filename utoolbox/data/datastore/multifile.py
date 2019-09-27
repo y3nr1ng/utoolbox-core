@@ -82,7 +82,7 @@ class VolumeTilesDatastore(FolderCollectionDatastore, BufferedDatastore):
         if self._merge:
             it = np.unravel_index(list(range(len(uri_list))), self._tile_shape)
             ny, nx = self._raw_read_func(uri_list[0]).shape
-            for (ity, itx), path in zip(it, uri_list):
+            for (ity, itx), path in zip(zip(*it), uri_list):
                 im = self._raw_read_func(path)
                 self._buffer[ity * ny : (ity + 1) * ny, itx * nx : (itx + 1) * nx] = im
         else:
