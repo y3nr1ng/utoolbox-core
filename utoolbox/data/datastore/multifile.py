@@ -41,16 +41,19 @@ class FolderCollectionDatastore(FolderDatastore):
 
 
 class VolumeTilesDatastore(FolderCollectionDatastore, BufferedDatastore):
-    def __init__(self, *args, tile_shape=None, merge=True, **kwargs):
-        """
-        :param tile_shape: tile shape in 2D
-        :param bool merge: merge the tiles as one
-        """
+    """
+    Args:
+        tile_shape (tuple): tile shape
+        tile_order (str): order of the tiles, in 'C' or 'F'
+        merge (bool): merge the tiles as one when requested
+    """
+
+    def __init__(self, *args, tile_shape=None, tile_order="C", merge=True, **kwargs):
         if ("read_func" not in kwargs) or (kwargs["read_func"] is None):
             raise TypeError("read function must be provided to deduce buffer size")
         super().__init__(*args, **kwargs)
 
-        self._tile_shape, self._merge = tile_shape, merge
+        self._tile_shape, self._tile_order, self._merge = tile_shape, tile_order, merge
 
         # an arbitrary stack to prime the new URI list
         new_uri = {z: [] for z in range(len(next(iter(self._uri.values()))))}
@@ -80,14 +83,18 @@ class VolumeTilesDatastore(FolderCollectionDatastore, BufferedDatastore):
 
     def _deserialize_to_buffer(self, uri_list):
         if self._merge:
-            it = np.unravel_index(list(range(len(uri_list))), self._tile_shape)
+            it = np.unravel_index(
+                list(range(len(uri_list))), self._tile_shape, order=self._tile_order
+            )
             ny, nx = self._raw_read_func(uri_list[0]).shape
             for (ity, itx), path in zip(zip(*it), uri_list):
                 im = self._raw_read_func(path)
                 self._buffer[ity * ny : (ity + 1) * ny, itx * nx : (itx + 1) * nx] = im
         else:
-            np.concatenate(
-                [self._raw_read_func(path) for path in uri_list], out=self._buffer
+            np.stack(
+                [self._raw_read_func(path) for path in uri_list],
+                axis=0,
+                out=self._buffer,
             )
         return self._buffer
 

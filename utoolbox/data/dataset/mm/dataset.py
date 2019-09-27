@@ -58,12 +58,12 @@ class MicroManagerDataset(MultiChannelDataset):
                     tx = grid["GridColumnIndex"]
                 if grid["GridRowIndex"] > ty:
                     ty = grid["GridRowIndex"]
-            self._tile_shape = (tx + 1, ty + 1)
-            logger.info('dataset is a {} grid'.format(self._tile_shape))
+            self._tile_shape = (ty + 1, tx + 1)
+            logger.info("dataset is a {} grid".format(self._tile_shape))
 
             # extract prefix without position info
             prefix = os.path.commonprefix([grid["Label"] for grid in grids])
-            i = prefix.rfind('_')
+            i = prefix.rfind("_")
             if i > 0:
                 prefix = prefix[:i]
             logger.debug('folder prefix "{}"'.format(prefix))
@@ -71,7 +71,7 @@ class MicroManagerDataset(MultiChannelDataset):
         else:
             # shortcut to the actual data source
             self._root = meta_dir
-            
+
         try:
             return metadata
         except KeyError:
@@ -88,6 +88,7 @@ class MicroManagerDataset(MultiChannelDataset):
                 folder_pattern="{}*".format(self._folder_prefix),
                 file_pattern="*_{}_*".format(channel),
                 tile_shape=self._tile_shape,
+                tile_order="F",
                 merge=self._merge,
             )
         else:
@@ -97,3 +98,4 @@ class MicroManagerDataset(MultiChannelDataset):
                 sub_dir=False,
                 pattern="*_{}_*".format(channel),
             )
+
