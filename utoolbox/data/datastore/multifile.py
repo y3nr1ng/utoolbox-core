@@ -10,7 +10,11 @@ from .base import BufferedDatastore
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["FolderCollectionDatastore", "VolumeTilesDatastore"]
+__all__ = [
+    "FolderCollectionDatastore",
+    "SparseVolumeDatastore",
+    "SparseVolumeTilesDatastore",
+]
 
 
 class FolderCollectionDatastore(FolderDatastore):
@@ -43,8 +47,8 @@ class FolderCollectionDatastore(FolderDatastore):
 class SparseVolumeDatastore(FolderCollectionDatastore, BufferedDatastore):
     """
     Args:
-        tile_shape (tuple): tile shape
-        tile_order (str): order of the tiles, in 'C' or 'F'
+        tile_shape (tuple, optional): tile shape
+        tile_order (str, optional): order of the tiles, in 'C' or 'F'
     """
 
     def __init__(self, *args, tile_shape=None, tile_order="C", **kwargs):
@@ -69,7 +73,7 @@ class SparseVolumeDatastore(FolderCollectionDatastore, BufferedDatastore):
         return self._buffer
 
 
-class VolumeTilesDatastore(FolderCollectionDatastore, BufferedDatastore):
+class SparseVolumeTilesDatastore(SparseVolumeDatastore):
     """
     Args:
         tile_shape (tuple): tile shape
@@ -77,12 +81,10 @@ class VolumeTilesDatastore(FolderCollectionDatastore, BufferedDatastore):
         merge (bool): merge the tiles as one when requested
     """
 
-    def __init__(self, *args, tile_shape=None, tile_order="C", merge=True, **kwargs):
-        if ("read_func" not in kwargs) or (kwargs["read_func"] is None):
-            raise TypeError("read function must be provided to deduce buffer size")
+    def __init__(self, *args, merge=True, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self._tile_shape, self._tile_order, self._merge = tile_shape, tile_order, merge
+        self._merge = merge
 
         # an arbitrary stack to prime the new URI list
         new_uri = {z: [] for z in range(len(next(iter(self._uri.values()))))}
@@ -119,13 +121,10 @@ class VolumeTilesDatastore(FolderCollectionDatastore, BufferedDatastore):
             for (ity, itx), path in zip(zip(*it), uri_list):
                 im = self._raw_read_func(path)
                 self._buffer[ity * ny : (ity + 1) * ny, itx * nx : (itx + 1) * nx] = im
+            return self._buffer
         else:
-            np.stack(
-                [self._raw_read_func(path) for path in uri_list],
-                axis=0,
-                out=self._buffer,
-            )
-        return self._buffer
+            # simple concatenation
+            return super()._deserialize_to_buffer(uri_list)
 
 
 '''

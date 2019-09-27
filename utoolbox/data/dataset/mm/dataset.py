@@ -4,7 +4,11 @@ import os
 
 import imageio
 
-from utoolbox.data.datastore import ImageFolderDatastore, VolumeTilesDatastore
+from utoolbox.data.datastore import (
+    ImageFolderDatastore,
+    SparseVolumeDatastore,
+    SparseVolumeTilesDatastore,
+)
 from ..base import MultiChannelDataset
 from .error import NoMetadataInTileFolderError, NoSummarySectionError
 
@@ -16,14 +20,17 @@ class MicroManagerDataset(MultiChannelDataset):
     Representation of Micro-Manager dataset stored in sparse stack format.
 
     Args:
-        root (str): Source directory of the dataset.
-        merge (bool, optional): Return merged result for tiled dataset.
+        root (str): source directory of the dataset
+        merge (bool, optional): return merged result for tiled dataset
+        force_stack (bool, optional): force the dataset to be interpreted as stacks
     """
 
-    def __init__(self, root, merge=True):
+    def __init__(self, root, merge=True, force_stack=False):
         if not os.path.exists(root):
             raise FileNotFoundError("invalid dataset root")
-        self._tiled = None
+        if merge and force_stack:
+            logger.warning("force output as stack, merging request is ignored")
+        self._tiled, self._force_stack = None, force_stack
         self._merge = merge
         super().__init__(root)
 
@@ -81,8 +88,8 @@ class MicroManagerDataset(MultiChannelDataset):
         return self.metadata["ChNames"]
 
     def _load_channel(self, channel):
-        if self._tiled:
-            return VolumeTilesDatastore(
+        if self._tiled and not self._force_stack:
+            return SparseVolumeTilesDatastore(
                 self.root,
                 read_func=imageio.imread,
                 folder_pattern="{}*".format(self._folder_prefix),
@@ -90,12 +97,14 @@ class MicroManagerDataset(MultiChannelDataset):
                 tile_shape=self._tile_shape,
                 tile_order="F",
                 merge=self._merge,
+                extensions=['tif']
             )
         else:
-            return ImageFolderDatastore(
+            return SparseVolumeDatastore(
                 self.root,
                 read_func=imageio.imread,
                 sub_dir=False,
                 pattern="*_{}_*".format(channel),
+                extensions=['tif']
             )
 
