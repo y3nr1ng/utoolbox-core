@@ -18,6 +18,11 @@ strategy:
       python.version: '3.7'
 
 steps:
+- task: CondaEnvironment@0
+  inputs:
+    environmentName: 'workspace'
+    packageSpecs: 'python=3 numpy scipy'
+    
 - task: UsePythonVersion@0
   inputs:
     versionSpec: '$(python.version)'
