@@ -144,7 +144,7 @@ class SparseTiledVolumeDatastore(SparseVolumeDatastore):
 
     def _generate_deserialization_tasks(self, uri_list):
         logger.debug('generate deserialization tasks')
-        if self._merge:
+        if not self._merge:
             return super()._generate_deserialization_tasks(uri_list)
 
         it = np.unravel_index(
