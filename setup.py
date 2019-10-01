@@ -17,7 +17,7 @@ setup(
     #   bumpversion release
     # to next version
     #   bump patch/minor/major
-    version="0.3.0.dev",
+    version="0.4.0.dev",
     # one-line description for the summary field
     description="A Python image processing package for LLSM.",
     long_description=long_description,
@@ -59,6 +59,7 @@ setup(
         # gui
         "PySide2",
         "vispy",
+        "pyopengl",
         # parallel
         'cupy-cuda101 ; platform_system!="Darwin"',
         'cupy ; platform_system=="Darwin"',
