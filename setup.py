@@ -63,7 +63,6 @@ setup(
         # parallel
         'cupy-cuda101 ; platform_system!="Darwin"',
         'cupy ; platform_system=="Darwin"',
-        "dask",
         # utils
         "mako",
         "click",
@@ -85,6 +84,7 @@ setup(
             "zpatch=utoolbox.cli.zpatch:main",
             "dataset=utoolbox.cli.dataset:main",
             "analyze=utoolbox.cli.analyze:main",
+            "mm2bdv=utoolbox.cli.mm2bdv:main",
         ]
     },
     # contains c source, cannot safely run in compressed form

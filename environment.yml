@@ -14,6 +14,7 @@ dependencies:
 
     # linter
     - flake8
+    
     # formatter
     - black
     
@@ -26,8 +27,6 @@ dependencies:
     - coverage
     - pytest-cov
 
-    # native libraries
-    #  numpy from conda has mkl support
+    # libraries from conda has mkl support
     - numpy
-    #  av libraries is easier to install using conda
-    - av
+    - scipy
