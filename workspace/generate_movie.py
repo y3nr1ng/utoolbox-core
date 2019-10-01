@@ -1,15 +1,23 @@
 from math import floor
 import os
 
-import av
 import imageio
 
-from utoolbox.data.datastore import FolderDatastore
+from utoolbox.data import MicroManagerDataset
 
-root = 'Movie_decon'
-ds = FolderDatastore(root, read_func=imageio.imread, extensions=['tif'])
+root = 'Z:/charm/20181009_ExM_4x_hippocampus'
+ds = MicroManagerDataset(root)
 framerate = 24
 
+for channel, datastore in ds.items():
+    with datastore as source:
+        for name, data in source.items():
+            print(name)
+            imageio.imwrite('demo.tif', data)
+            break
+    break
+
+"""
 # dummy read
 ny, nx = next(iter(ds.values())).shape[:2]
 ny, nx = floor(ny/2)*2, floor(nx/2)*2
@@ -37,3 +45,4 @@ for key, im in ds.items():
 packet = stream.encode(None)
 out.mux(packet)
 out.close()
+"""

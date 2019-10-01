@@ -56,7 +56,7 @@ setup(
         "imageio",
         "imageio-ffmpeg",
         "tifffile",
-        'h5py',
+        "h5py",
         # gui
         "PySide2",
         "vispy",
