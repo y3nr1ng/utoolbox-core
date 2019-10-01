@@ -12,10 +12,13 @@ class Dataset(Mapping):
     """
     Dataset base class.
 
-    Parameters
-    ----------
-    root : str
-        Source of the dataset.
+    Arg:
+        root (str): source of the dataset
+
+    Attributes:
+        info (DatasetInfo): dataset description parsed from the metadata
+        metadata : raw dataset metadata
+        root (str): absolute path to the source
     """
 
     def __init__(self, root):
@@ -32,6 +35,12 @@ class Dataset(Mapping):
     def __len__(self):
         return len(self._datastore)
 
+    ##
+
+    @property
+    def info(self):
+        return self._info
+
     @property
     def metadata(self):
         """Extracted metadata of this dataset."""
@@ -42,8 +51,7 @@ class Dataset(Mapping):
         """Root of the dataset, need not to be a file object."""
         return self._root
 
-    def to_hdf(self, dst_root=None, virtual=True):
-        raise NotImplementedError
+    ##
 
     @abstractmethod
     def _load_datastore(self):
@@ -58,10 +66,8 @@ class MultiChannelDataset(Dataset):
     """
     Dataset with multi-color channels.
 
-    Parameters
-    ----------
-    root : str
-        Source of the dataset.
+    Arg:
+        root (str): source of the dataset
     """
 
     def __init__(self, root):
@@ -69,6 +75,8 @@ class MultiChannelDataset(Dataset):
 
     def __iter__(self):
         return iter(self._datastore)
+
+    ##
 
     @abstractmethod
     def _find_channels(self):

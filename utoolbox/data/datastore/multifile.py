@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "FolderCollectionDatastore",
     "SparseVolumeDatastore",
-    "SparseVolumeTilesDatastore",
+    "SparseTiledVolumeDatastore",
 ]
 
 
@@ -73,7 +73,7 @@ class SparseVolumeDatastore(FolderCollectionDatastore, BufferedDatastore):
         return self._buffer
 
 
-class SparseVolumeTilesDatastore(SparseVolumeDatastore):
+class SparseTiledVolumeDatastore(SparseVolumeDatastore):
     """
     Args:
         tile_shape (tuple): tile shape

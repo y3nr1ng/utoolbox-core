@@ -5,9 +5,8 @@ import os
 import imageio
 
 from utoolbox.data.datastore import (
-    ImageFolderDatastore,
     SparseVolumeDatastore,
-    SparseVolumeTilesDatastore,
+    SparseTiledVolumeDatastore,
 )
 from ..base import MultiChannelDataset
 from .error import NoMetadataInTileFolderError, NoSummarySectionError
@@ -89,7 +88,7 @@ class MicroManagerDataset(MultiChannelDataset):
 
     def _load_channel(self, channel):
         if self._tiled and not self._force_stack:
-            return SparseVolumeTilesDatastore(
+            return SparseTiledVolumeDatastore(
                 self.root,
                 read_func=imageio.imread,
                 folder_pattern="{}*".format(self._folder_prefix),
