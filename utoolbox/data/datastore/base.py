@@ -31,7 +31,7 @@ class Datastore(MutableMapping):
 
         self._read_func, self._write_func = read_func, write_func
         self._immutable = immutable
-    
+
         # short circuit if immutable
         self._del_func = None if immutable else del_func
 
@@ -88,7 +88,10 @@ class TransientDatastore(Datastore):
     """Datastores that require explicit allocation and cleanup routines."""
 
     def __init__(self, **kwargs):
+        self._activated = False
         super().__init__(**kwargs)
+
+    ##
 
     def __enter__(self):
         self.open()
@@ -99,9 +102,30 @@ class TransientDatastore(Datastore):
 
     def open(self):
         self._allocate_resources()
+        self._activated = True
 
     def close(self):
         self._free_resources()
+        self._activated = False
+
+    ##
+
+    def __delitem__(self, key):
+        if not self.is_activated:
+            raise RuntimeError("please activate the datastore first")
+        super().__delitem__(key)
+
+    def __getitem__(self, key):
+        if not self.is_activated:
+            raise RuntimeError("please activate the datastore first")
+        return super().__getitem__(key)
+
+    def __setitem__(self, key, value):
+        if not self.is_activated:
+            raise RuntimeError("please activate the datastore first")
+        super().__setitem__(key, value)
+
+    ##
 
     @abstractmethod
     def _allocate_resources(self):
@@ -110,6 +134,13 @@ class TransientDatastore(Datastore):
     @abstractmethod
     def _free_resources(self):
         pass
+
+    ##
+
+    @property
+    def is_activated(self):
+        """Is the datastore activated?"""
+        return self._activated
 
 
 class BufferedDatastore(TransientDatastore):
