@@ -190,7 +190,7 @@ def main(src_path, dst_dir=None, dry_run=False):
     pprint(dataset.metadata)
 
     if not dry_run:
-        with h5py.File(hdf_path, "a") as h:
+        with h5py.File(hdf_path, "w") as h:
             # Why declare this?
             h["__DATA_TYPES__/Enum_Boolean"] = np.dtype("bool")
 

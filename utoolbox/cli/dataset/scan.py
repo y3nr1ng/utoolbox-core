@@ -3,8 +3,7 @@ import logging
 import click
 
 from utoolbox.data import MicroManagerDataset, SPIMDataset
-import utoolbox.data.dataset.mm.error as mm_error
-import utoolbox.data.dataset.spim.error as spim_error
+import utoolbox.data.dataset.error import DatasetError
 
 __all__ = ["determine_format"]
 
@@ -16,6 +15,7 @@ logger = logging.getLogger(__name__)
 @click.pass_context
 def determine_format(ctx, root):
     def _try_dataset_flavors(root):
+
         try:
             return SPIMDataset(root, refactor=False)
         except spim_error.SettingsNotFoundError:
@@ -28,5 +28,13 @@ def determine_format(ctx, root):
 
         raise RuntimeError("unable to determine dataset flavor")
 
-    ds = _try_dataset_flavors(root)
+    for klass in (SPIMDataset, MicroManagerDataset):
+        try:
+            ds = klass(root)
+            break
+        except DatasetError:
+            logger.debug(f"not \"{klass.__name__}\"")
+    else:
+        raise RuntimeError('unable to determine dataset flavor')
+    
     print(ds.metadata)
