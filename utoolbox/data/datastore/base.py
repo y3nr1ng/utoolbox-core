@@ -12,9 +12,9 @@ import numpy as np
 
 from .error import ImmutableUriListError, ReadOnlyDataError
 
-logger = logging.getLogger(__name__)
+__all__ = ["BufferedDatastore", "Datastore", "TransientDatastore"]
 
-__all__ = ["Datastore", "BufferedDatastore"]
+logger = logging.getLogger(__name__)
 
 
 class Datastore(MutableMapping):
@@ -127,6 +127,13 @@ class TransientDatastore(Datastore):
 
     ##
 
+    @property
+    def is_activated(self):
+        """Is the datastore activated?"""
+        return self._activated
+
+    ##
+
     @abstractmethod
     def _allocate_resources(self):
         pass
@@ -135,21 +142,20 @@ class TransientDatastore(Datastore):
     def _free_resources(self):
         pass
 
-    ##
-
-    @property
-    def is_activated(self):
-        """Is the datastore activated?"""
-        return self._activated
-
 
 class BufferedDatastore(TransientDatastore):
     """
     Reading data that requires internal buffer to piece together the fractions
     before returning it.
+
+    Args:
+        read_func : reader
+        write_func : writer
+        mapped (bool, optional) : use memory mapped buffer instead of in-memory buffer
     """
 
-    def __init__(self, read_func=None, write_func=None, **kwargs):
+    def __init__(self, read_func=None, write_func=None, mapped=False, **kwargs):
+        self._mapped = mapped
         # staging area
         self._mmap, self._buffer = None, None
 
@@ -163,24 +169,40 @@ class BufferedDatastore(TransientDatastore):
 
         super().__init__(read_func=read_func, write_func=write_func, **kwargs)
 
+    ##
+
+    @property
+    def is_mapped(self):
+        return self._mapped
+
+    ##
+
     @abstractmethod
     def _buffer_shape(self):
         """
         Determine shape and type of the internal buffer.
         
-        :return: a tuple, (shape, dtype)
+        Returns:
+            (tuple) : represents (shape, dtype)
         """
         raise NotImplementedError
 
     def _deserialize_to_buffer(self, uri):
         """
-        Load data definition x into the internal buffer.
+        Load data definition into the internal buffer.
         
-        :param x: any definition that can be interpreted internally
+        Arg:
+            uri : any definition that can be interpreted internally
         """
         raise NotImplementedError
 
     def _serialize_from_buffer(self, uri):
+        """
+        Export data from the internal buffer.
+        
+        Arg:
+            uri : any definition that can be interpreted internally
+        """
         raise NotImplementedError
 
     def _allocate_resources(self):
@@ -188,14 +210,18 @@ class BufferedDatastore(TransientDatastore):
         nbytes = dtype.itemsize * reduce(mul, shape)
         logger.info("dimension {}, {}, {} bytes".format(shape, dtype, nbytes))
 
-        self._mmap = mmap.mmap(-1, nbytes)
-        self._buffer = np.ndarray(shape, dtype, buffer=self._mmap)
+        if self.is_mapped:
+            self._mmap = mmap.mmap(-1, nbytes)
+            self._buffer = np.ndarray(shape, dtype, buffer=self._mmap)
+        else:
+            self._buffer = np.empty(shape, dtype)
 
     def _free_resources(self):
         if sys.getrefcount(self._buffer) > 2:
             # getrefcount + self._buffer -> 2 references
             logger.warning("buffer is referenced externally")
         self._buffer = None
-        self._mmap.close()
+        if self.is_mapped:
+            self._mmap.close()
 
         logger.debug("internal buffer destroyed")
