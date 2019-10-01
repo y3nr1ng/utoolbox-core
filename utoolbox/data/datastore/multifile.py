@@ -1,12 +1,14 @@
 """
 Datastores that use multiple files to composite a single data entry.
 """
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import logging
 
 import numpy as np
 
-from .direct import FolderDatastore
-from .base import BufferedDatastore
+from utoolbox.data.datastore.base import BufferedDatastore
+from utoolbox.data.datastore.direct import FolderDatastore
 
 logger = logging.getLogger(__name__)
 
@@ -51,12 +53,29 @@ class SparseVolumeDatastore(FolderCollectionDatastore, BufferedDatastore):
         tile_order (str, optional): order of the tiles, in 'C' or 'F'
     """
 
-    def __init__(self, *args, tile_shape=None, tile_order="C", **kwargs):
+    def __init__(
+        self, *args, tile_shape=None, tile_order="C", max_workers=None, **kwargs
+    ):
         if ("read_func" not in kwargs) or (kwargs["read_func"] is None):
             raise TypeError("read function must be provided to deduce buffer size")
         super().__init__(*args, **kwargs)
 
         self._tile_shape, self._tile_order = tile_shape, tile_order
+
+        self._executor = ThreadPoolExecutor(max_workers=max_workers)
+        self._loop = None
+
+    ##
+
+    @property
+    def executor(self):
+        return self._executor
+
+    @property
+    def loop(self):
+        return self._loop if self._loop else asyncio.get_event_loop()
+
+    ##
 
     def _buffer_shape(self):
         # first layer of an arbitrary stack
@@ -67,10 +86,21 @@ class SparseVolumeDatastore(FolderCollectionDatastore, BufferedDatastore):
         return (nz, ny, nx), image.dtype
 
     def _deserialize_to_buffer(self, uri_list):
-        np.stack(
-            [self._raw_read_func(path) for path in uri_list], axis=0, out=self._buffer
-        )
+        async def _deserialize_items_to_buffer():
+            tasks = self._generate_deserialization_tasks(uri_list)
+            await asyncio.wait(tasks)
+
+        self.loop.run_until_complete(_deserialize_items_to_buffer())
         return self._buffer
+
+    def _generate_deserialization_tasks(self, uri_list):
+        def _reader(path, z):
+            self._buffer[z, ...] = self._raw_read_func(path)
+
+        return [
+            self.loop.run_in_executor(self.executor, _reader, path, z)
+            for z, path in enumerate(uri_list)
+        ]
 
 
 class SparseTiledVolumeDatastore(SparseVolumeDatastore):
@@ -112,89 +142,23 @@ class SparseTiledVolumeDatastore(SparseVolumeDatastore):
 
         return shape, image.dtype
 
-    def _deserialize_to_buffer(self, uri_list):
+    def _generate_deserialization_tasks(self, uri_list):
+        logger.debug('generate deserialization tasks')
         if self._merge:
-            it = np.unravel_index(
-                list(range(len(uri_list))), self._tile_shape, order=self._tile_order
-            )
-            ny, nx = self._raw_read_func(uri_list[0]).shape
-            for (ity, itx), path in zip(zip(*it), uri_list):
-                im = self._raw_read_func(path)
-                self._buffer[ity * ny : (ity + 1) * ny, itx * nx : (itx + 1) * nx] = im
-            return self._buffer
-        else:
-            # simple concatenation
-            return super()._deserialize_to_buffer(uri_list)
+            return super()._generate_deserialization_tasks(uri_list)
 
-
-'''
-class SparseTilesImageFolderDatastore(SparseStackImageFolderDatastore):
-    """Each folder represents a tiled stack."""
-    def __init__(self, root, read_func, tile_sz=None, **kwargs):
-        """
-        :param str root: root folder path
-        :param read_func: read function for the actual file
-        :param tuple(int,int) tile_sz: dimension of the tiles
-
-        .. note:: Currently, only 2D tiling is supported.
-        """
-        super(SparseTilesImageFolderDatastore, self).__init__(
-            root, read_func, **kwargs
+        it = np.unravel_index(
+            list(range(len(uri_list))), self._tile_shape, order=self._tile_order
         )
-        self._tile_sz = tile_sz if tile_sz else self._find_tile_sz()
+        ny, nx = self._raw_read_func(uri_list[0]).shape
 
-    @property
-    def tile_sz(self):
-        return self._tile_sz
+        def _reader(path, ity, itx):
+            logger.debug(f'reading tile ({ity}, {itx})')
+            self._buffer[
+                ity * ny : (ity + 1) * ny, itx * nx : (itx + 1) * nx
+            ] = self._raw_read_func(path)
 
-    def _extract_tile_pos(self, fn, pattern=r'.*_(\d{3,})_(\d{3,})'):
-        tokens = re.search(pattern, fn)
-        return int(tokens.group(2)), int(tokens.group(1))
-
-    def _find_tile_sz(self):
-        pos = []
-        for fn in self.files:
-            try:
-                pos.append(self._extract_tile_pos(fn))
-            except:
-                logger.warning("unknown stack name \"{}\", ignored".format(fn))
-                continue
-        
-        ypos, xpos = list(zip(*pos))
-        def find_range(lst):
-            return max(lst)-min(lst)+1
-        tile_sz = find_range(ypos), find_range(xpos)
-        logger.info("tile size {}".format(tile_sz[::-1]))
-        
-        return tile_sz
-
-    def _buffer_shape(self):
-        im = self._raw_read_func(self._raw_files[0])
-        ny, nx = im.shape
-        nty, ntx = self.tile_sz
-
-        shape = ny*nty, nx*ntx
-        
-        return (shape, im.dtype)
-    
-    def _load_to_buffer(self, z, pattern=r'.*_(\d{3,})\.'):
-        shape = None
-        for dp in self.files:
-            ty, tx = self._extract_tile_pos(dp)
-            stack = list(filter(lambda x: x.startwith(dp), self._raw_files))
-            #TODO build lookup table instead of search all the times
-            for fp in stack:
-                if self._extract_depth(fp) == z:
-                    im = self._raw_read_func(fp)
-
-                    try:
-                        ny, nx = shape
-                    except TypeError:
-                        shape = im.shape
-                        ny, nx = shape
-                    sel = (slice(ny*ty, ny*(ty+1)), slice(nx*tx, nx*(tx+1)))
-                    # TODO fix this vvvvv
-                    #self._buffer[*sel] = im
-
-                    break
-'''
+        return [
+            self.loop.run_in_executor(self.executor, _reader, path, *tile_pos)
+            for tile_pos, path in zip(zip(*it), uri_list)
+        ]
