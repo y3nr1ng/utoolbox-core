@@ -31,7 +31,7 @@ class Datastore(MutableMapping):
 
         self._read_func, self._write_func = read_func, write_func
         self._immutable = immutable
-
+    
         # short circuit if immutable
         self._del_func = None if immutable else del_func
 
@@ -88,7 +88,7 @@ class TransientDatastore(Datastore):
     """Datastores that require explicit allocation and cleanup routines."""
 
     def __init__(self, **kwargs):
-        super().__init__(*kwargs)
+        super().__init__(**kwargs)
 
     def __enter__(self):
         self.open()
@@ -155,7 +155,7 @@ class BufferedDatastore(TransientDatastore):
     def _allocate_resources(self):
         shape, dtype = self._buffer_shape()
         nbytes = dtype.itemsize * reduce(mul, shape)
-        logger.info("dimension {}, {}, {} bytes".format(shape[::-1], dtype, nbytes))
+        logger.info("dimension {}, {}, {} bytes".format(shape, dtype, nbytes))
 
         self._mmap = mmap.mmap(-1, nbytes)
         self._buffer = np.ndarray(shape, dtype, buffer=self._mmap)
