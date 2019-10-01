@@ -1,4 +1,3 @@
-# pylint: disable=E1102
 from abc import abstractmethod
 from collections import OrderedDict
 from collections.abc import MutableMapping
@@ -18,15 +17,17 @@ logger = logging.getLogger(__name__)
 
 
 class Datastore(MutableMapping):
-    """Basic datastore that includes abstract read logic."""
+    """
+    Basic datastore that includes abstract read logic.
+    
+    Args:
+        read_func : reader
+        write_func : writer
+        del_func : deleter
+        immutable (bool, optional): is URI entries fixed
+    """
 
     def __init__(self, read_func=None, write_func=None, del_func=None, immutable=False):
-        """
-        :param func read_func: read operation
-        :param func write_func: write operation
-        :param func del_func: delete operation
-        :param bool immutable: is URI entries fixed
-        """
         self._uri = OrderedDict()
 
         self._read_func, self._write_func = read_func, write_func
