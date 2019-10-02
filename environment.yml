@@ -9,7 +9,7 @@ dependencies:
     - python=3
 
     # build tools
-    - bump2version
+    #- bumpversion # development stalled, use bump2version
     - twine
 
     # linter
@@ -30,3 +30,8 @@ dependencies:
     # libraries from conda has mkl support
     - numpy
     - scipy
+
+    # other pip dependencies
+    - pip
+    - pip: 
+        - bump2version
