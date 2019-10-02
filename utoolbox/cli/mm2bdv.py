@@ -1,4 +1,6 @@
+from functools import reduce
 import logging
+import operator
 import os
 from pprint import pprint
 
@@ -22,8 +24,8 @@ def save_to_hdf(
     handle,
     ss,
     data,
-    subsamples=[(1, 1, 1), (2, 4, 4)],
-    chunks=[(4, 32, 32), (16, 16, 16)],
+    downsamples=[(1, 1, 1), (2, 4, 4)],
+    chunks=(64, 128, 128),
     compression="gzip",
 ):
     """
@@ -37,32 +39,38 @@ def save_to_hdf(
     # resolutions and subdivisions, resizable axis to allow additional levels
     group = handle.create_group(f"s{ss:02d}")
     # .. subsample
-    _subsamples = np.array(subsamples)
+    _downsamples = np.array(downsamples)
     group.create_dataset(
         "resolutions",
-        data=np.fliplr(_subsamples),
+        data=np.fliplr(_downsamples),
         dtype="<f8",
-        chunks=_subsamples.shape,
-        maxshape=(None, None),
+        chunks=_downsamples.shape,
+        maxshape=(None, 3),
     )
+    print(np.fliplr(_downsamples).shape)
+
     # .. chunks
+    # expand chunk setup if necessary
+    if isinstance(chunks[0], int):
+        chunks = (chunks,)
+        chunks *= len(downsamples)
     _chunks = np.array(chunks)
     group.create_dataset(
         "subdivisions",
         data=np.fliplr(_chunks),
         dtype="<i4",
         chunks=_chunks.shape,
-        maxshape=(None, None),
+        maxshape=(None, 3),
     )
 
     # NOTE BDV cannot handle uint16
     data = data.astype(np.int16)
 
-    for i, (subsample, chunk) in enumerate(zip(subsamples, chunks)):
-        logger.debug(f".. > subsample: {subsample}, chunk: {chunk}")
+    for i, (downsample, chunk) in enumerate(zip(downsamples, chunks)):
+        logger.debug(f".. > subsample: {downsample}, chunk: {chunk}")
 
         # downsample range
-        ranges = tuple(slice(None, None, step) for step in subsample)
+        ranges = tuple(slice(None, None, step) for step in downsample)
 
         # new dataset
         path = f"t{0:05d}/s{ss:02d}/{i}"
@@ -113,7 +121,16 @@ def find_voxel_size(metadata):
     default=False,
     help="Dry run, generate XML only.",
 )
-def main(src_path, dst_dir=None, dry_run=False):
+@click.option(
+    "-s",
+    "--downsample",
+    "downsamples",
+    nargs=3,
+    type=int,
+    multiple=True,
+    help='downsample ratio along "X Y Z" axis',
+)
+def main(src_path, dst_dir=None, dry_run=False, downsamples=[(1, 1, 1), (2, 2, 2)]):
     """
     Convert Micro-Manager dataset to BigDataViewer complient XML/HDF5 format.
 
@@ -121,6 +138,7 @@ def main(src_path, dst_dir=None, dry_run=False):
         src_path (str): path to the MM dataset
         dst_path (str, optional): where to save the BDV dataset
         dry_run (bool, optinal): save XML only
+        downsamples (tuple of int, optional): downsample ratio along (X, Y, Z) axis
     """
     dataset = MicroManagerDataset(src_path, force_stack=True)
 
@@ -144,7 +162,21 @@ def main(src_path, dst_dir=None, dry_run=False):
                     ss = xml.add_view(channel, data, name=key, voxel_size=voxel_size)
                     logger.info(f".. [{ss}] {key}")
     else:
-        with h5py.File(h5_path, "a") as h:
+        # ensure downsamples is wrapped
+        if isinstance(downsamples[0], int):
+            downsamples = [downsamples]
+        # reverse downsampling ratio
+        downsamples = [tuple(reversed(s)) for s in downsamples]
+
+        # estimate cache size
+        chunk_size = (64, 64, 64)
+        max_slots = reduce(operator.mul, (1024 // c for c in chunk_size[1:]), 1)
+        rdcc_nbytes = reduce(operator.mul, chunk_size, 1) * max_slots * 2
+        logger.info(f"cache size: {rdcc_nbytes} bytes")
+
+        with h5py.File(
+            h5_path, "w", rdcc_nbytes=rdcc_nbytes, rdcc_nslots=max_slots
+        ) as h:
             # Why declare this?
             h["__DATA_TYPES__/Enum_Boolean"] = np.dtype("bool")
 
@@ -155,13 +187,7 @@ def main(src_path, dst_dir=None, dry_run=False):
                             channel, data, name=key, voxel_size=voxel_size
                         )
                         logger.info(f".. [{ss}] {key}")
-                        save_to_hdf(
-                            h,
-                            ss,
-                            data,
-                            [(1, 2, 2), (2, 4, 4), (4, 8, 8)],
-                            [(4, 32, 32), (16, 16, 16), (16, 16, 16)],
-                        )
+                        save_to_hdf(h, ss, data, downsamples, chunk_size)
     xml.serialize()
 
 
