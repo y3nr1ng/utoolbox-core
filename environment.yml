@@ -9,7 +9,7 @@ dependencies:
     - python=3
 
     # build tools
-    - bumpversion
+    - bump2version
     - twine
 
     # linter
