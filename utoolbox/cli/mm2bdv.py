@@ -61,17 +61,25 @@ def save_to_hdf(
     for i, (subsample, chunk) in enumerate(zip(subsamples, chunks)):
         logger.debug(f".. > subsample: {subsample}, chunk: {chunk}")
 
+        # downsample range
+        ranges = tuple(slice(None, None, step) for step in subsample)
+
+        # new dataset
         path = f"t{0:05d}/s{ss:02d}/{i}"
         logger.debug(f".. > {path}")
         group = handle.create_group(path)
-        ranges = tuple(slice(None, None, step) for step in subsample)
         group.create_dataset(
             "cells",
             data=data[ranges],
             chunks=chunk,
             scaleoffset=0,
             compression=compression,
+            shuffle=True,
         )
+
+    # actual write back
+    logger.debug(f".. > flushing..")
+    handle.flush()
 
 
 def find_voxel_size(metadata):
