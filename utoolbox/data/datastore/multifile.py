@@ -4,6 +4,7 @@ Datastores that use multiple files to composite a single data entry.
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import logging
+from multiprocessing import cpu_count
 
 import numpy as np
 
@@ -48,13 +49,16 @@ class FolderCollectionDatastore(FolderDatastore):
 
 class SparseVolumeDatastore(FolderCollectionDatastore, BufferedDatastore):
     """
+    Multiple volumes represented by folders of images. 
+    
     Args:
         tile_shape (tuple, optional): tile shape
         tile_order (str, optional): order of the tiles, in 'C' or 'F'
+        max_workers (int, optional): maximum number of workers to fetch the data
     """
 
     def __init__(
-        self, *args, tile_shape=None, tile_order="C", max_workers=None, **kwargs
+        self, *args, tile_shape=None, tile_order="C", max_workers=0, **kwargs
     ):
         if ("read_func" not in kwargs) or (kwargs["read_func"] is None):
             raise TypeError("read function must be provided to deduce buffer size")
@@ -62,6 +66,8 @@ class SparseVolumeDatastore(FolderCollectionDatastore, BufferedDatastore):
 
         self._tile_shape, self._tile_order = tile_shape, tile_order
 
+        if max_workers < 1:
+            max_workers = cpu_count()
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
         self._loop = None
 
@@ -105,6 +111,8 @@ class SparseVolumeDatastore(FolderCollectionDatastore, BufferedDatastore):
 
 class SparseTiledVolumeDatastore(SparseVolumeDatastore):
     """
+    Similar to spares volumes, but volumes are spatially tiled.
+
     Args:
         tile_shape (tuple): tile shape
         tile_order (str): order of the tiles, in 'C' or 'F'
@@ -135,30 +143,33 @@ class SparseTiledVolumeDatastore(SparseVolumeDatastore):
         except TypeError:
             raise TypeError("unable to determine buffer size due to invalid tile shape")
         if self._merge:
+            # merge as a big image
             ny, nx = image.shape
             shape = (nty * ny, ntx * nx)
         else:
+            # a stack of images
             shape = (ntx * nty,) + image.shape
 
         return shape, image.dtype
 
     def _generate_deserialization_tasks(self, uri_list):
-        logger.debug('generate deserialization tasks')
-        if not self._merge:
+        if self._merge:
+            # merge as a big image
+            it = np.unravel_index(
+                list(range(len(uri_list))), self._tile_shape, order=self._tile_order
+            )
+            ny, nx = self._raw_read_func(uri_list[0]).shape
+
+            def _reader(path, ity, itx):
+                logger.debug(f'reading tile ({ity}, {itx})')
+                self._buffer[
+                    ity * ny : (ity + 1) * ny, itx * nx : (itx + 1) * nx
+                ] = self._raw_read_func(path)
+
+            return [
+                self.loop.run_in_executor(self.executor, _reader, path, *tile_pos)
+                for tile_pos, path in zip(zip(*it), uri_list)
+            ]
+        else:
+            # a stack of images
             return super()._generate_deserialization_tasks(uri_list)
-
-        it = np.unravel_index(
-            list(range(len(uri_list))), self._tile_shape, order=self._tile_order
-        )
-        ny, nx = self._raw_read_func(uri_list[0]).shape
-
-        def _reader(path, ity, itx):
-            logger.debug(f'reading tile ({ity}, {itx})')
-            self._buffer[
-                ity * ny : (ity + 1) * ny, itx * nx : (itx + 1) * nx
-            ] = self._raw_read_func(path)
-
-        return [
-            self.loop.run_in_executor(self.executor, _reader, path, *tile_pos)
-            for tile_pos, path in zip(zip(*it), uri_list)
-        ]
