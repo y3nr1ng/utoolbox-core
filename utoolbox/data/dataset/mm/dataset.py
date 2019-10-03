@@ -63,7 +63,7 @@ class MicroManagerDataset(MultiChannelDataset):
         info.shape = (self.metadata["Height"], self.metadata["Width"])
         dx, r = self.metadata["PixelSize_um"], self.metadata["PixelAspect"]
         if dx == 0:
-            logger.warning('pixel size unset, default to 1')
+            logger.warning("pixel size unset, default to 1")
             dx = 1
         info.pixel_size = (r * dx, dx)
 

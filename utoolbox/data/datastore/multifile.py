@@ -57,9 +57,7 @@ class SparseVolumeDatastore(FolderCollectionDatastore, BufferedDatastore):
         max_workers (int, optional): maximum number of workers to fetch the data
     """
 
-    def __init__(
-        self, *args, tile_shape=None, tile_order="C", max_workers=0, **kwargs
-    ):
+    def __init__(self, *args, tile_shape=None, tile_order="C", max_workers=0, **kwargs):
         if ("read_func" not in kwargs) or (kwargs["read_func"] is None):
             raise TypeError("read function must be provided to deduce buffer size")
         super().__init__(*args, **kwargs)
@@ -161,7 +159,7 @@ class SparseTiledVolumeDatastore(SparseVolumeDatastore):
             ny, nx = self._raw_read_func(uri_list[0]).shape
 
             def _reader(path, ity, itx):
-                logger.debug(f'reading tile ({ity}, {itx})')
+                logger.debug(f"reading tile ({ity}, {itx})")
                 self._buffer[
                     ity * ny : (ity + 1) * ny, itx * nx : (itx + 1) * nx
                 ] = self._raw_read_func(path)

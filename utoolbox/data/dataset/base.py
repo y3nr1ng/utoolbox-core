@@ -55,7 +55,7 @@ class DatasetInfo(AttrDict):
                         ax_range[iax][1] = ax
                 except TypeError:
                     ax_range[iax] = [ax, ax]
-        return tuple(ax[1] - ax[0] for ax in ax_range)
+        return tuple(ax[1] - ax[0] + 1 for ax in ax_range)
 
     ##
 
@@ -83,7 +83,7 @@ class Dataset(Mapping, metaclass=ABCMeta):
 
     def __init__(self, root):
         self._root = os.path.abspath(os.path.expanduser(root))
-        
+
         self._metadata, self._info = self._load_metadata(), DatasetInfo()
         self._deserialize_info_from_metadata()
 
