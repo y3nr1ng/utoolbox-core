@@ -48,10 +48,13 @@ def preview_datastore(datastore, size, method, fps, quality, output):
 
             data = cp.asarray(data, dtype=cp.float32)
             data = zoom(data, factor)
+            data = data.astype(cp.uint16)
 
             data = auto_contrast(data)
+            data = (data - data.min()) / (data.max() - data.min()) * 255
 
-            data = cp.asnumpy(data).astype(np.uint8)
+            data = data.astype(cp.uint8)
+            data = cp.asnumpy(data)
 
             writer.append_data(data)
 
