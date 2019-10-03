@@ -1,10 +1,9 @@
 import logging
 
 import cupy as cp
-from cupy.cuda.memory import OutOfMemoryError
 from mako.template import Template
 
-from utoolbox.algorithm import AttrDict
+from utoolbox.utils import AttrDict
 
 __all__ = ["RawKernelFile"]
 

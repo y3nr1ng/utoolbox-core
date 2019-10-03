@@ -133,6 +133,7 @@ def find_voxel_size(metadata):
 def main(src_path, dst_dir=None, dry_run=False, downsamples=[(1, 1, 1), (2, 2, 2)]):
     """
     Convert Micro-Manager dataset to BigDataViewer complient XML/HDF5 format.
+    \f
 
     Args:
         src_path (str): path to the MM dataset
@@ -142,7 +143,11 @@ def main(src_path, dst_dir=None, dry_run=False, downsamples=[(1, 1, 1), (2, 2, 2
     """
     dataset = MicroManagerDataset(src_path, force_stack=True)
 
-    pprint(dataset.metadata)
+    # pprint(dataset.metadata)
+    print("== info ==")
+    for key, value in dataset.info.items():
+        pprint(f"{key}: {value}")
+    print()
 
     if dst_dir is None:
         dst_dir = f"{src_path}_hdf5"
@@ -195,8 +200,8 @@ def main(src_path, dst_dir=None, dry_run=False, downsamples=[(1, 1, 1), (2, 2, 2
 
 if __name__ == "__main__":
     main(
-        "Z:/charm/Clarity_Brain/perfus_Lectin594_poststain_lectin647_2x0bj_1",
-        "E:/lectin594_poststain_lectin647_2x0bj",
+        "Z:/charm/20181009_ExM_4x_hippocampus",
+        "E:/20181009_ExM_4x_hippocampus",
         dry_run=True,
     )
 

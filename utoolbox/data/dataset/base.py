@@ -1,14 +1,74 @@
-from abc import abstractmethod
+from abc import ABCMeta, abstractmethod
+from collections import namedtuple
 from collections.abc import Mapping
 import logging
 import os
 
+from utoolbox.utils import AttrDict
+
 logger = logging.getLogger(__name__)
 
-__all__ = ["Dataset", "MultiChannelDataset"]
+__all__ = ["Dataset", "DatasetInfo", "MultiChannelDataset"]
 
 
-class Dataset(Mapping):
+class DatasetInfo(AttrDict):
+    """
+    Book-keeping relevant information of the dataset.
+    """
+
+    TileInfo = namedtuple("TileInfo", ["index", "extent"])
+
+    def __init__(self):
+        """Populate default values."""
+        # time
+        self.frames = 1
+
+        # color
+        self.channels = []
+
+        # stack, 2D
+        self.shape = None
+        self.pixel_size = None
+
+        # stack, 3D
+        self.n_slices = 1
+        self.z_step = 0
+
+        # tiles
+        self.tiles = []
+
+    ##
+
+    @property
+    def tile_shape(self):
+        if not self.is_tiled:
+            raise RuntimeError("not a tiled dataset")
+
+        indices = [tile.index for tile in self.tiles]
+        ax_range = ([None, None],) * len(self.tiles[0].index)
+        for index in indices:
+            for i, ax in zip(index, ax_range):
+                try:
+                    if i < ax[0]:
+                        ax[0] = i
+                    elif i > ax[1]:
+                        ax[1] = i
+                except TypeError:
+                    ax[0] = ax[1] = i
+        return tuple(ax[1] - ax[0] for ax in ax_range)
+
+    ##
+
+    @property
+    def is_tiled(self):
+        return len(self.tiles) > 0
+
+    @property
+    def is_timeseries(self):
+        return self.frames > 1
+
+
+class Dataset(Mapping, metaclass=ABCMeta):
     """
     Dataset base class.
 
@@ -23,7 +83,10 @@ class Dataset(Mapping):
 
     def __init__(self, root):
         self._root = os.path.abspath(os.path.expanduser(root))
-        self._metadata = self._load_metadata()
+        
+        self._metadata, self._info = self._load_metadata(), DatasetInfo()
+        self._deserialize_info_from_metadata()
+
         self._datastore = self._load_datastore()
 
     def __getitem__(self, key):
@@ -60,6 +123,11 @@ class Dataset(Mapping):
 
     def _load_metadata(self):
         pass
+
+    @abstractmethod
+    def _deserialize_info_from_metadata(self):
+        """Load dataset info."""
+        raise NotImplementedError
 
 
 class MultiChannelDataset(Dataset):
