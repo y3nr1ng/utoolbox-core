@@ -18,10 +18,7 @@ framerate = 24
 
 for channel, datastore in ds.items():
     with datastore as source:
-        for name, data in source.items():
-            print(f"name: {name}")
-            imageio.imwrite("demo.tif", data)
-            break
+        imageio.imwrite("demo.tif", source[110])
     break
 
 """
