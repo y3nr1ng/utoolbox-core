@@ -69,7 +69,7 @@ class SparseVolumeDatastore(FolderCollectionDatastore, BufferedDatastore):
         if max_workers < 1:
             max_workers = cpu_count()
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
-        self._loop = None
+        self._loop = asyncio.get_event_loop()
 
     ##
 
@@ -79,7 +79,7 @@ class SparseVolumeDatastore(FolderCollectionDatastore, BufferedDatastore):
 
     @property
     def loop(self):
-        return self._loop if self._loop else asyncio.get_event_loop()
+        return self._loop
 
     ##
 
