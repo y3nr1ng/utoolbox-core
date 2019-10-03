@@ -36,13 +36,16 @@ def determine_format(path):
             }
         ]
         answers = prompt(questions)
-        
-        with ds[answers['channel']] as source:
+
+        with ds[answers["channel"]] as source:
             i = 0
             for key, value in source.items():
-                logger.info(f'.. {key}')
-                yield value
+                logger.info(f".. {key}")
+
+                # DEBUG
                 if i < 5:
                     i += 1
                 else:
                     break
+
+                yield value

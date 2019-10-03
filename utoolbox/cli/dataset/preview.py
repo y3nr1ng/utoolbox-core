@@ -23,9 +23,10 @@ logger = logging.getLogger(__name__)
     default="zstack",
 )
 @click.option("--fps", type=float, default=24)
+@click.option("-q", "--quality", type=int, default=8)
 @click.option("-o", "--output", type=click.Path())
 @processor
-def preview_datastore(datastore, size, method, fps, output):
+def preview_datastore(datastore, size, method, fps, quality, output):
     # lookup size
     size = {
         "4K": (2160, 3840),
@@ -35,16 +36,19 @@ def preview_datastore(datastore, size, method, fps, output):
     }[size]
 
     if method == "zstack":
-        writer = imageio.get_writer(output, fps=fps)
+        writer = imageio.get_writer(
+            output, fps=fps, quality=quality, pixelformat="gray"
+        )
         for data in datastore:
-            m, M = data.min(), data.max()
-            data = (data - m) / (M - m)
-            data = (data * 255).astype(np.uint8)
+            data = data.astype(np.float32)
 
             factor = shape_to_zoom_factor(data.shape, size)
             data = zoom(data, factor)
 
-            imageio.imwrite('test.tif', data)
+            m, M = data.min(), data.max()
+            data = (data - m) / (M - m)
+            
+            data = (data * 255).astype(np.uint8)
 
             writer.append_data(data)
 
