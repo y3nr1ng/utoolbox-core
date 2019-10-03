@@ -1,19 +1,26 @@
 from math import floor
 import os
 
+import coloredlogs
 import imageio
 
 from utoolbox.data import MicroManagerDataset
 
-root = 'Z:/charm/20181009_ExM_4x_hippocampus'
+coloredlogs.install(
+    level="INFO",
+    fmt="%(asctime)s %(levelname)s %(message)s",
+    datefmt="%H:%M:%S",
+)
+
+root = "Z:/charm/20181009_ExM_4x_hippocampus"
 ds = MicroManagerDataset(root)
 framerate = 24
 
 for channel, datastore in ds.items():
     with datastore as source:
         for name, data in source.items():
-            print(name)
-            imageio.imwrite('demo.tif', data)
+            print(f"name: {name}")
+            imageio.imwrite("demo.tif", data)
             break
     break
 
