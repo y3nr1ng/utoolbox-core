@@ -8,6 +8,7 @@ import numpy as np
 
 # from scipy.ndimage import zoom
 
+from utoolbox.exposure import auto_contrast
 from utoolbox.cli.utils import processor
 
 __all__ = ["preview_datastore"]
@@ -48,9 +49,7 @@ def preview_datastore(datastore, size, method, fps, quality, output):
             data = cp.asarray(data, dtype=cp.float32)
             data = zoom(data, factor)
 
-            m, M = data.min(), data.max()
-            data = (data - m) / (M - m)
-            data *= 255
+            data = auto_contrast(data)
 
             data = cp.asnumpy(data).astype(np.uint8)
 
