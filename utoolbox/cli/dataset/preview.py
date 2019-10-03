@@ -1,9 +1,12 @@
 import logging
 
 import click
+import cupy as cp
+from cupyx.scipy.ndimage import zoom
 import imageio
 import numpy as np
-from scipy.ndimage import zoom
+
+# from scipy.ndimage import zoom
 
 from utoolbox.cli.utils import processor
 
@@ -40,15 +43,16 @@ def preview_datastore(datastore, size, method, fps, quality, output):
             output, fps=fps, quality=quality, pixelformat="gray"
         )
         for data in datastore:
-            data = data.astype(np.float32)
-
             factor = shape_to_zoom_factor(data.shape, size)
+
+            data = cp.asarray(data, dtype=cp.float32)
             data = zoom(data, factor)
 
             m, M = data.min(), data.max()
             data = (data - m) / (M - m)
-            
-            data = (data * 255).astype(np.uint8)
+            data *= 255
+
+            data = cp.asnumpy(data).astype(np.uint8)
 
             writer.append_data(data)
 

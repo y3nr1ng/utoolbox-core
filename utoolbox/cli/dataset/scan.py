@@ -15,8 +15,9 @@ logger = logging.getLogger(__name__)
 
 @click.command("scan", short_help="scan and identify a dataset format")
 @click.argument("path", type=click.Path(exists=True))
+@click.option('-s', '--skip', type=int, default=1, help='number of data to skip')
 @generator
-def determine_format(path):
+def determine_format(path, skip):
     for klass in (SPIMDataset, MicroManagerDataset):
         try:
             ds = klass(path)
@@ -41,7 +42,7 @@ def determine_format(path):
         channel = ds.info.channels[0]
 
     with ds[channel] as source:
-        i = 0
-        for key, value in source.items():
-            logger.info(f".. {key}")
-            yield value
+        for i, (key, value) in enumerate(source.items()):
+            if i % skip == 0:
+                logger.info(f".. {key}")
+                yield value
