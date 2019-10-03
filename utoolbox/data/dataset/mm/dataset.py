@@ -113,7 +113,6 @@ class MicroManagerDataset(MultiChannelDataset):
             "extensions": ["tif"],
         }
         if self.info.is_tiled and not self._force_stack:
-            print("sparse tiled volume")
             return SparseTiledVolumeDatastore(
                 self.root,
                 tile_shape=self.info.tile_shape,
@@ -122,6 +121,5 @@ class MicroManagerDataset(MultiChannelDataset):
                 **kwargs,
             )
         else:
-            print("sparse volume")
             return SparseVolumeDatastore(self.root, sub_dir=False, **kwargs)
 

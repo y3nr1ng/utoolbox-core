@@ -45,16 +45,16 @@ class DatasetInfo(AttrDict):
             raise RuntimeError("not a tiled dataset")
 
         indices = [tile.index for tile in self.tiles]
-        ax_range = ([None, None],) * len(self.tiles[0].index)
+        ax_range = [[None, None]] * len(self.tiles[0].index)
         for index in indices:
-            for i, ax in zip(index, ax_range):
+            for iax, ax in enumerate(index):
                 try:
-                    if i < ax[0]:
-                        ax[0] = i
-                    elif i > ax[1]:
-                        ax[1] = i
+                    if ax < ax_range[iax][0]:
+                        ax_range[iax][0] = ax
+                    elif ax > ax_range[iax][1]:
+                        ax_range[iax][1] = ax
                 except TypeError:
-                    ax[0] = ax[1] = i
+                    ax_range[iax] = [ax, ax]
         return tuple(ax[1] - ax[0] for ax in ax_range)
 
     ##
