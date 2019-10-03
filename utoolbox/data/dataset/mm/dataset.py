@@ -81,9 +81,9 @@ class MicroManagerDataset(MultiChannelDataset):
                 # extent
                 extent_xy, extent_z = None, None
                 for key, value in grid["DeviceCoordinatesUm"].items():
-                    if "XYStage" in key:
+                    if "XY" in key:
                         extent_xy = tuple(value[::-1])
-                    elif "ZStage" in key:
+                    elif "Z" in key:
                         extent_z = (value[0],)
                 extent = extent_z + extent_xy
 
