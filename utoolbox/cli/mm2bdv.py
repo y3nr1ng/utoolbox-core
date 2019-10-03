@@ -158,8 +158,10 @@ def main(src_path, dst_dir=None, dry_run=False, downsamples=[(1, 1, 1), (2, 2, 2
     if dry_run:
         for channel, datastore in dataset.items():
             with datastore as source:
-                for key, data in source.items():
-                    ss = xml.add_view(channel, data, name=key, voxel_size=voxel_size)
+                for key in source.keys():
+                    ss = xml.add_view(
+                        channel, source._buffer, name=key, voxel_size=voxel_size
+                    )
                     logger.info(f".. [{ss}] {key}")
     else:
         # ensure downsamples is wrapped

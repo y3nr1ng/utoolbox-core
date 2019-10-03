@@ -211,6 +211,7 @@ class BufferedDatastore(TransientDatastore):
         nbytes = dtype.itemsize * reduce(mul, shape)
         logger.info("dimension {}, {}, {} bytes".format(shape, dtype, nbytes))
 
+        logger.debug("allocating buffer... ")
         if self.is_mapped:
             self._mmap = mmap.mmap(-1, nbytes)
             self._buffer = np.ndarray(shape, dtype, buffer=self._mmap)
