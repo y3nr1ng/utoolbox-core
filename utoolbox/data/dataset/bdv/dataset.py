@@ -22,6 +22,9 @@ class BigDataViewerDataset(MultiChannelDataset):
     def _load_metadata(self):
         pass
 
+    def _deserialize_info_from_metadata(self):
+        pass
+
     def _find_channels(self):
         pass
 
@@ -149,7 +152,7 @@ class BigDataViewerXML(object):
             for i, value in enumerate(values):
                 variants = SubElement(attribute, key)
                 SubElement(variants, "id").text = str(i)
-                SubElement(variants, "name").text = value
+                SubElement(variants, "name").text = str(value)
 
         tree = ElementTree(self.root)
         tree.write(self.path)
@@ -188,12 +191,12 @@ class BigDataViewerXML(object):
 
         # populate default fields
         setups = SubElement(sequence, "ViewSetups")
-        timepoints = SubElement(sequence, 'Timepoints')
-        timepoints.set('type', 'pattern')
+        timepoints = SubElement(sequence, "Timepoints")
+        timepoints.set("type", "pattern")
         registrations = SubElement(root, "ViewRegistrations")
 
         # TODO no timeseries
-        SubElement(timepoints, 'integerpattern').text = str(0)
+        SubElement(timepoints, "integerpattern").text = str(0)
 
         # save internal arguments
         self._root = root
