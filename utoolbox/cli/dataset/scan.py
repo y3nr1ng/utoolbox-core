@@ -42,7 +42,7 @@ def determine_format(path, skip):
         channel = ds.info.channels[0]
 
     with ds[channel] as source:
-        for i, (key, value) in enumerate(source.items()):
+        for i, key in enumerate(source.keys()):
             if i % skip == 0:
                 logger.info(f".. {key}")
-                yield value
+                yield source[key]
