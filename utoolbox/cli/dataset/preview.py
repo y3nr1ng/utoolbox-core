@@ -1,65 +1,71 @@
 import logging
 
 import click
+import cupy as cp
+from cupyx.scipy.ndimage import zoom
 import imageio
+import numpy as np
 
-__all__ = ["preview_dataset"]
+# from scipy.ndimage import zoom
+
+from utoolbox.exposure import auto_contrast
+from utoolbox.cli.utils import processor
+
+__all__ = ["preview_datastore"]
 
 logger = logging.getLogger(__name__)
 
 
 @click.command("preview", short_help="generate preview")
-@click.argument("root", type=click.Path(exists=True))
-@click.option("--size", type=int, default=1)
-@click.option("--format", type=click.Choice(["mp4", "tif"]))
-@click.pass_context
-def preview_dataset(ctx, root, shrink):
-    pass
+@click.option(
+    "-s", "--size", type=click.Choice(["4K", "QHD", "FHD", "HD"]), default="4K"
+)
+@click.option(
+    "-m",
+    "--method",
+    type=click.Choice(["zstack", "rotate", "montage"]),
+    default="zstack",
+)
+@click.option("--fps", type=float, default=24)
+@click.option("-q", "--quality", type=int, default=8)
+@click.option("-o", "--output", type=click.Path())
+@processor
+def preview_datastore(datastore, size, method, fps, quality, output):
+    # lookup size
+    size = {
+        "4K": (2160, 3840),
+        "QHD": (1440, 2560),
+        "FHD": (1080, 1920),
+        "HD": (720, 1280),
+    }[size]
 
-
-def dummy():
-    ds = FolderDatastore(
-        root, read_func=imageio.volread, pattern="*5a_ch0_*", extensions=["tif"]
-    )
-    # dummy read
-    ny, nx = next(iter(ds.values())).max(axis=0).shape
-
-    # expand path
-    root = os.path.abspath(root)
-    parent, basename = os.path.dirname(root), os.path.basename(root)
-    out_path = os.path.join(parent, "{}.mp4".format(basename))
-
-    # invoke ffmpeg
-    ffmpeg_process = (
-        ffmpeg.input(
-            "pipe:", format="rawvideo", pix_fmt="gray", s="{}x{}".format(nx, ny)
+    if method == "zstack":
+        writer = imageio.get_writer(
+            output, fps=fps, quality=quality, pixelformat="gray"
         )
-        .output(out_path, pix_fmt="gray")
-        .overwrite_output()
-        .run_async(pipe_stdin=True)
-    )
+        for data in datastore:
+            factor = shape_to_zoom_factor(data.shape, size)
 
-    u8_max = np.iinfo(np.uint8).max
-    for key, im in ds.items():
-        logger.info(key)
+            data = cp.asarray(data, dtype=cp.float32)
+            data = zoom(data, factor)
+            data = data.astype(cp.uint16)
 
-        with Orthogonal(np.asarray(im)) as data_ortho:
-            data = data_ortho.xy
+            data = auto_contrast(data)
+            data = (data - data.min()) / (data.max() - data.min()) * 255
 
-        # in
-        data = data.astype(np.float32)
+            data = data.astype(cp.uint8)
+            data = cp.asnumpy(data)
 
-        # normalize
-        m, M = data.min(), data.max()
-        data = (data - m) / (M - m)
-        data *= u8_max
+            writer.append_data(data)
 
-        print(data.dtype)
+            # frame
+            yield data
+        writer.close()
+    elif method == "rotate":
+        raise NotImplementedError()
+    elif method == "montage":
+        raise NotImplementedError()
 
-        # out
-        data = data.astype(np.uint8)
 
-        ffmpeg_process.stdin.write(data.tobytes())
-
-    ffmpeg_process.stdin.close()
-    ffmpeg_process.wait()
+def shape_to_zoom_factor(in_shape, out_shape):
+    return min(o / i for i, o in zip(in_shape, out_shape))

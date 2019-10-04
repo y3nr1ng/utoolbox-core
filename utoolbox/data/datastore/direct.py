@@ -51,7 +51,7 @@ class FolderDatastore(Datastore):
         pattern="*",
         extensions=None,
         create_new=True,
-        **kwargs
+        **kwargs,
     ):
         if "del_func" not in kwargs:
             kwargs["del_func"] = os.unlink
