@@ -45,9 +45,8 @@ class MicroManagerDataset(MultiChannelDataset):
 
         try:
             with open(meta_path, "r") as fd:
-                meta = fd.read().decode('ascii', errors='ignore')    
-            # discard frame specific info
-            return json.dumps(meta)["Summary"]
+                # discard frame specific info
+                return json.dumps(fd.read())["Summary"]
         except KeyError:
             raise NoSummarySectionError()
 
@@ -80,7 +79,7 @@ class MicroManagerDataset(MultiChannelDataset):
                 index = (grid["GridRowIndex"], grid["GridColumnIndex"])
 
                 # extent
-                extent_xy, extent_z = (0, 0), (0, )
+                extent_xy, extent_z = (0, 0), (0,)
                 for key, value in grid["DeviceCoordinatesUm"].items():
                     if "XY" in key:
                         extent_xy = tuple(value[::-1])
