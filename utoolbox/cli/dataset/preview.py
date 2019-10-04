@@ -3,13 +3,10 @@ import logging
 import click
 import cupy as cp
 from cupyx.scipy.ndimage import zoom
-import imageio
-import numpy as np
-
-# from scipy.ndimage import zoom
 
 from utoolbox.exposure import auto_contrast
 from utoolbox.cli.utils import processor
+from utoolbox.utils.decorator import run_once
 
 __all__ = ["preview_datastore"]
 
@@ -18,19 +15,16 @@ logger = logging.getLogger(__name__)
 
 @click.command("preview", short_help="generate preview")
 @click.option(
-    "-s", "--size", type=click.Choice(["4K", "QHD", "FHD", "HD"]), default="4K"
-)
-@click.option(
     "-m",
     "--method",
     type=click.Choice(["zstack", "rotate", "montage"]),
     default="zstack",
 )
-@click.option("--fps", type=float, default=24)
-@click.option("-q", "--quality", type=int, default=8)
-@click.option("-o", "--output", type=click.Path())
+@click.option(
+    "-s", "--size", type=click.Choice(["4K", "QHD", "FHD", "HD"]), default="4K"
+)
 @processor
-def preview_datastore(datastore, size, method, fps, quality, output):
+def preview_datastore(stream, method, size):
     # lookup size
     size = {
         "4K": (2160, 3840),
@@ -40,32 +34,26 @@ def preview_datastore(datastore, size, method, fps, quality, output):
     }[size]
 
     if method == "zstack":
-        writer = imageio.get_writer(
-            output, fps=fps, quality=quality, pixelformat="gray"
-        )
-        for data in datastore:
+        for data in stream:
+            data = cp.asarray(data)
+
             factor = shape_to_zoom_factor(data.shape, size)
+            data = zoom(data, factor, order=1, output=data.dtype)
 
-            data = cp.asarray(data, dtype=cp.float32)
-            data = zoom(data, factor)
             data = data.astype(cp.uint16)
-
             data = auto_contrast(data)
             data = (data - data.min()) / (data.max() - data.min()) * 255
-
-            data = data.astype(cp.uint8)
-            data = cp.asnumpy(data)
-
-            writer.append_data(data)
+            data = data.astype(cp.uint8)    
 
             # frame
             yield data
-        writer.close()
+
     elif method == "rotate":
         raise NotImplementedError()
     elif method == "montage":
         raise NotImplementedError()
 
 
+@run_once
 def shape_to_zoom_factor(in_shape, out_shape):
     return min(o / i for i, o in zip(in_shape, out_shape))
