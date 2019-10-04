@@ -15,7 +15,7 @@ from pyopencl.elementwise import ElementwiseKernel
 from pyopencl.reduction import ReductionKernel
 import pyopencl.tools
 
-from utoolbox.container import AttrDict
+from utoolbox.utils import AttrDict
 from utoolbox.parallel import parse_cq
 
 logger = logging.getLogger(__name__)

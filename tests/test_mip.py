@@ -1,53 +1,28 @@
-import logging
-import os
-
-import coloredlogs
-import imageio
 import numpy as np
-import pycuda.driver as cuda
-import tqdm
+from numpy.testing import assert_array_equal
+import pytest
+from pytest import fixture
 
-from utoolbox.util.decorator.benchmark import timeit
-from utoolbox.parallel.gpu import create_some_context
-from utoolbox.transform import MIPTransform
+from utoolbox.transform.projections import Orthogonal
 
-coloredlogs.install(
-    level='DEBUG',
-    fmt='%(asctime)s %(module)s[%(process)d] %(levelname)s %(message)s',
-    datefmt='%H:%M:%S'
-)
+@fixture
+def data(shape=(64, 128, 256)):
+    return np.random.randint(0, 2**16-1, size=shape, dtype=np.uint16)
 
-logger = logging.getLogger(__name__)
+def test_xy_proj(data):
+    cpu = np.max(data, axis=0)
+    with Orthogonal(data) as ortho:
+        gpu = ortho.xy
+    assert_array_equal(cpu, gpu)
 
+def test_xz_proj(data):
+    cpu = np.max(data, axis=1)
+    with Orthogonal(data) as ortho:
+        gpu = ortho.xz
+    assert_array_equal(cpu, gpu)
 
-##### FETCH DATA #####
-path = "deskew_output.tif"
-I_in = imageio.volread(path)
-logger.info("I_in.shape={}".format(I_in.shape))
-
-
-##### EXCEUTE DESKEW #####
-@timeit
-def gpu(data):
-    ctx = create_some_context()
-    ctx.push()
-
-    transform = MIPTransform('z')
-    for _ in tqdm.trange(100):
-        I_out = transform(I_in)
-
-    cuda.Context.pop()
-
-    return I_out
-
-@timeit
-def cpu(data):
-    for _ in tqdm.trange(100):
-        I_out = np.max(data, axis=0).squeeze()
-    return I_out
-    
-I_out_gpu = gpu(I_in)
-I_out_cpu = cpu(I_in)
-
-##### RESULT #####
-#imageio.imwrite("deskew_output_mip.tif", I_out)
+def test_yz_proj(data):
+    cpu = np.max(data, axis=2)
+    with Orthogonal(data) as ortho:
+        gpu = ortho.yz
+    assert_array_equal(cpu, gpu)
