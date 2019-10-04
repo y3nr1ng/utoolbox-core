@@ -21,7 +21,7 @@ in_data = cp.asarray(in_data)
 
 out_data = pm(in_data, in_place=True)
 out_data = ri(out_data, out_range=cp.uint16)
-volwrite('_debug.tif', cp.asnumpy(out_data))
+volwrite("_debug.tif", cp.asnumpy(out_data))
 ##
 # endregion
 ##

@@ -83,6 +83,9 @@ class SPIMDataset(MultiChannelDataset):
             lines = fd.read()
         return Settings(lines)
 
+    def _deserialize_info_from_metadata(self):
+        raise NotImplementedError
+
     def _find_channels(self):
         return [ch.id for ch in self.metadata.waveform.channels]
 
