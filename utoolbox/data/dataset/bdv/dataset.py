@@ -150,7 +150,7 @@ class BigDataViewerXML(object):
             attribute = SubElement(self._setups, "Attributes")
             attribute.set("name", key)
             for i, value in enumerate(values):
-                variants = SubElement(attribute, key)
+                variants = SubElement(attribute, key.capitalize())
                 SubElement(variants, "id").text = str(i)
                 SubElement(variants, "name").text = str(value)
 
