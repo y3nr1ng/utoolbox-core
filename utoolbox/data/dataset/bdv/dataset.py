@@ -106,15 +106,19 @@ class BigDataViewerXML(object):
             """
             Archive an attribute and returns its respective ID.
             """
+            # XML can only accept strings
+            value = str(value)
             try:
                 attribute = cls.attributes[key]
                 try:
                     return attribute.index(value)
                 except ValueError:
+                    # new value
                     attribute.append(value)
                     return len(attribute) - 1
             except KeyError:
-                cls.attributes[key] = [str(value)]
+                # new attribute
+                cls.attributes[key] = [value]
                 return 0
 
     def __init__(self, h5_path):
@@ -132,7 +136,7 @@ class BigDataViewerXML(object):
         Add a new view and return its stored view ID.
         """
         vid = len(self._views)
-        tile = tile if tile else vid
+        tile = vid if tile is None else tile
         view = BigDataViewerXML.View(
             vid, data, name=name, voxel_size=voxel_size, channel=channel, tile=tile
         )
