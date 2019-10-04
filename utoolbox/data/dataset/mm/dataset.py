@@ -44,7 +44,7 @@ class MicroManagerDataset(MultiChannelDataset):
         meta_path = os.path.join(self.root, "metadata.txt")
 
         try:
-            with open(meta_path, "r", encoding='utf-8', errors='ignore') as fd:
+            with open(meta_path, "r", encoding='ascii', errors='ignore') as fd:
                 # discard frame specific info
                 return json.load(fd, strict=False)["Summary"]
         except KeyError:
