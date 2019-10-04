@@ -3,11 +3,11 @@ import logging
 import click
 import coloredlogs
 
-from utoolbox.data.datastore import FolderDatastore
-from utoolbox.transform.projections import Orthogonal
-
-from utoolbox.cli.dataset.scan import determine_format
+from utoolbox.cli.dataset.export import export
 from utoolbox.cli.dataset.preview import preview_datastore
+from utoolbox.cli.dataset.scan import determine_format
+from utoolbox.cli.dataset.transform import rotate
+
 
 __all__ = ["main"]
 
@@ -27,6 +27,7 @@ def main(verbose):
         datefmt="%H:%M:%S",
     )
 
+
 @main.resultcallback()
 def process_commands(processors, verbose):
     stream = ()
@@ -34,14 +35,16 @@ def process_commands(processors, verbose):
     # pipe through all stream processors
     for processor in processors:
         stream = processor(stream)
-    
+
     # evaluate the stream and throw away the item
     for _ in stream:
         pass
 
 
 main.add_command(determine_format, "scan")
+main.add_command(rotate, "rotate")
 main.add_command(preview_datastore, "preview")
+main.add_command(export, "export")
 
 if __name__ == "__main__":
     main()
