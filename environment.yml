@@ -5,17 +5,33 @@ channels:
     - conda-forge
 
 dependencies:
+    # core
+    - python=3
+
     # build tools
-    - conda-build
-    - bumpversion
+    #- bumpversion # development stalled, use bump2version
     - twine
 
-    # core
-    - python=3.6
-
-    # numpy dependency
-    # NOTE Pre-install numpy until upstream pycuda can incorporate
-    # https://stackoverflow.com/q/27021270/ in its aksetup_helper.py
-    - numpy
+    # linter
+    - flake8
     
-    # native libraries
+    # formatter
+    - black
+    
+    # docs
+    - sphinx
+    - sphinx_rtd_theme
+
+    # tests
+    - pytest
+    - coverage
+    - pytest-cov
+
+    # libraries from conda has mkl support
+    - numpy
+    - scipy
+
+    # other pip dependencies
+    - pip
+    - pip: 
+        - bump2version

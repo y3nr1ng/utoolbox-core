@@ -1,0 +1,1 @@
+from .colormap import AmiraColormap

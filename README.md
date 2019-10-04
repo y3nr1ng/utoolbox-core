@@ -1,17 +1,28 @@
 # uToolbox
-[![Build Status](https://travis-ci.com/liuyenting/uToolbox.svg?token=RnNdzNQoCUCRNxtUiy7m&branch=master)](https://travis-ci.com/liuyenting/uToolbox)  
+[![Build Status](https://travis-ci.com/liuyenting/uToolbox.svg?token=RnNdzNQoCUCRNxtUiy7m&branch=master)](https://travis-ci.com/liuyenting/uToolbox) 
+[![Doc Status](https://readthedocs.org/projects/pip/badge/?version=latest&style=flat)](https://utoolbox.readthedocs.io/)  
+
 A Python image processing package for LLSM.
 
-## Getting Started
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See deployment for notes on how to deploy the project on a live system.
+**TODO** intro
 
-### Prerequisites
-It is encouraged to use environment wrapper and package manager, conda is chosen as the reference solution. Please follow the [installation section](https://conda.io/docs/user-guide/install/index.html) in their official guide.
+For more information, refer to [the documentation](https://utoolbox.readthedocs.io/en/latest/index.html).
 
-Some of the codes require CUDA dependency, please download the binary release from the [NVIDIA website](https://developer.nvidia.com/cuda-downloads).
+## Installation
+uToolbox is published on [PyPI](https://pypi.org/project/utoolbox/) and can be installed from there:
 
-For the time being, these are the tested version combination during development and deployment.
-**TODO** add environment description
+`pip install -U utoolbox`
+
+Beta releases are also published:
+
+`pip install -U --pre utoolbox`
+
+If you wish to install uToolbox for development purposes, refer to [the developer guide](https://utoolbox.readthedocs.io/en/latest/intro/developer.html).
+
+## Documentation
+Documentation is available from [readthedocs.io](https://utoolbox.readthedocs.io/en/latest/index.html).
+
+**TODO** migrate platform support info
 
 #### macOS
 - High Sierra 10.13.6, Darwin 17.7.0
@@ -26,56 +37,11 @@ For the time being, these are the tested version combination during development 
 - CUDA 8.0.44
 
 
-### Installing
-Following step-by-step instructions will demonstrate how to get a development environment running.
-
-Clone this repository to somewhere convenient.
-```
-git clone https://github.com/liuyenting/utoolbox.git
-cd utoolbox
-```
-
-Install the conda environment by
-```
-conda env create -f environment.yml
-conda activate utoolbox-dev
-```
-this will prepare an environment with required development tools under the name `utoolbox-dev`.
-
-Since pip does not honor the `setup_requires` description, we have to install basic requirements first.
-```
-pip install -e .
-```
-Then proceed with GPU related packages using `extras_require` flag.
-```
-pip install -e ".[gpu]"
-```
-
-**TODO** execute tests
-
-
-## Deployment
-These steps will deploy this package on a live system for general use.
-
-After ensuring the prerequisites are satisfied, first
-```
-pip install utoolbox
-```
-then
-```
-pip install utoolbox[gpu]
-```
-
-
-## Contributing
-
-## Versioning
-
 ## Authors
 - Liu, Yen-Ting
 
 ## License
-This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details
+This project is licensed under the Apache 2.0 License - see the [LICENSE.md](LICENSE.md) file for details
 
 ## Acknowledgments
 - [LLSpy](https://github.com/tlambert03/LLSpy) by Talley Lambert.

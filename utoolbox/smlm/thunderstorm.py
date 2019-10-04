@@ -160,6 +160,7 @@ class ThunderSTORM(object):
                 **method_parameters
             }
 
+        # NOTE these options are stubs
         renderer_parameters = {
             'renderer': '[Averaged shifted histograms]',
             'magnification': 1.0,

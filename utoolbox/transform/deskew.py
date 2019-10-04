@@ -1,191 +1,173 @@
+from functools import reduce
 import logging
-from math import radians, sin, cos, ceil, hypot
+from math import ceil, cos, degrees, radians, sin
+from operator import mul
 import os
 
-from jinja2 import Template
+import cupy as cp
 import numpy as np
-from pycuda.compiler import SourceModule
-import pycuda.driver as cuda
-import pycuda.gpuarray as gpuarray
-from pycuda.tools import dtype_to_ctype
-import tqdm
-
-from utoolbox.container import AttrDict, Resolution
 
 logger = logging.getLogger(__name__)
 
-class DeskewTransform(object):
-    """
-    Perform standard deskew operation on sample scanned data.
+__all__ = [
+    'Deskew', 
+    'deskew'
+]
 
-    Note
-    ----
-    Shearing **always** happened along the X-axis.
-    """
-    def __init__(self, resolution, angle, rotate=True):
-        """
-        Parameters
-        ----------
-        resolution : utoolbox.container.Resolution
-            Resolution object that specifies the lateral and axial resolution.
-        angle : float
-            Angle between coverslip and detection objective.
-        rotate : bool
-            Rotate the result to perpendicular to coverslip, default to True.
-        """
-        if type(resolution) is not Resolution:
-            try:
-                resolution = Resolution._make(resolution)
-            except TypeError:
-                raise TypeError("invalid resolution input")
-        angle = radians(angle)
+###
+# region: kernel definitions
+###
 
-        self._in_res = resolution
-        self._angle = angle
+cu_file = os.path.join(os.path.dirname(__file__), 'deskew.cu')
+
+ushort_to_float = cp.ElementwiseKernel(
+    'uint16 src', 'float32 dst',
+    'dst = (float)src',
+    'ushort_to_float'
+)
+
+float_to_ushort = cp.ElementwiseKernel(
+    'float32 src', 'uint16 dst',
+    'dst = (unsigned short)src',
+    'float_to_ushort'
+)
+
+###
+# endregion
+###
+
+class Deskew(object):
+    """Restore the actual spatial size of acquired lightsheet data."""
+    def __init__(self, angle=32.8, dr=.108, dz=0.5, rotate=True):
+        """
+        :param float angle: target objective angle
+        :param float dr: lateral resolution
+        :param float dz: step size of the piezo stage
+        :param bool rotate: rotate the result to conventional axis
+        """
+        self._angle = radians(angle)
+        self._in_res = (dr, dz)
         self._rotate = rotate
 
-        self._px_shift = resolution.dz * cos(angle) / resolution.dxy
-        self._out_res = Resolution(resolution.dxy, resolution.dz * sin(angle))
-        logger.debug(
-            "dyx={:.3f}um, dz={:.3f}um, angle={:.2f}rad, shift={:.2f}px".format(
-                resolution.dxy, resolution.dz, angle, self.px_shift
-            )
-        )
+        #DEBUG
+        if rotate:
+            raise NotImplementedError("not yet supported")
+
+        self._out_res = self._estimate_resolution()
 
         self._in_shape, self._out_shape = None, None
-        self._iw_origin = 0
-        self._upload_texture = None
-
-    def __call__(self, data, copy=False):
-        """
-        Parameters
-        ----------
-        data : np.ndarray
-            SPIM data.
-        copy : bool
-            Determine whether output should be a duplicate of internal buffer,
-            default to False.
-        """
-        if (data.shape != self._in_shape) or (data.dtype != self._dtype):
-            logger.info("resizing workspace")
-            if self._in_shape is not None:
-                self.destroy_workspace()
-            self._in_shape, self._dtype = data.shape, data.dtype
-
-            try:
-                self._load_kernel()
-            except cuda.CompileError:
-                logger.error("compile error")
-                raise
-
-            cuda.memcpy_htod(self._d_px_shift, np.float32(self.px_shift))
-
-            self.create_workspace()
-
-        # upload reference volume
-        ref_vol = self._upload_ref_vol(data.astype(np.float32))
-
-        # determine grid & block size
-        n_blocks = (32, 32, 1)
-        nw, nv, nu = self._out_shape
-        n_grids = (ceil(float(nu)/n_blocks[0]), ceil(float(nw)/n_blocks[1]), 1)
-
-        nz, _, nx = self._in_shape
-        dxy, dz = self._in_res
-        duv, dw = self._out_res
-
-        # execute
-        for iv in tqdm.trange(nv):
-            self._kernel.prepared_call(
-                n_grids, n_blocks,
-                self._d_slice.gpudata,
-                np.int32(iv),
-                np.int32(nu), np.int32(nw),
-                np.int32(nx), np.int32(nz)
-            )
-            h_slice = self._d_slice.get()
-            self._h_vol[:, iv, :] = h_slice
-
-        # free resource
-        ref_vol.free()
-
-        result = self._h_vol if not copy else self._h_vol.copy()
-        return result
+        self._template = None
 
     @property
     def angle(self):
-        return self._angle
+        """
+        Target objective angle in degrees
+        """
+        return degrees(self._angle)
 
     @property
-    def out_res(self):
-        return self._out_res
-
+    def dr(self):
+        """Output lateral resolution in microns."""
+        return self._out_res[0]
+    
     @property
-    def px_shift(self):
-        return self._px_shift
-
+    def dz(self):
+        """Output axial resolution in microns."""
+        return self._out_res[1]
+    
     @property
     def rotate(self):
+        """Rotate the result to conventional axis."""
         return self._rotate
 
-    def create_workspace(self):
-        nz, ny, nx = self._in_shape # [px]
-        total_shift = self.px_shift * (nz-1) # [px]
+    @property
+    def shape(self):
+        """Final shape after deskew."""
+        return self._out_shape
+    
+    def _estimate_resolution(self):
+        """
+        Estimate output lateral and axial resolution.
+        
+        :return: (lateral, axial) resolution
+        :rtype: tuple(float,float)
+        """
+        dr, dz0 = self._in_res
+        dz = dz0 * sin(self._angle)
+        return (dr, dz)
 
-        if self.rotate:
-            h = hypot(total_shift, nz) # [px]
-            vsin, vcos = nz/h, total_shift/h # from [px]
+    def _refresh_internal_buffers(self, ref):
+        logger.info("updating internal buffers")
 
-            nw, nv, nu = ceil(nx*vsin), ny, ceil(h + nx*vcos)
+        # reference for interpolation, on device
+        self._template = cp.empty_like(ref, dtype=cp.float32)
 
-            # update output resolution
-            dxy, dz = self._in_res # [um]
-            self._out_res = Resolution(
-                hypot(total_shift*dxy, nz*dz) / nu,
-                nx*dxy / nw
-            )
-            #TODO need to findout whether resample is required
-        else:
-            vsin, vcos = 0., 1.
-            nw, nv, nu = nz, ny, ceil(nx+total_shift)
-        self._out_shape = (nw, nv, nu)
-        logger.debug("duv={:.3f}um, dw={:.3f}um".format(self._out_res.dxy, self._out_res.dz))
+        # store shape info
+        self._in_shape = ref.shape
+        self._out_shape = self._estimate_shape(ref)
 
-        cuda.memcpy_htod(self._d_vsin, np.float32(vsin))
-        cuda.memcpy_htod(self._d_vcos, np.float32(vcos))
-        logger.debug("vsin={:.4f}, vcos={:.4f}".format(vsin, vcos))
+    def _estimate_shape(self, ref):
+        """
+        Estimate output shape.
+        
+        :return: numpy shape format, (nz, ny, nx)
+        :rtype: tuple(int,int,int)
+        """
+        #DEBUG
+        return ref.shape
 
-        self._h_vol = np.empty(self._out_shape, dtype=self._dtype)
-        self._d_slice = gpuarray.empty((nw, nu), dtype=self._dtype, order='C')
-        logger.info("workspace allocated, {}, {}".format(self._out_shape, self._dtype))
+        dx = self._estimate_shift()
+        nz, ny, nx0 = ref.shape
+        nx = ceil(nx0 + dx * (nz-1))
+        return (nz, ny, nx)
 
-    def destroy_workspace(self):
-        pass
+    def _estimate_shift(self):
+        """
+        Estimate pixel shift per layer.
+        
+        :return: pixel shift
+        :rtype: float
+        """
+        dr0, dz0 = self._in_res
+        return dz0 * cos(self._angle) / dr0
 
-    def _load_kernel(self):
-        path = os.path.join(os.path.dirname(__file__), "deskew.cu")
-        with open(path, 'r') as fd:
-            tpl = Template(fd.read())
-            source = tpl.render(dst_type=dtype_to_ctype(self._dtype))
-            module = SourceModule(source)
+    def _upload(self, src):
+        """
+        Uplaod data to device.
 
-        self._kernel = module.get_function("deskew_kernel")
+        :param np.ndarray src: source
+        """
+        ushort_to_float(cp.asarray(src), self._template)
 
-        self._d_px_shift, _ = module.get_global('px_shift')
-        self._d_vsin, _ = module.get_global('vsin')
-        self._d_vcos, _ = module.get_global('vcos')
+    def _download(self, dst):
+        """
+        Download data from device.
 
-        self._texture = module.get_texref("ref_vol")
-        self._texture.set_address_mode(0, cuda.address_mode.BORDER)
-        self._texture.set_address_mode(1, cuda.address_mode.BORDER)
-        self._texture.set_address_mode(2, cuda.address_mode.BORDER)
-        self._texture.set_filter_mode(cuda.filter_mode.LINEAR)
+        :param np.ndarray dst: destination
 
-        self._kernel.prepare('Piiiii',texrefs=[self._texture])
+        .. note::
+            Pinned memory and device memory are reused throughout the process.
+        """
+        buffer = cp.asarray(dst)
+        float_to_ushort(self._template, buffer)
+        dst[...] = cp.asnumpy(buffer)
 
-    def _upload_ref_vol(self, data):
-        """Upload the reference volume into texture memory."""
-        assert data.dtype == np.float32, "np.float32 is required"
-        ref_vol = cuda.np_to_array(data, 'C')
-        self._texture.set_array(ref_vol)
-        return ref_vol
+    def run(self, data, out=None):
+        try:
+            if data.shape != self._in_shape:
+                raise RuntimeError("incompatible buffer")
+        except:
+            self._refresh_internal_buffers(data)
+
+        self._upload(data)
+
+        #TODO execute conversion
+
+        if out is None:
+            out = np.empty(self._out_shape, data.dtype)
+        self._download(out)
+        return out
+    
+def deskew(data, **kwargs):
+    """Helper function that wraps :class:`.Deskew` for one-off use."""
+    pass
