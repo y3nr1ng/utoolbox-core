@@ -205,7 +205,6 @@ def main(src_path, dst_dir=None, dry_run=False, downsamples=[(1, 1, 1), (2, 2, 2
 if __name__ == "__main__":
     main(
         "Z:/charm/20181009_ExM_4x_hippocampus",
-        "E:/20181009_ExM_4x_hippocampus",
         dry_run=True,
     )
 

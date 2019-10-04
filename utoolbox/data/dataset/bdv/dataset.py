@@ -76,7 +76,8 @@ class BigDataViewerXML(object):
 
             # attach attributes
             attributes = SubElement(setup, "attributes")
-            for key, value in self.attributes.items():
+            for key, index in self.attributes.items():
+                value = BigDataViewerXML.View.attributes[key][index]
                 if not isinstance(value, str):
                     value = str(value)
                 SubElement(attributes, key).text = value
@@ -114,7 +115,7 @@ class BigDataViewerXML(object):
                     return attribute.index(value)
                 except ValueError:
                     attribute.append(value)
-                    return len(attribute)
+                    return len(attribute) - 1
             except KeyError:
                 cls.attributes[key] = [str(value)]
                 return 0
@@ -136,7 +137,7 @@ class BigDataViewerXML(object):
         vid = len(self._views)
         tile = tile if tile else vid
         view = BigDataViewerXML.View(
-            vid, data, name=name, voxel_size=voxel_size, channel=channel, tile=vid
+            vid, data, name=name, voxel_size=voxel_size, channel=channel, tile=tile
         )
         self._views.append(view)
         return vid
