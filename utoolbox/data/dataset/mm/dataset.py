@@ -46,7 +46,7 @@ class MicroManagerDataset(MultiChannelDataset):
         try:
             with open(meta_path, "r") as fd:
                 # discard frame specific info
-                return json.dumps(fd.read())["Summary"]
+                return json.load(fd, strict=False)["Summary"]
         except KeyError:
             raise NoSummarySectionError()
 
