@@ -77,10 +77,7 @@ class BigDataViewerXML(object):
             # attach attributes
             attributes = SubElement(setup, "attributes")
             for key, index in self.attributes.items():
-                value = BigDataViewerXML.View.attributes[key][index]
-                if not isinstance(value, str):
-                    value = str(value)
-                SubElement(attributes, key).text = value
+                SubElement(attributes, key).text = str(index)
 
             # spatial calibrations
             voxel = SubElement(setup, "voxelSize")
