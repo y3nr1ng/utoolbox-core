@@ -129,11 +129,12 @@ class BigDataViewerXML(object):
 
         self._views = []
 
-    def add_view(self, channel, data, name="untitled", voxel_size=(1, 1, 1)):
+    def add_view(self, channel, data, name="untitled", voxel_size=(1, 1, 1), tile=None):
         """
         Add a new view and return its stored view ID.
         """
         vid = len(self._views)
+        tile = tile if tile else vid
         view = BigDataViewerXML.View(
             vid, data, name=name, voxel_size=voxel_size, channel=channel, tile=vid
         )

@@ -163,9 +163,13 @@ def main(src_path, dst_dir=None, dry_run=False, downsamples=[(1, 1, 1), (2, 2, 2
     if dry_run:
         for channel, datastore in dataset.items():
             with datastore as source:
-                for key in source.keys():
+                for i_tile, key in enumerate(source.keys()):
                     ss = xml.add_view(
-                        channel, source._buffer, name=key, voxel_size=voxel_size
+                        channel,
+                        source._buffer,
+                        name=key,
+                        voxel_size=voxel_size,
+                        tile=i_tile,
                     )
                     logger.info(f".. [{ss}] {key}")
     else:
@@ -189,9 +193,9 @@ def main(src_path, dst_dir=None, dry_run=False, downsamples=[(1, 1, 1), (2, 2, 2
 
             for channel, datastore in dataset.items():
                 with datastore as source:
-                    for key, data in source.items():
+                    for i_tile, (key, data) in enumerate(source.items()):
                         ss = xml.add_view(
-                            channel, data, name=key, voxel_size=voxel_size
+                            channel, data, name=key, voxel_size=voxel_size, tile=i_tile
                         )
                         logger.info(f".. [{ss}] {key}")
                         save_to_hdf(h, ss, data, downsamples, chunk_size)
