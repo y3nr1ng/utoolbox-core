@@ -1,15 +1,27 @@
 from math import floor
 import os
 
-import av
+import coloredlogs
 import imageio
 
-from utoolbox.data.datastore import FolderDatastore
+from utoolbox.data import MicroManagerDataset
 
-root = 'Movie_decon'
-ds = FolderDatastore(root, read_func=imageio.imread, extensions=['tif'])
+coloredlogs.install(
+    level="INFO",
+    fmt="%(asctime)s %(levelname)s %(message)s",
+    datefmt="%H:%M:%S",
+)
+
+root = "Z:/charm/20181009_ExM_4x_hippocampus"
+ds = MicroManagerDataset(root)
 framerate = 24
 
+for channel, datastore in ds.items():
+    with datastore as source:
+        imageio.imwrite("demo.tif", source[110])
+    break
+
+"""
 # dummy read
 ny, nx = next(iter(ds.values())).shape[:2]
 ny, nx = floor(ny/2)*2, floor(nx/2)*2
@@ -37,3 +49,4 @@ for key, im in ds.items():
 packet = stream.encode(None)
 out.mux(packet)
 out.close()
+"""
