@@ -1,4 +1,4 @@
-from functools import wraps
+from functools import update_wrapper
 
 
 def processor(func):
@@ -8,13 +8,23 @@ def processor(func):
     Adapt from clicks `imagepipe` example.
     """
 
-    @wraps(func)
-    def wrapped_func(*args, **kwargs):
-        return func(dataset, *args, **kwargs)
+    def new_func(*args, **kwargs):
+        def processor(stream):
+            return func(stream, *args, **kwargs)
 
-    return wrapped_func
+        return processor
+
+    return update_wrapper(new_func, func)
 
 
 def generator(func):
     """Helper function that continuously generate data source for others to ingest."""
-    pass
+
+    @processor
+    def new_func(stream, *args, **kwargs):
+        for item in stream:
+            yield item
+        for item in func(*args, **kwargs):
+            yield item
+
+    return update_wrapper(new_func, func)

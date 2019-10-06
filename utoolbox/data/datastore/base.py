@@ -1,4 +1,3 @@
-# pylint: disable=E1102
 from abc import abstractmethod
 from collections import OrderedDict
 from collections.abc import MutableMapping
@@ -12,26 +11,28 @@ import numpy as np
 
 from .error import ImmutableUriListError, ReadOnlyDataError
 
-logger = logging.getLogger(__name__)
+__all__ = ["BufferedDatastore", "Datastore", "TransientDatastore"]
 
-__all__ = ["Datastore", "BufferedDatastore"]
+logger = logging.getLogger(__name__)
 
 
 class Datastore(MutableMapping):
-    """Basic datastore that includes abstract read logic."""
+    """
+    Basic datastore that includes abstract read logic.
+    
+    Args:
+        read_func : reader
+        write_func : writer
+        del_func : deleter
+        immutable (bool, optional): is URI entries fixed
+    """
 
     def __init__(self, read_func=None, write_func=None, del_func=None, immutable=False):
-        """
-        :param func read_func: read operation
-        :param func write_func: write operation
-        :param func del_func: delete operation
-        :param bool immutable: is URI entries fixed
-        """
         self._uri = OrderedDict()
 
         self._read_func, self._write_func = read_func, write_func
         self._immutable = immutable
-    
+
         # short circuit if immutable
         self._del_func = None if immutable else del_func
 
@@ -88,7 +89,10 @@ class TransientDatastore(Datastore):
     """Datastores that require explicit allocation and cleanup routines."""
 
     def __init__(self, **kwargs):
+        self._activated = False
         super().__init__(**kwargs)
+
+    ##
 
     def __enter__(self):
         self.open()
@@ -99,9 +103,37 @@ class TransientDatastore(Datastore):
 
     def open(self):
         self._allocate_resources()
+        self._activated = True
 
     def close(self):
         self._free_resources()
+        self._activated = False
+
+    ##
+
+    def __delitem__(self, key):
+        if not self.is_activated:
+            raise RuntimeError("please activate the datastore first")
+        super().__delitem__(key)
+
+    def __getitem__(self, key):
+        if not self.is_activated:
+            raise RuntimeError("please activate the datastore first")
+        return super().__getitem__(key)
+
+    def __setitem__(self, key, value):
+        if not self.is_activated:
+            raise RuntimeError("please activate the datastore first")
+        super().__setitem__(key, value)
+
+    ##
+
+    @property
+    def is_activated(self):
+        """Is the datastore activated?"""
+        return self._activated
+
+    ##
 
     @abstractmethod
     def _allocate_resources(self):
@@ -116,9 +148,15 @@ class BufferedDatastore(TransientDatastore):
     """
     Reading data that requires internal buffer to piece together the fractions
     before returning it.
+
+    Args:
+        read_func : reader
+        write_func : writer
+        mapped (bool, optional) : use memory mapped buffer instead of in-memory buffer
     """
 
-    def __init__(self, read_func=None, write_func=None, **kwargs):
+    def __init__(self, read_func=None, write_func=None, mapped=False, **kwargs):
+        self._mapped = mapped
         # staging area
         self._mmap, self._buffer = None, None
 
@@ -132,24 +170,40 @@ class BufferedDatastore(TransientDatastore):
 
         super().__init__(read_func=read_func, write_func=write_func, **kwargs)
 
+    ##
+
+    @property
+    def is_mapped(self):
+        return self._mapped
+
+    ##
+
     @abstractmethod
     def _buffer_shape(self):
         """
         Determine shape and type of the internal buffer.
         
-        :return: a tuple, (shape, dtype)
+        Returns:
+            (tuple) : represents (shape, dtype)
         """
         raise NotImplementedError
 
     def _deserialize_to_buffer(self, uri):
         """
-        Load data definition x into the internal buffer.
+        Load data definition into the internal buffer.
         
-        :param x: any definition that can be interpreted internally
+        Arg:
+            uri : any definition that can be interpreted internally
         """
         raise NotImplementedError
 
     def _serialize_from_buffer(self, uri):
+        """
+        Export data from the internal buffer.
+        
+        Arg:
+            uri : any definition that can be interpreted internally
+        """
         raise NotImplementedError
 
     def _allocate_resources(self):
@@ -157,14 +211,19 @@ class BufferedDatastore(TransientDatastore):
         nbytes = dtype.itemsize * reduce(mul, shape)
         logger.info("dimension {}, {}, {} bytes".format(shape, dtype, nbytes))
 
-        self._mmap = mmap.mmap(-1, nbytes)
-        self._buffer = np.ndarray(shape, dtype, buffer=self._mmap)
+        logger.debug("allocating buffer... ")
+        if self.is_mapped:
+            self._mmap = mmap.mmap(-1, nbytes)
+            self._buffer = np.ndarray(shape, dtype, buffer=self._mmap)
+        else:
+            self._buffer = np.empty(shape, dtype)
 
     def _free_resources(self):
         if sys.getrefcount(self._buffer) > 2:
             # getrefcount + self._buffer -> 2 references
             logger.warning("buffer is referenced externally")
         self._buffer = None
-        self._mmap.close()
+        if self.is_mapped:
+            self._mmap.close()
 
         logger.debug("internal buffer destroyed")
