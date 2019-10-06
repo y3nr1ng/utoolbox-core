@@ -4,7 +4,7 @@ import sys
 from PySide2.QtWidgets import QApplication
 
 from utoolbox.apps.volview.gui import MainWindow
-from utoolbox.apps.volview.model import DataModel
+from utoolbox.apps.volview.model import SimpleDataModel
 
 __all__ = ["volview"]
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 def volview(data, cmap="gray", show=True):
     # TODO datastore/ndarray
 
-    model = DataModel(data)
+    model = SimpleDataModel(data)
 
     # create application
     app = QApplication()

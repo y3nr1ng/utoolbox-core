@@ -26,9 +26,8 @@ class MainWindow(QMainWindow):
         # use stylesheet to setup dark mode
         # self.setStyleSheet("background-color:black; color:white;")
 
-    def set_model(self, data):
-        # TODO bind data to model
-        pass
+    def set_model(self, model):
+        self.canvas.model = model
 
     ##
 
