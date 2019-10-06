@@ -29,7 +29,9 @@ ushort_to_float = cp.ElementwiseKernel(
 
 
 class DftRegister(object):
-    def __init__(self, template, upsample_factor=1, return_error=True):
+    def __init__(
+        self, template, upsample_factor=1, return_error=True
+    ):
         self._real_tpl, self._cplx_tpl = template, None
         self._upsample_factor = int(upsample_factor)
         self._return_error, self._int_tpl = return_error, None
@@ -51,9 +53,7 @@ class DftRegister(object):
             if self.upsample_factor > 1:
                 # using upsampled intensity
                 self._int_tpl = cp.asnumpy(
-                    self._upsampled_dft(
-                        self.cplx_tpl * self.cplx_tpl.conj(), 1, self.upsample_factor
-                    )
+                    self._upsampled_dft(self.cplx_tpl * self.cplx_tpl.conj(), 1)
                 )[0, 0]
                 self._int_tpl /= np.float32(self.norm_factor)
             else:
@@ -99,14 +99,16 @@ class DftRegister(object):
 
         # local maxima
         maxima = np.unravel_index(
-            cp.asnumpy(cp.argmax(cp.abs(cross_corr))), cross_corr.shape
+            cp.asnumpy(cp.argmax(cp.abs(cross_corr))), target.shape
         )
         # coarse shifts, wrap around
-        shifts = tuple(
-            (ax_max - ax_sz) if ax_max > ax_sz // 2 else ax_max
-            for ax_max, ax_sz in zip(maxima, target.shape)
+        shifts = np.array(
+            [
+                (ax_sh - ax_sz) if ax_sh > ax_sz / 2.0 else ax_sh
+                for ax_sh, ax_sz in zip(maxima, target.shape)
+            ]
         )
-        # logger.debug("coarse_shifts={}".format(shifts))
+        logger.debug("coarse_shifts={}".format(shifts))
 
         if self.upsample_factor == 1:
             if return_error:
@@ -132,19 +134,18 @@ class DftRegister(object):
             maxima = np.unravel_index(
                 cp.asnumpy(cp.argmax(cp.abs(cross_corr))), cross_corr.shape
             )
+
             # wrap around
             shifts = tuple(
                 shift + float(ax_max - dft_shift) / self.upsample_factor
                 for shift, ax_max in zip(shifts, maxima)
             )
-            # logger.debug("fine_shifts={}".format(shifts))
+            logger.debug("fine_shifts={}".format(shifts))
 
             if return_error:
                 cross_corr_max = cp.asnumpy(cross_corr[maxima])
                 int_tar = cp.asnumpy(
-                    self._upsampled_dft(
-                        cplx_tar * cplx_tar.conj(), 1, self.upsample_factor
-                    )
+                    self._upsampled_dft(cplx_tar * cplx_tar.conj(), 1)
                 )[0, 0]
                 int_tar /= self.norm_factor
                 error = self._compute_error(cross_corr_max, int_tar)
@@ -192,12 +193,11 @@ class DftRegister(object):
             # expand integer to list
             region_sz = (region_sz,) * array.ndim
 
-        try:
+        if offsets is None:
+            offsets = (0,) * array.ndim
+        else:
             if len(offsets) != array.ndim:
                 raise ValueError("axis offsets must match array dimension")
-        except TypeError:
-            # expand integer to list
-            offsets = (offsets,) * array.ndim
 
         dim_props = zip(reversed(array.shape), reversed(region_sz), reversed(offsets))
         for ax_sz, up_ax_sz, ax_offset in dim_props:
