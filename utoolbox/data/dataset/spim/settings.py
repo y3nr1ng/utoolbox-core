@@ -4,7 +4,7 @@ from enum import Enum
 import logging
 import re
 
-from utoolbox.algorithm import AttrDict
+from utoolbox.utils import AttrDict
 
 logger = logging.getLogger(__name__)
 

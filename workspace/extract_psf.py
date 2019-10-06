@@ -43,7 +43,7 @@ def preview_volume(vols, shifts=None):
 
     for i, vol in enumerate(vols):
         volume = scene.visuals.Volume(
-            vol, cmap=cmap, clim=(600, 3000), parent=view.scene, emulate_texture=False
+            vol, cmap=cmap, parent=view.scene, emulate_texture=False
         )
         volume.method = "translucent"
         volume.transform = scene.STTransform(scale=(2, 2, 5.5))
@@ -54,7 +54,9 @@ def preview_volume(vols, shifts=None):
             volume.transform = scene.STTransform(translate=shifts[i])
 
     # assign camera
-    camera = scene.cameras.TurntableCamera(parent=view.scene, fov=60.0, name="Arcball", elevation=30.)
+    camera = scene.cameras.TurntableCamera(
+        parent=view.scene, fov=60.0, name="Arcball", elevation=30.0
+    )
     view.camera = camera
     view.camera.flip = (False, True, True)
 
@@ -149,15 +151,15 @@ if __name__ == "__main__":
         level="DEBUG", fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
     )
 
-    """
     from vispy import io
 
     vol = np.load(io.load_data_file("brain/mri.npz"))["data"]
     print(vol.dtype)
-    """
 
+    """
     import imageio
     vol = imageio.volread('20181019_expanded_hippo/1-Pos_002_005.tif')
+    """
 
     import cupy as cp
 
@@ -166,10 +168,9 @@ if __name__ == "__main__":
 
     vol = auto_contrast(vol)
     vol = cp.asnumpy(vol)
-    #vol = np.swapaxes(vol, 0, 1)
+    vol = np.swapaxes(vol, 0, 1)
     print(vol.dtype)
 
-    """
     avg, std = vol.mean(), vol.std()
     vol[vol < (avg - std)] = 0
 
@@ -179,9 +180,8 @@ if __name__ == "__main__":
     vol2 = vol[:, mid:, :]
 
     preview_volume((vol1, vol2), ((0, -mid, 0), (0, mid, 0)))
-    """
 
-    vol = vol[:, ::2, ::2]
-    preview_volume((vol, ))
+    # vol = vol[:, ::2, ::2]
+    # preview_volume((vol, ))
     # main()
 

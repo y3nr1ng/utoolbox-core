@@ -4,12 +4,8 @@ import os
 
 import imageio
 
-from utoolbox.data.datastore import (
-    ImageFolderDatastore,
-    SparseVolumeDatastore,
-    SparseVolumeTilesDatastore,
-)
-from ..base import MultiChannelDataset
+from utoolbox.data.datastore import SparseVolumeDatastore, SparseTiledVolumeDatastore
+from utoolbox.data.dataset.base import DatasetInfo, MultiChannelDataset
 from .error import NoMetadataInTileFolderError, NoSummarySectionError
 
 logger = logging.getLogger(__name__)
@@ -30,8 +26,7 @@ class MicroManagerDataset(MultiChannelDataset):
             raise FileNotFoundError("invalid dataset root")
         if merge and force_stack:
             logger.warning("force output as stack, merging request is ignored")
-        self._tiled, self._force_stack = None, force_stack
-        self._merge = merge
+        self._merge, self._force_stack = merge, force_stack
         super().__init__(root)
 
     def _load_metadata(self):
@@ -44,67 +39,87 @@ class MicroManagerDataset(MultiChannelDataset):
                 break
         if meta_dir == self.root:
             raise NoMetadataInTileFolderError()
-        logger.debug('using metadata from "{}"'.format(meta_dir))
-        meta_path = os.path.join(meta_dir, "metadata.txt")
+        self._root = meta_dir
+        logger.debug('using metadata from "{}"'.format(self.root))
+        meta_path = os.path.join(self.root, "metadata.txt")
 
-        with open(meta_path, "r") as fd:
-            # discard frame specific info
-            metadata = json.load(fd)["Summary"]
-
-        # use 'InitialPositionList' to determine tiling config
         try:
-            grids = metadata["InitialPositionList"]
-            self._tiled = len(grids) > 1
-        except (KeyError, TypeError):
-            self._tiled = False
-        if self._tiled:
-            # extract tile shape
-            tx, ty = -1, -1
-            for grid in grids:
-                if grid["GridColumnIndex"] > tx:
-                    tx = grid["GridColumnIndex"]
-                if grid["GridRowIndex"] > ty:
-                    ty = grid["GridRowIndex"]
-            self._tile_shape = (ty + 1, tx + 1)
-            logger.info("dataset is a {} grid".format(self._tile_shape))
+            with open(meta_path, "r") as fd:
+                # discard frame specific info
+                return json.load(fd)["Summary"]
+        except KeyError:
+            raise NoSummarySectionError()
 
-            # extract prefix without position info
+    def _deserialize_info_from_metadata(self):
+        info = self.info
+
+        # time
+        info.frames = self.metadata["Frames"]
+
+        # color
+        info.channels = self.metadata["ChNames"]
+
+        # stack, 2D
+        info.shape = (self.metadata["Height"], self.metadata["Width"])
+        dx, r = self.metadata["PixelSize_um"], self.metadata["PixelAspect"]
+        if dx == 0:
+            logger.warning("pixel size unset, default to 1")
+            dx = 1
+        info.pixel_size = (r * dx, dx)
+
+        # stack, 3D
+        info.n_slices = self.metadata["Slices"]
+        info.z_step = abs(self.metadata["z-step_um"])
+
+        if self.metadata["Positions"] > 1:
+            # tiled dataset
+            grids = self.metadata["InitialPositionList"]
+            for grid in grids:
+                # index
+                index = (grid["GridRowIndex"], grid["GridColumnIndex"])
+
+                # extent
+                extent_xy, extent_z = (0, 0), (0, )
+                for key, value in grid["DeviceCoordinatesUm"].items():
+                    if "XY" in key:
+                        extent_xy = tuple(value[::-1])
+                    elif "Z" in key:
+                        extent_z = (value[0],)
+                extent = extent_z + extent_xy
+
+                # save
+                info.tiles.append(DatasetInfo.TileInfo(index=index, extent=extent))
+            logger.info(f"dataset is a {info.tile_shape} grid")
+
+            # extract prefix across folders
             prefix = os.path.commonprefix([grid["Label"] for grid in grids])
             i = prefix.rfind("_")
             if i > 0:
                 prefix = prefix[:i]
             logger.debug('folder prefix "{}"'.format(prefix))
             self._folder_prefix = prefix
-        else:
-            # shortcut to the actual data source
-            self._root = meta_dir
 
-        try:
-            return metadata
-        except KeyError:
-            raise NoSummarySectionError()
+            # reset root folder one level up, we are one level down in one of the tile
+            self._root, _ = os.path.split(self.root)
 
     def _find_channels(self):
-        return self.metadata["ChNames"]
+        return self.info.channels
 
     def _load_channel(self, channel):
-        if self._tiled and not self._force_stack:
-            return SparseVolumeTilesDatastore(
+        kwargs = {
+            "read_func": imageio.imread,
+            "folder_pattern": "{}*".format(self._folder_prefix),
+            "file_pattern": "*_{}_*".format(channel),
+            "extensions": ["tif"],
+        }
+        if self.info.is_tiled and not self._force_stack:
+            return SparseTiledVolumeDatastore(
                 self.root,
-                read_func=imageio.imread,
-                folder_pattern="{}*".format(self._folder_prefix),
-                file_pattern="*_{}_*".format(channel),
-                tile_shape=self._tile_shape,
+                tile_shape=self.info.tile_shape,
                 tile_order="F",
                 merge=self._merge,
-                extensions=['tif']
+                **kwargs,
             )
         else:
-            return SparseVolumeDatastore(
-                self.root,
-                read_func=imageio.imread,
-                sub_dir=False,
-                pattern="*_{}_*".format(channel),
-                extensions=['tif']
-            )
+            return SparseVolumeDatastore(self.root, sub_dir=False, **kwargs)
 
