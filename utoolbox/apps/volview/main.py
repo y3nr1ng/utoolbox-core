@@ -19,7 +19,7 @@ def volview(data, cmap="gray", show=True):
     # create application
     app = QApplication()
     # create actual user interface
-    main = MainWindow()
+    main = MainWindow(size=(768, 768))
     main.set_model(model)
     main.show()
     # run the main Qt event loop
@@ -27,7 +27,12 @@ def volview(data, cmap="gray", show=True):
 
 
 if __name__ == "__main__":
+    import coloredlogs
     import imageio
+
+    coloredlogs.install(
+        level="DEBUG", fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
+    )
 
     data = imageio.volread("/scratch/t1-head-demo.tif")
     volview(data)
