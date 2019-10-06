@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from utoolbox.container.datastore import ImageFolderDatastore
 from utoolbox.transform.projections import Orthogonal
-from utoolbox.util.logging import TqdmLoggingHandler
+from utoolbox.utils.logging import TqdmLoggingHandler
 
 ###
 # region: Configure logging facilities

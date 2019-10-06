@@ -10,7 +10,7 @@ import numpy as np
 
 from utoolbox.container.datastore import ImageFolderDatastore
 from utoolbox.stitching.fusion import rmlp2
-from utoolbox.util.decorator import timeit
+from utoolbox.utils.decorator import timeit
 
 ##
 # region: Setup logger

@@ -21,7 +21,7 @@ class PSFAverage(object):
         self._bbox = self._normalize_bbox(bbox)
         self._ratio = ratio
 
-    def __call__(self, data):
+    def __call__(self, data, return_coords=False):
         if not (data.ndim == 2 or data.ndim == 3):
             raise ValueError("input has to be 2-D or 3-D")
 
@@ -29,11 +29,11 @@ class PSFAverage(object):
             coords = self._select_candidates(data)
         else:
             coords = self._select_candidates(np.max(data, axis=0))
-        peaks = self._crop_candidates(data, coords)
+        peaks = self._crop_candidates(data, coords, return_coords)
 
         #TODO fit each 3d psf
 
-        return peaks, None
+        return peaks
 
     ##
 
@@ -65,7 +65,7 @@ class PSFAverage(object):
         logger.info(f"found {coords.shape[0]} peaks")
         return coords
 
-    def _crop_candidates(self, data, coords):
+    def _crop_candidates(self, data, coords, return_coords=False):
         results = []
         bz, by, bx = self.bbox
         rz, ry, rx = bz // 2, by // 2, bx // 2
@@ -98,9 +98,14 @@ class PSFAverage(object):
                 if not (rz <= cz < shape[0] - rz):
                     logger.debug(f".. ({cx}, {cy}, {cz}), insufficient z height")
                     continue
-                results.append(roi[cz - rz : cz + rz + 1, ...])
+                result = roi[cz - rz : cz + rz + 1, ...]
+                if return_coords:
+                    result = (result, (cz, cy, cx))
             else:
-                results.append(roi)
+                result = roi
+                if return_coords:
+                    result = (result, (cy, cx))
+            results.append(result)
 
         logger.info(f"{len(results)} peaks cropped")
         return results

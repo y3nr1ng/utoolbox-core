@@ -17,7 +17,7 @@ setup(
     #   bumpversion release
     # to next version
     #   bump patch/minor/major
-    version="0.2.2.dev",
+    version="0.5.18.dev0",
     # one-line description for the summary field
     description="A Python image processing package for LLSM.",
     long_description=long_description,
@@ -56,17 +56,19 @@ setup(
         "imageio",
         "imageio-ffmpeg",
         "tifffile",
+        "h5py",
         # gui
         "PySide2",
         "vispy",
+        "pyopengl",
         # parallel
         'cupy-cuda101 ; platform_system!="Darwin"',
         'cupy ; platform_system=="Darwin"',
-        "dask",
         # utils
         "mako",
         "click",
         "coloredlogs",
+        "PyInquirer",
         "tqdm",
     ],
     # additional groups of dependencies here for the "extras" syntax
@@ -84,6 +86,7 @@ setup(
             "zpatch=utoolbox.cli.zpatch:main",
             "dataset=utoolbox.cli.dataset:main",
             "analyze=utoolbox.cli.analyze:main",
+            "mm2bdv=utoolbox.cli.mm2bdv:main",
         ]
     },
     # contains c source, cannot safely run in compressed form
