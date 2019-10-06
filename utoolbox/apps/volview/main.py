@@ -3,7 +3,7 @@ import sys
 
 from PySide2.QtWidgets import QApplication
 
-from utoolbox.apps.volview.gui import MainWidget
+from utoolbox.apps.volview.gui import MainWindow
 from utoolbox.apps.volview.model import DataModel
 
 __all__ = ["volview"]
@@ -19,9 +19,9 @@ def volview(data, cmap="gray", show=True):
     # create application
     app = QApplication()
     # create actual user interface
-    widget = MainWidget()
-    widget.set_model(model)
-    widget.show()
+    main = MainWindow()
+    main.set_model(model)
+    main.show()
     # run the main Qt event loop
     sys.exit(app.exec_())
 
@@ -29,5 +29,5 @@ def volview(data, cmap="gray", show=True):
 if __name__ == "__main__":
     import imageio
 
-    data = imageio.volread("demo_brain-vessel.tif")
+    data = imageio.volread("/scratch/t1-head-demo.tif")
     volview(data)
