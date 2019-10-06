@@ -9,36 +9,31 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-__all__ = [
-    'Deskew', 
-    'deskew'
-]
+__all__ = ["Deskew", "deskew"]
 
 ###
 # region: kernel definitions
 ###
 
-cu_file = os.path.join(os.path.dirname(__file__), 'deskew.cu')
+cu_file = os.path.join(os.path.dirname(__file__), "deskew.cu")
 
 ushort_to_float = cp.ElementwiseKernel(
-    'uint16 src', 'float32 dst',
-    'dst = (float)src',
-    'ushort_to_float'
+    "uint16 src", "float32 dst", "dst = (float)src", "ushort_to_float"
 )
 
 float_to_ushort = cp.ElementwiseKernel(
-    'float32 src', 'uint16 dst',
-    'dst = (unsigned short)src',
-    'float_to_ushort'
+    "float32 src", "uint16 dst", "dst = (unsigned short)src", "float_to_ushort"
 )
 
 ###
 # endregion
 ###
 
+
 class Deskew(object):
     """Restore the actual spatial size of acquired lightsheet data."""
-    def __init__(self, angle=32.8, dr=.108, dz=0.5, rotate=True):
+
+    def __init__(self, angle=32.8, dr=0.108, dz=0.5, rotate=True):
         """
         :param float angle: target objective angle
         :param float dr: lateral resolution
@@ -49,7 +44,7 @@ class Deskew(object):
         self._in_res = (dr, dz)
         self._rotate = rotate
 
-        #DEBUG
+        # DEBUG
         if rotate:
             raise NotImplementedError("not yet supported")
 
@@ -69,12 +64,12 @@ class Deskew(object):
     def dr(self):
         """Output lateral resolution in microns."""
         return self._out_res[0]
-    
+
     @property
     def dz(self):
         """Output axial resolution in microns."""
         return self._out_res[1]
-    
+
     @property
     def rotate(self):
         """Rotate the result to conventional axis."""
@@ -84,7 +79,7 @@ class Deskew(object):
     def shape(self):
         """Final shape after deskew."""
         return self._out_shape
-    
+
     def _estimate_resolution(self):
         """
         Estimate output lateral and axial resolution.
@@ -113,12 +108,12 @@ class Deskew(object):
         :return: numpy shape format, (nz, ny, nx)
         :rtype: tuple(int,int,int)
         """
-        #DEBUG
+        # DEBUG
         return ref.shape
 
         dx = self._estimate_shift()
         nz, ny, nx0 = ref.shape
-        nx = ceil(nx0 + dx * (nz-1))
+        nx = ceil(nx0 + dx * (nz - 1))
         return (nz, ny, nx)
 
     def _estimate_shift(self):
@@ -161,13 +156,14 @@ class Deskew(object):
 
         self._upload(data)
 
-        #TODO execute conversion
+        # TODO execute conversion
 
         if out is None:
             out = np.empty(self._out_shape, data.dtype)
         self._download(out)
         return out
-    
+
+
 def deskew(data, **kwargs):
     """Helper function that wraps :class:`.Deskew` for one-off use."""
     pass
