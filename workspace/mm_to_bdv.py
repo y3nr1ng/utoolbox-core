@@ -199,7 +199,13 @@ def main(src_path, dst_dir=None, dry_run=False):
                 with datastore as source:
                     for key, value in source.items():
                         logger.info(f".. [{ss}] {key}")
-                        save_to_hdf(h, ss, value, [(4, 8, 8)], [(16, 16, 16)])
+                        save_to_hdf(
+                            h,
+                            ss,
+                            value,
+                            [(2, 2, 2), (4, 8, 8)],
+                            [(16, 16, 16), (16, 16, 16)],
+                        )
                         ss += 1
 
     # save the xml
