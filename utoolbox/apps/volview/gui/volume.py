@@ -15,7 +15,10 @@ class Canvas(QObject, SceneCanvas):
     model_changed = Signal()
 
     def __init__(self):
-        super().__init__()
+        # NOTE somehow, super() failed to __init__ both parent class
+        # super().__init__()
+        QObject.__init__(self)
+        SceneCanvas.__init__(self)
         self.unfreeze()
 
         # model
@@ -53,7 +56,8 @@ class Canvas(QObject, SceneCanvas):
 
 
 class VolumeCanvas(Canvas):
-    def __init__(self, method="translucent", cmap="gray"):
+    def __init__(self, method="translucent", cmap="viridis"):
+        logger.debug("VolumeCanvas.__init__")
         super().__init__()
         self.unfreeze()
 
@@ -68,13 +72,13 @@ class VolumeCanvas(Canvas):
 
     def on_model_changed(self):
         if self.volume is None:
+            logger.debug("create new volume visual")
             # create volume visual
             self.volume = Volume(
                 self.model.data,
                 method=self._method,
                 cmap=self._cmap,
                 emulate_texture=False,
-                parent=self.view.scene,
             )
             # create viewbox
             viewbox = self.grid.add_view(row=0, col=0)
@@ -82,8 +86,8 @@ class VolumeCanvas(Canvas):
             # attach camera
             viewbox.camera = self.camera
         else:
-            # TODO self.volume.set_data()
-            pass
+            logger.debug("update data in the visual")
+            self.volume.set_data(self.model.data)
 
     ##
 

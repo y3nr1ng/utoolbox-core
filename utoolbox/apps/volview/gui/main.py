@@ -82,7 +82,18 @@ class MainWindow(QMainWindow):
         snapshot_action = view_menu.addAction("Take snapshot")
 
     def _setup_canvas(self):
-        self.canvas = VolumeCanvas()
+        # DEBUG hard coded transclucent colormap
+        from vispy.color import BaseColormap
+
+        class TransGrays(BaseColormap):
+            glsl_map = """
+            vec4 translucent_grays(float t) {
+                return vec4(t, t, t, t*0.05);
+            }
+            """
+
+        cmap = TransGrays()
+        self.canvas = VolumeCanvas(cmap=cmap)
         self.setCentralWidget(self.canvas.native)
         self.tranfsorm = TransformModel()
 
