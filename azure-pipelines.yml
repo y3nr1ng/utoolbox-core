@@ -77,6 +77,6 @@ jobs:
           artifactFeed: utoolbox-nightly
         displayName: Twine authenticate 
       
-      - script: python -m twine upload -r "twine-nightly" --config-file $(PYPIRC_PATH) *-nightly/*
+      - script: python -m twine upload -r "utoolbox-nightly" --config-file $(PYPIRC_PATH) *-nightly/*
         displayName: Upload wheels to Azure Artifacts feed
       
