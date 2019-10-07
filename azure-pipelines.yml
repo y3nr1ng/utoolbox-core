@@ -6,27 +6,29 @@
 trigger:
 - master
 
+strategy:
+  matrix:
+    py36:
+      python.version: '3.6'
+    py37:
+      python.version: '3.7'
+      
 jobs:
 - job: linux
   pool:
-    vmImage: 'ubuntu-latest'
+    vmImage: 'ubuntu-16.04'
   steps:
-  - task: CondaEnvironment@0
-    inputs:
-      environmentName: 'workspace'
-      packageSpecs: 'python=3 numpy scipy'
-      
   - task: UsePythonVersion@0
     inputs:
       versionSpec: '$(python.version)'
     displayName: 'Use Python $(python.version)'
-
-  - script: |
+  - task: CondaEnvironment@0
+    inputs:
+      environmentName: 'workspace'
+      packageSpecs: 'python=$(python.version) numpy scipy'
+      createOptions: '--yes --quiet'
+    displayName: 'Create Aanconda environment'
+  - bash: |
       python -m pip install --upgrade pip
-      pip install -r requirements.txt
-    displayName: 'Install dependencies'
-
-  - script: |
-      pip install pytest pytest-azurepipelines
-      pytest
-    displayName: 'pytest'
+      pip install .
+    displayName: 'Install uToolbox package'
