@@ -2,7 +2,7 @@ from abc import abstractmethod
 import logging
 
 from PySide2.QtCore import QObject, Signal
-from vispy.scene import SceneCanvas
+from vispy.scene import SceneCanvas, STTransform
 from vispy.scene.cameras import ArcballCamera
 from vispy.scene.visuals import Volume
 
