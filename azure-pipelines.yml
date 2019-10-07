@@ -6,28 +6,37 @@
 trigger:
 - master
 
-strategy:
-  matrix:
+jobs:
+- job: 'linux'
+
+  pool:
+    vmImage: 'ubuntu-16.04'
+
+  strategy:
+    matrix:
     py36:
       python.version: '3.6'
     py37:
       python.version: '3.7'
-      
-pool:
-  vmImage: 'ubuntu-16.04'
 
-steps:
-- task: UsePythonVersion@0
-  inputs:
-    versionSpec: '$(python.version)'
-  displayName: 'Use Python $(python.version)'
-- task: CondaEnvironment@0
-  inputs:
-    environmentName: 'workspace'
-    packageSpecs: 'python=$(python.version) numpy scipy'
-    createOptions: '--yes --quiet'
-  displayName: 'Create Aanconda environment'
-- bash: |
-    python -m pip install --upgrade pip
-    pip install .
-  displayName: 'Install uToolbox package'
+  steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '$(python.version)'
+    displayName: 'Use Python $(python.version)'
+
+  - script: sudo install -d -m 0777 /usr/local/miniconda/envs
+    displayName: 'Fix Anaconda permissions'
+
+  - task: CondaEnvironment@0
+    inputs:
+      environmentName: 'workspace'
+      packageSpecs: 'python=$(python.version) numpy scipy'
+      createOptions: '--yes --quiet'
+    displayName: 'Create Aanconda environment'
+
+  - bash: |
+      conda activate workspace
+      python -m pip install --upgrade pip
+      pip install .
+    displayName: 'Install uToolbox package'
