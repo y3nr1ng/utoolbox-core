@@ -13,22 +13,21 @@ strategy:
     py37:
       python.version: '3.7'
       
-jobs:
-- job: linux
-  pool:
-    vmImage: 'ubuntu-16.04'
-  steps:
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: '$(python.version)'
-    displayName: 'Use Python $(python.version)'
-  - task: CondaEnvironment@0
-    inputs:
-      environmentName: 'workspace'
-      packageSpecs: 'python=$(python.version) numpy scipy'
-      createOptions: '--yes --quiet'
-    displayName: 'Create Aanconda environment'
-  - bash: |
-      python -m pip install --upgrade pip
-      pip install .
-    displayName: 'Install uToolbox package'
+pool:
+  vmImage: 'ubuntu-16.04'
+
+steps:
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '$(python.version)'
+  displayName: 'Use Python $(python.version)'
+- task: CondaEnvironment@0
+  inputs:
+    environmentName: 'workspace'
+    packageSpecs: 'python=$(python.version) numpy scipy'
+    createOptions: '--yes --quiet'
+  displayName: 'Create Aanconda environment'
+- bash: |
+    python -m pip install --upgrade pip
+    pip install .
+  displayName: 'Install uToolbox package'
