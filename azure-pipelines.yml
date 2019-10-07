@@ -14,10 +14,10 @@ jobs:
 
   strategy:
     matrix:
-    py36:
-      python.version: '3.6'
-    py37:
-      python.version: '3.7'
+      py36:
+        python.version: '3.6'
+      py37:
+        python.version: '3.7'
 
   steps:
   - task: UsePythonVersion@0
