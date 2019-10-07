@@ -39,13 +39,10 @@ jobs:
 
   # TODO pytest
 
-  - script: |
-      pip install cibuildwheel
-      cibuildwheel --output-dir wheelhouse .
+  - script: python setup.py bdist_wheel
     displayName: Build Python wheel
-
-  - task: PublishBuildArtifacts@1
+  
+  - task: PublishPipelineArtifact@1
     inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-      ArtifactName: 'linux-nightly'
-      publishLocation: 'Container'
+      targetPath: '$(Pipeline.Workspace)/dist'
+      artifact: 'linux-nightly' 
