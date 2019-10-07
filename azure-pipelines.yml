@@ -8,10 +8,10 @@ trigger:
       - v*
 
 jobs:
-  - job: linux
+  - job: manylinux
 
     pool:
-      vmImage: Ubuntu-16.04
+      vmImage: Ubuntu-latest
 
     strategy:
       matrix:
@@ -40,30 +40,30 @@ jobs:
 
       # TODO pytest
 
-      - script: python setup.py bdist_wheel
+      - script: python setup.py bdist_wheel --plat-name manylinux2010_x86_64
         displayName: Build Python wheel
       
       - task: PublishPipelineArtifact@1
         inputs:
           targetPath: $(System.DefaultWorkingDirectory)/dist
-          artifact: linux-py$(python.version)-nightly 
+          artifact: utoolbox-$(Agent.OS)_$(Agent.JobName)-nightly 
 
-  - job: deploy
+  - job: publish
 
     pool: 
-      vmImage: Ubuntu-16.04
+      vmImage: Ubuntu-latest
     
     condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/heads/master'))
 
     dependsOn:
-      - linux
+      - manylinux
     
     steps:
       - task: UsePythonVersion@0
       - task: DownloadPipelineArtifact@2
         inputs:
           patterns: |
-            *-nightly/*.whl
+            utoolbox-*-nightly/*.whl
         displayName: Download all artifacts
       
       - script: |
@@ -77,6 +77,6 @@ jobs:
           artifactFeed: utoolbox-nightly
         displayName: Twine authenticate 
       
-      - script: python -m twine upload -r "utoolbox-nightly" --config-file "$(PYPIRC_PATH)" "$(Pipeline.Workspace)/*-nightly/*"
+      - script: python -m twine upload -r "utoolbox-nightly" --config-file "$(PYPIRC_PATH)" "$(Pipeline.Workspace)/*/*.whl"
         displayName: Upload wheels to Azure Artifacts feed
       
