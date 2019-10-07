@@ -25,7 +25,7 @@ jobs:
       versionSpec: '$(python.version)'
     displayName: 'Use Python $(python.version)'
 
-  - script: sudo install -d -m 0777 /usr/local/miniconda/envs
+  - script: sudo install -d -m 0777 /usr/envs
     displayName: 'Fix Anaconda permissions'
 
   - task: CondaEnvironment@0
