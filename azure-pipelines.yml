@@ -25,23 +25,14 @@ jobs:
       versionSpec: '$(python.version)'
     displayName: Use Python $(python.version)
 
-  - script: sudo install -d -m 0777 /usr/envs
-    displayName: Fix Anaconda permissions
-
-  - task: CondaEnvironment@0
-    inputs:
-      environmentName: 'workspace'
-      packageSpecs: 'python=$(python.version) numpy scipy'
-      createOptions: '--yes --quiet'
-    displayName: Create Aanconda environment
-
-  - script: |
-      echo "##vso[task.prependpath]$CONDA/bin"
-      conda init bash
+  - script: echo "##vso[task.prependpath]$CONDA/bin"
     displayName: Add conda to PATH
 
+  - script: conda create -n workspace python=$(python.version) numpy scipy --quiet
+    displayName: Create Anaconda environment
+
   - script: |
-      conda activate workspace
+      source activate workspace
       python -m pip install --upgrade pip
       pip install .
     displayName: Install uToolbox package
