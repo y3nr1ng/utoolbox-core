@@ -37,10 +37,11 @@ jobs:
 
   - bash: |
       echo "##vso[task.prependpath]$CONDA/bin"
+      conda init bash
     displayName: Add conda to PATH
 
   - script: |
-      source activate workspace
+      conda activate workspace
       python -m pip install --upgrade pip
       pip install .
     displayName: Install uToolbox package
