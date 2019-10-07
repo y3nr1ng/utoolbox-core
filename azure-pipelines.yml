@@ -44,5 +44,5 @@ jobs:
   
   - task: PublishPipelineArtifact@1
     inputs:
-      targetPath: '$(Pipeline.Workspace)/dist'
+      targetPath: '$(System.DefaultWorkingDirectory)/dist'
       artifact: 'linux-nightly' 
