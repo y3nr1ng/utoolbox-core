@@ -35,11 +35,12 @@ jobs:
       createOptions: '--yes --quiet'
     displayName: Create Aanconda environment
 
-  - bash: echo "##vso[task.prependpath]$CONDA/bin"
+  - bash: |
+      echo "##vso[task.prependpath]$CONDA/bin"
     displayName: Add conda to PATH
 
   - script: |
-      conda activate workspace
+      source activate workspace
       python -m pip install --upgrade pip
       pip install .
     displayName: Install uToolbox package
