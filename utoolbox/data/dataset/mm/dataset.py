@@ -79,7 +79,7 @@ class MicroManagerDataset(MultiChannelDataset):
                 index = (grid["GridRowIndex"], grid["GridColumnIndex"])
 
                 # extent
-                extent_xy, extent_z = (0, 0), (0, )
+                extent_xy, extent_z = (0, 0), (0,)
                 for key, value in grid["DeviceCoordinatesUm"].items():
                     if "XY" in key:
                         extent_xy = tuple(value[::-1])
