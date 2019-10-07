@@ -1,43 +1,81 @@
 trigger:
-- master
+  branches:
+    - master
+  
+  tags:
+    include:
+      - v*
 
 jobs:
-- job: 'linux'
+  - job: linux
 
-  pool:
-    vmImage: 'ubuntu-16.04'
+    pool:
+      vmImage: Ubuntu-16.04
 
-  strategy:
-    matrix:
-      py36:
-        python.version: '3.6'
-      py37:
-        python.version: '3.7'
+    strategy:
+      matrix:
+        py36:
+          python.version: 3.6
+        py37:
+          python.version: 3.7
 
-  steps:
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: $(python.version)
-    displayName: Use Python $(python.version)
+    steps:
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: $(python.version)
+        displayName: Use Python $(python.version)
 
-  - script: echo "##vso[task.prependpath]$CONDA/bin"
-    displayName: Add conda to PATH
+      - script: echo "##vso[task.prependpath]$CONDA/bin"
+        displayName: Add conda to PATH
 
-  - script: conda create --yes --quiet --name workspace python=$(python.version) numpy scipy
-    displayName: Create Anaconda environment
+      - script: conda create --yes --quiet --name workspace python=$(python.version) numpy scipy
+        displayName: Create Anaconda environment
 
-  - script: |
-      source activate workspace
-      python -m pip install --upgrade pip
-      pip install .
-    displayName: Install uToolbox package
+      - script: |
+          source activate workspace
+          python -m pip install --upgrade pip
+          pip install .
+        displayName: Install uToolbox package
 
-  # TODO pytest
+      # TODO pytest
 
-  - script: python setup.py bdist_wheel
-    displayName: Build Python wheel
-  
-  - task: PublishPipelineArtifact@1
-    inputs:
-      targetPath: $(System.DefaultWorkingDirectory)/dist
-      artifact: linux-nightly 
+      - script: python setup.py bdist_wheel
+        displayName: Build Python wheel
+      
+      - task: PublishPipelineArtifact@1
+        inputs:
+          targetPath: $(System.DefaultWorkingDirectory)/dist
+          artifact: linux-nightly 
+
+  - job: deploy
+
+    pool: 
+      vmImage: Ubuntu-16.04
+    
+    condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/v')
+
+    dependsOn:
+      - linux
+    
+    steps:
+      - task: UsePythonVersion@0
+      - task: DownloadPipelineArtifact@2
+        inputs:
+          patterns: |
+            *-nightly/*.whl
+        displayName: Download all artifacts
+      
+      - script: |
+          cd $(Pipeline.Workspace)
+          python -m pip install --upgrade pip
+          pip install twine
+        displayName: Install twine
+      
+      - task: TwineAuthenticate@1
+        inputs:
+          artifactFeed: utoolbox-nightly
+        displayName: Twine authenticate 
+      
+      - script: python -m twine upload -r "twine-nightly" --config-file $(PYPIRC_PATH) *-nightly/*
+        displayName: Upload wheels to Azure Artifacts feed
+      
