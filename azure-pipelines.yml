@@ -35,7 +35,7 @@ jobs:
       createOptions: '--yes --quiet'
     displayName: 'Create Aanconda environment'
 
-  - bash: |
+  - script: |
       conda activate workspace
       python -m pip install --upgrade pip
       pip install .
