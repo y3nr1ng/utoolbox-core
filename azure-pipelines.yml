@@ -22,7 +22,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '$(python.version)'
+      versionSpec: $(python.version)
     displayName: Use Python $(python.version)
 
   - script: echo "##vso[task.prependpath]$CONDA/bin"
@@ -36,3 +36,16 @@ jobs:
       python -m pip install --upgrade pip
       pip install .
     displayName: Install uToolbox package
+
+  # TODO pytest
+
+  - script: |
+      pip install cibuildwheel
+      cibuildwheel --output-dir wheelhouse .
+    displayName: Build Python wheel
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      ArtifactName: 'linux-nightly'
+      publishLocation: 'Container'
