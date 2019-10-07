@@ -4,11 +4,27 @@ from setuptools import find_namespace_packages, setup
 
 cwd = os.path.abspath(os.path.dirname(__file__))
 
-###
-# get description from README.md
-###
 with open(os.path.join(cwd, "README.md"), encoding="utf-8") as fd:
     long_description = fd.read()
+
+try:
+    from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
+
+    class bdist_wheel(_bdist_wheel):
+        """
+        Patch bdist_wheel to force package as platform wheel.
+        
+        Reference:
+            https://stackoverflow.com/a/45150383
+        """
+
+        def finalize_options(self):
+            _bdist_wheel.finalize_options(self)
+            self.root_is_pure = False
+
+
+except ImportError:
+    bdist_wheel = None
 
 setup(
     # published project name
@@ -89,6 +105,8 @@ setup(
             "mm2bdv=utoolbox.cli.mm2bdv:main",
         ]
     },
+    # command hooks
+    cmdclass={"bdist_wheel": bdist_wheel},
     # contains c source, cannot safely run in compressed form
     zip_safe=False,
 )
