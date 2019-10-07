@@ -35,7 +35,7 @@ jobs:
       createOptions: '--yes --quiet'
     displayName: Create Aanconda environment
 
-  - bash: |
+  - script: |
       echo "##vso[task.prependpath]$CONDA/bin"
       conda init bash
     displayName: Add conda to PATH
