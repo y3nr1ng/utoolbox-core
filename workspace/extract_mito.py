@@ -12,10 +12,5 @@ coloredlogs.install(
 )
 
 dataset = SPIMDataset("raw")
-pprint(dataset.metadata)
 pprint(dataset.info)
-
-from utoolbox.cli.prompt import prompt_options
-
-print(prompt_options("Select a number", [123, 456, 789]))
 

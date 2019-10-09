@@ -106,16 +106,18 @@ class SPIMDataset(MultiChannelDataset):
         lx, ly, rx, ry = metadata.camera.roi
         info.shape = (ry - ly, rx - lx)
 
-        pxsize = prompt_float('What is the size of the pixel? ')
+        pxsize = prompt_float("What is the size of the pixel? ")
         info.pixel_size = (pxsize,) * 2
 
         # stack, 3D
         if metadata.waveform.type == ScanType.OBJECTIVE:
-            info.n_slices = metadata["Slices"] # TODO more extraction pattern
-            info.z_step = abs(metadata.obj_piezo_step)
+            info.n_slices = metadata.waveform.obj_piezo_n_steps
+            info.z_step = abs(metadata.waveform.obj_piezo_step_size)
         elif metadata.waveform.type == ScanType.SAMPLE:
-            raise RuntimeError('sample scan not supported yet')
-        
+            logger.warning("sample scanned data requires deskew")
+            info.n_slices = metadata.waveform.sample_piezo_n_steps
+            info.z_step = abs(metadata.waveform.sample_piezo_step_size)
+
     def _load_channel(self, channel):
         # NOTE
         # `imageio.volread` can adapt for both 2D and 3D TIFF files.
