@@ -21,6 +21,7 @@ class AutoContrast(object):
     """
     Implements ImageJ1-style auto contrast adjustment.
     """
+
     def __init__(self, n_bins=256, auto_threshold=5000, block_sz=(512,)):
         self._n_bins = n_bins
         self._auto_threshold = auto_threshold
@@ -62,6 +63,7 @@ class AutoContrast(object):
         except ValueError:
             # floating point data type, normalize
             dtype_max = 1
+            logger.warning("found floating data type, data will normalize to [0, 1]")
         lookup_kernel = cp.ElementwiseKernel(
             "T in",
             "T out",

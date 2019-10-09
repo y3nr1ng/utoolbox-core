@@ -1,62 +1,48 @@
+from abc import abstractmethod
 import logging
 
-import numpy as np
-from PySide2.QtCore import Signal
+from PySide2.QtCore import QObject, Signal
 from vispy.scene import SceneCanvas
-from vispy.scene.visuals import Volume
+from vispy.scene.cameras import ArcballCamera
 
 __all__ = ["Canvas"]
 
 logger = logging.getLogger(__name__)
 
 
-class Canvas(SceneCanvas):
+class Canvas(QObject, SceneCanvas):
     model_changed = Signal()
 
-    def __init__(self, *args, **kwargs):
-        super().__init__()
+    def __init__(self):
+        # NOTE somehow, super() failed to __init__ both parent class
+        # super().__init__()
+        QObject.__init__(self)
+        SceneCanvas.__init__(self)
+        self.unfreeze()
 
+        # model
         self._model = None
 
-        # initialize the view
-        view = self.central_widget.add_view()
+        # view
+        self._grid = self.central_widget.add_grid()
+        self.camera = ArcballCamera()
 
-        # add volume visual, use dummy
-        dummy = np.zeros(shape=(16, 16, 16), dtype=np.uint16)
-        volume = Volume(
-            dummy,
-            method="translucent",
-            parent=view.scene,
-            emulate_texture=False,
-        )
-        self.volume = volume
-
+        # signal
         self.model_changed.connect(self.on_model_changed)
 
-        self.refresh()
+        self.freeze()
 
     ##
 
-    def on_draw(self):
-        gloo.clear(color="block", depth=True)
-        self.volume.draw()
-
-    def on_resize(self, event):
-        # set viewport and reconfigure visual transforms
-        viewport = (0, 0, self.physical_size[0], self.physical_size[1])
-        self.context.set_viewport(*viewport)
-        self.volume.transform.configure(canvas=self, viewport=viewport)
-
-    ##
-
-    def refresh(self):
-        pass
-
+    @abstractmethod
     def on_model_changed(self):
-        self.volume.set_data(self.model)
-        self.refresh()
+        raise NotImplementedError()
 
     ##
+
+    @property
+    def grid(self):
+        return self._grid
 
     @property
     def model(self):
@@ -64,6 +50,5 @@ class Canvas(SceneCanvas):
 
     @model.setter
     def model(self, model):
-        if (self.model is None) or (self.model != model):
-            self._model = model
-            self.model_changed.emit()
+        self._model = model
+        self.model_changed.emit()

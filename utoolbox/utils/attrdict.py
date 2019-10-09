@@ -10,9 +10,8 @@ class AttrDict(OrderedDict):
     as much as possible as a normal dict. Keys that are not valid identifiers or
     names of keywords cannot be used as attributes.
 
-    Reference
-    ---------
-    imageio.core.util.Dict
+    Reference: 
+        - imageio.core.util.Dict
     """
 
     __reserved_names__ = dir(OrderedDict())
