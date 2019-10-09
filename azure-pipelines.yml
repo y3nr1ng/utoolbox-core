@@ -1,32 +1,83 @@
-# Python package
-# Create and test a Python package on multiple Python versions.
-# Add steps that analyze code, save the dist with the build record, publish to a PyPI-compatible index, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/python
-
 trigger:
-- master
+  branches:
+    include:
+      - master
+  
+  tags:
+    include:
+      - v*
 
 jobs:
-- job: linux
-  pool:
-    vmImage: 'ubuntu-latest'
-  steps:
-  - task: CondaEnvironment@0
-    inputs:
-      environmentName: 'workspace'
-      packageSpecs: 'python=3 numpy scipy'
+  - job: manylinux
+
+    pool:
+      vmImage: Ubuntu-latest
+
+    strategy:
+      matrix:
+        py36:
+          python.version: 3.6
+        py37:
+          python.version: 3.7
+
+    steps:
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: $(python.version)
+        displayName: Use Python $(python.version)
+
+      - script: echo "##vso[task.prependpath]$CONDA/bin"
+        displayName: Add conda to PATH
+
+      - script: conda create --yes --quiet --name workspace python=$(python.version) numpy scipy
+        displayName: Create Anaconda environment
+
+      - script: |
+          source activate workspace
+          python -m pip install --upgrade pip
+          pip install .
+        displayName: Install uToolbox package
+
+      # TODO pytest
+
+      - script: python setup.py bdist_wheel --plat-name manylinux2010_x86_64
+        displayName: Build Python wheel
       
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: '$(python.version)'
-    displayName: 'Use Python $(python.version)'
+      - task: PublishPipelineArtifact@1
+        inputs:
+          targetPath: $(System.DefaultWorkingDirectory)/dist
+          artifact: artifact-$(Agent.OS)_$(Agent.JobName) 
+        displayName: Publish pipeline artifact
 
-  - script: |
-      python -m pip install --upgrade pip
-      pip install -r requirements.txt
-    displayName: 'Install dependencies'
+  - job: publish
 
-  - script: |
-      pip install pytest pytest-azurepipelines
-      pytest
-    displayName: 'pytest'
+    pool: 
+      vmImage: Ubuntu-latest
+    
+    condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
+
+    dependsOn:
+      - manylinux
+    
+    steps:
+      - task: UsePythonVersion@0
+      - task: DownloadPipelineArtifact@2
+        inputs:
+          patterns: |
+            artifact-*/*.whl
+        displayName: Download all artifacts
+      
+      - script: |
+          cd $(Pipeline.Workspace)
+          python -m pip install --upgrade pip
+          pip install twine
+        displayName: Install twine
+      
+      - task: TwineAuthenticate@1
+        inputs:
+          artifactFeed: utoolbox-nightly
+        displayName: Twine authenticate 
+      
+      - script: python -m twine upload -r "utoolbox-nightly" --config-file "$(PYPIRC_PATH)" "$(Pipeline.Workspace)/*/*.whl"
+        displayName: Upload wheels to Azure Artifacts feed
+      

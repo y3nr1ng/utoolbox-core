@@ -1,9 +1,11 @@
 import logging
 
+import numpy as np
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QDialog, QLabel, QSlider, QVBoxLayout
 from vispy.scene import SceneCanvas, PanZoomCamera
-from vispy.scene.visuals import Histogram
+
+from utoolbox.apps.volview.gui.histogram import Histogram
 
 __all__ = ["TransferFunctionWidget"]
 
@@ -11,42 +13,17 @@ logger = logging.getLogger(__name__)
 
 
 class TransferFunctionDialog(QDialog):
-    def __init__(self):
+    def __init__(self, n_bins=256):
+        self._n_bins = n_bins
+
         super().__init__()
+        self.setWindowModality(Qt.NonModal)
         self.setWindowTitle("Transfer Function")
 
         layout = QVBoxLayout()
 
-        # DEBUG use random data
-        import numpy as np
-
-        np.random.seed(42)
-
-        n = 100000
-        data = np.empty((n,))
-        lasti = 0
-        for i in range(1, 20):
-            nexti = lasti + (n - lasti) // 2
-            scale = np.abs(np.random.randn(1)) + 0.1
-            data[lasti:nexti] = np.random.normal(
-                size=(nexti - lasti,), loc=np.random.randn(1), scale=scale / i
-            )
-            lasti = nexti
-        data = data[:lasti]
-
-        data = (data - data.min()) / (data.max() - data.min()) * 255
-
-        n_bins = 256
-        print(data)
-        print(np.histogram(data, bins=n_bins))
-
-        canvas = SceneCanvas(size=(n_bins, 128), bgcolor="white")
-        viewbox = canvas.central_widget.add_view(border_width=0)
-        histogram = Histogram(data, bins=n_bins, orientation="h", color="gray")
-        viewbox.add(histogram)
-        viewbox.camera = PanZoomCamera(interactive=False)
-        viewbox.camera.set_range(margin=0)
-        layout.addWidget(canvas.native)
+        histogram = self._create_histogram_widget()
+        layout.addWidget(histogram)
 
         minimum = QSlider(Qt.Horizontal)
         minimum.setStyleSheet(
@@ -96,14 +73,75 @@ class TransferFunctionDialog(QDialog):
 
         self.setLayout(layout)
 
+<<<<<<< HEAD
+=======
+    ##
+
+    @property
+    def histogram(self):
+        pass
+
+    @property
+    def n_bins(self):
+        return self._n_bins
+
+    ##
+
+    def _create_histogram_widget(self, height=128):
+        # create canvas
+        canvas = SceneCanvas(size=(self.n_bins, height), bgcolor="white")
+        viewbox = canvas.central_widget.add_view(border_width=0)
+        viewbox.camera = PanZoomCamera(interactive=False)
+
+        # dummy data
+        edges = np.arange(self.n_bins + 1, dtype=np.int)
+        data = np.zeros_like(edges, shape=(self.n_bins,))
+
+        # create histogram
+        histogram = Histogram((data, edges), orientation="h", color="gray")
+        viewbox.add(histogram)
+        viewbox.camera.set_range(margin=0)
+
+        # save accessors
+        self._viewbox, self._histogram = viewbox, histogram
+
+        return canvas.native
+
+>>>>>>> 9886c19f25c11cf39fc41b0230e3a4a71525c079
 
 if __name__ == "__main__":
     import sys
     from PySide2.QtWidgets import QApplication
 
     app = QApplication(sys.argv)
+<<<<<<< HEAD
 
     tf = TransferFunctionDialog()
     tf.show()
 
+=======
+    
+    # generate random data
+    np.random.seed(42)
+
+    n = 100000
+    data = np.empty((n,))
+    lasti = 0
+    for i in range(1, 20):
+        nexti = lasti + (n - lasti) // 2
+        scale = np.abs(np.random.randn(1)) + 0.1
+        data[lasti:nexti] = np.random.normal(
+            size=(nexti - lasti,), loc=np.random.randn(1), scale=scale / i
+        )
+        lasti = nexti
+    data = data[:lasti]
+
+    histogram = np.histogram(data, bins=256)
+    
+    tf = TransferFunctionDialog()
+    tf.show()
+
+    print('.. pass tf.show()')
+
+>>>>>>> 9886c19f25c11cf39fc41b0230e3a4a71525c079
     sys.exit(app.exec_())

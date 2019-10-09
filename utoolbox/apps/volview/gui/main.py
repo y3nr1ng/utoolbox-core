@@ -93,6 +93,7 @@ class MainWindow(QMainWindow):
             """
 
         cmap = TransGrays()
+
         self.canvas = VolumeCanvas(cmap=cmap)
         self.setCentralWidget(self.canvas.native)
         self.tranfsorm = TransformModel()

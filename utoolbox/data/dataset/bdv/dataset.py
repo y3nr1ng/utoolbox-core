@@ -76,10 +76,8 @@ class BigDataViewerXML(object):
 
             # attach attributes
             attributes = SubElement(setup, "attributes")
-            for key, value in self.attributes.items():
-                if not isinstance(value, str):
-                    value = str(value)
-                SubElement(attributes, key).text = value
+            for key, index in self.attributes.items():
+                SubElement(attributes, key).text = str(index)
 
             # spatial calibrations
             voxel = SubElement(setup, "voxelSize")
@@ -108,15 +106,19 @@ class BigDataViewerXML(object):
             """
             Archive an attribute and returns its respective ID.
             """
+            # XML can only accept strings
+            value = str(value)
             try:
                 attribute = cls.attributes[key]
                 try:
                     return attribute.index(value)
                 except ValueError:
+                    # new value
                     attribute.append(value)
-                    return len(attribute)
+                    return len(attribute) - 1
             except KeyError:
-                cls.attributes[key] = [str(value)]
+                # new attribute
+                cls.attributes[key] = [value]
                 return 0
 
     def __init__(self, h5_path):
@@ -129,13 +131,14 @@ class BigDataViewerXML(object):
 
         self._views = []
 
-    def add_view(self, channel, data, name="untitled", voxel_size=(1, 1, 1)):
+    def add_view(self, channel, data, name="untitled", voxel_size=(1, 1, 1), tile=None):
         """
         Add a new view and return its stored view ID.
         """
         vid = len(self._views)
+        tile = vid if tile is None else tile
         view = BigDataViewerXML.View(
-            vid, data, name=name, voxel_size=voxel_size, channel=channel, tile=vid
+            vid, data, name=name, voxel_size=voxel_size, channel=channel, tile=tile
         )
         self._views.append(view)
         return vid
