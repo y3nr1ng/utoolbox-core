@@ -116,17 +116,17 @@ class Dataset(Mapping, metaclass=ABCMeta):
 
     ##
 
-    @abstractmethod
-    def _load_datastore(self):
-        """Load actual data as datastore object."""
-        raise NotImplementedError
-
     def _load_metadata(self):
         pass
 
     @abstractmethod
     def _deserialize_info_from_metadata(self):
         """Load dataset info."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _load_datastore(self):
+        """Load actual data as datastore object."""
         raise NotImplementedError
 
 
@@ -146,16 +146,12 @@ class MultiChannelDataset(Dataset):
 
     ##
 
-    @abstractmethod
-    def _find_channels(self):
-        return NotImplementedError
+    def _load_datastore(self):
+        """Override for multi-channel setup."""
+        channels = self.info.channels
+        logger.info("{} channel(s)".format(len(channels)))
+        return {channel: self._load_channel(channel) for channel in channels}
 
     @abstractmethod
     def _load_channel(self, channel):
         return NotImplementedError
-
-    def _load_datastore(self):
-        """Override for multi-channel setup."""
-        channels = self._find_channels()
-        logger.info("{} channel(s)".format(len(channels)))
-        return {channel: self._load_channel(channel) for channel in channels}
