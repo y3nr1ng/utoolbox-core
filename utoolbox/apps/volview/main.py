@@ -34,5 +34,9 @@ if __name__ == "__main__":
         level="DEBUG", fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
     )
 
+<<<<<<< HEAD
     data = imageio.volread("/scratch/t1-head-demo.tif")
+=======
+    data = imageio.volread("G:/t1-head-demo.tif")
+>>>>>>> 9886c19f25c11cf39fc41b0230e3a4a71525c079
     volview(data)
