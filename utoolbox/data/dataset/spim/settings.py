@@ -30,12 +30,19 @@ Channel = namedtuple(
 
 
 class Settings(AttrDict):
+    """
+    Object-oriented modeling of the Settings.txt from LatticeScope.
+
+    Args:
+        lines (str): raw string from the file
+    """
+
     section_pattern = re.compile(
         r"^(?:\*{5}\s{1}){3}\s*(?P<title>[^\*]+)(?:\s{1}\*{5}){3}", re.MULTILINE
     )
 
     def __init__(self, lines):
-        super(Settings, self).__init__()
+        super().__init__()
 
         sections = Settings.identify_sections(lines)
         for title, start, end in sections:
@@ -87,10 +94,17 @@ class Settings(AttrDict):
             parsed[field] = value
 
         # merge timestamp
-        parsed["timestamp"] = datetime.strptime(
-            " ".join([parsed["date"], parsed["time"]]), "%Y/%m/%d %H:%M:%S"
-        )
-        del parsed["date"], parsed["time"]
+        for timestamp_fmt in ("%Y/%m/%d %H:%M:%S", "%m/%d/%Y %H:%M:%S"):
+            try:
+                parsed["timestamp"] = datetime.strptime(
+                    " ".join([parsed["date"], parsed["time"]]), timestamp_fmt
+                )
+                del parsed["date"], parsed["time"]
+            except ValueError:
+                pass
+        else:
+            logger.warning("unable to parse the timestamp")
+            parsed["timestamp"] = " ".join([parsed["data"], parsed["time"]])
 
         return "general", parsed
 

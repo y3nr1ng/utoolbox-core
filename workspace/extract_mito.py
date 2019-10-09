@@ -1,27 +1,21 @@
-import cupy as cp
-from imageio import volread, volwrite
-import numpy as np
+import logging
+from pprint import pprint
 
-from utoolbox.filters.perona_malik import PeronaMalik3D
-from utoolbox.exposure.rescale_intensity import RescaleIntensity
+import coloredlogs
 
-in_data = volread("data/mito/mito.tif")
+from utoolbox.data import SPIMDataset
 
-ri = RescaleIntensity()
+logging.getLogger("tifffile").setLevel(logging.ERROR)
 
-##
-# region: PM filter
-##
-thre = in_data.std()
-print("thre={:.4f}".format(thre))
-pm = PeronaMalik3D(threshold=thre, niter=16)
+coloredlogs.install(
+    level="DEBUG", fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
+)
 
-in_data = in_data.astype(np.float32)
-in_data = cp.asarray(in_data)
+dataset = SPIMDataset("raw")
+pprint(dataset.metadata)
+pprint(dataset.info)
 
-out_data = pm(in_data, in_place=True)
-out_data = ri(out_data, out_range=cp.uint16)
-volwrite("_debug.tif", cp.asnumpy(out_data))
-##
-# endregion
-##
+from utoolbox.cli.prompt import prompt_options
+
+print(prompt_options("Select a number", [123, 456, 789]))
+
