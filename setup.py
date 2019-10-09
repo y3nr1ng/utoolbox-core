@@ -84,7 +84,7 @@ setup(
         "mako",
         "click",
         "coloredlogs",
-        "PyInquirer",
+        "prompt_toolkit",
         "tqdm",
     ],
     # additional groups of dependencies here for the "extras" syntax
