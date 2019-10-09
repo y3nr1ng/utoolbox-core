@@ -3,8 +3,8 @@ import os
 
 import click
 import imageio
-from PyInquirer import prompt
 
+from utoolbox.cli.prompt import prompt_options
 from utoolbox.data import MicroManagerDataset, SPIMDataset
 from utoolbox.data.dataset.error import DatasetError
 
@@ -55,15 +55,9 @@ def load_from_folder(path):
 
     # select channel to work with
     if len(ds.info.channels) > 1:
-        questions = [
-            {
-                "type": "list",
-                "name": "channel",
-                "message": "Please choose a channel to proceed:",
-                "choices": ds.info.channels,
-            }
-        ]
-        channel = prompt(questions)["channel"]
+        channel = prompt_options(
+            "Pleae choose a channel to proceed: ", ds.info.channels
+        )
     else:
         channel = ds.info.channels[0]
 
