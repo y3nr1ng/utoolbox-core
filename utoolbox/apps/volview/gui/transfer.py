@@ -73,6 +73,8 @@ class TransferFunctionDialog(QDialog):
 
         self.setLayout(layout)
 
+<<<<<<< HEAD
+=======
     ##
 
     @property
@@ -105,12 +107,19 @@ class TransferFunctionDialog(QDialog):
 
         return canvas.native
 
+>>>>>>> 9886c19f25c11cf39fc41b0230e3a4a71525c079
 
 if __name__ == "__main__":
     import sys
     from PySide2.QtWidgets import QApplication
 
     app = QApplication(sys.argv)
+<<<<<<< HEAD
+
+    tf = TransferFunctionDialog()
+    tf.show()
+
+=======
     
     # generate random data
     np.random.seed(42)
@@ -134,4 +143,5 @@ if __name__ == "__main__":
 
     print('.. pass tf.show()')
 
+>>>>>>> 9886c19f25c11cf39fc41b0230e3a4a71525c079
     sys.exit(app.exec_())
