@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 class MainWindow(QMainWindow):
     def __init__(self, size=(512, 512)):
+        self._models = []
+
         super().__init__()
 
         self.setWindowTitle("Demo")
@@ -26,8 +28,18 @@ class MainWindow(QMainWindow):
         # use stylesheet to setup dark mode
         # self.setStyleSheet("background-color:black; color:white;")
 
-    def set_model(self, model):
-        self.canvas.model = model
+    def add_model(self, model):
+        self.models.append(model)
+        # TODO trigger canvas update
+
+    def remove_model(self, model):
+        self.models.remove(model)
+
+    ##
+
+    @property
+    def models(self):
+        return self._models
 
     ##
 

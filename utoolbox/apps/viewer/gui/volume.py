@@ -11,37 +11,17 @@ logger = logging.getLogger(__name__)
 
 class VolumeCanvas(Canvas):
     def __init__(self, method="translucent", cmap="viridis"):
-        logger.debug("VolumeCanvas.__init__")
+        self._method, self._cmap = method, cmap  # TODO move cmap to model
+        self._viewbox = None
+
         super().__init__()
-        self.unfreeze()
-
-        self._method = method
-        self._cmap = cmap
-
-        self.volume = None
-
-        self.freeze()
 
     ##
 
     def on_model_changed(self):
-        if self.volume is None:
-            logger.debug("create new volume visual")
-            # create volume visual
-            self.volume = Volume(
-                self.model.data,
-                method=self._method,
-                cmap=self._cmap,
-                emulate_texture=False,
-            )
-            # create viewbox
-            viewbox = self.grid.add_view(row=0, col=0)
-            viewbox.add(self.volume)
-            # attach camera
-            viewbox.camera = self.camera
-        else:
-            logger.debug("update data in the visual")
-            self.volume.set_data(self.model.data)
+        logger.debug("re-assign node parents")
+        for model in self.model:
+            self.viewbox.add(model.visual)
 
     ##
 
@@ -52,3 +32,12 @@ class VolumeCanvas(Canvas):
     @property
     def method(self):
         return self._method
+
+    @property
+    def viewbox(self):
+        if self._viewbox is None:
+            logger.info("create (0, 0) viewbox")
+            self._viewbox = self.grid.add_view(0, 0)
+            self._viewbox.camera = self.camera
+        return self._viewbox
+

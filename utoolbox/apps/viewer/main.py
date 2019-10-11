@@ -4,7 +4,7 @@ import sys
 from PySide2.QtWidgets import QApplication
 
 from utoolbox.apps.viewer.gui import MainWindow
-from utoolbox.apps.viewer.model import SimpleDataModel
+from utoolbox.apps.viewer.model import SimpleVolumeModel
 
 __all__ = ["viewer"]
 
@@ -14,15 +14,16 @@ logger = logging.getLogger(__name__)
 def viewer(data, cmap="gray", show=True):
     # TODO datastore/ndarray
 
-    model = SimpleDataModel(data)
-
     # create application
     app = QApplication()
-    # create actual user interface
     main = MainWindow(size=(768, 768))
-    main.set_model(model)
+
+    # create model
+    model = SimpleVolumeModel(data)
+    main.add_model(model)
+
+    # show and wait forever in the event loo
     main.show()
-    # run the main Qt event loop
     sys.exit(app.exec_())
 
 
