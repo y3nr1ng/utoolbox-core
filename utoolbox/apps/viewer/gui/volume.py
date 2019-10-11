@@ -2,7 +2,7 @@ import logging
 
 from vispy.scene.visuals import Volume
 
-from utoolbox.apps.volview.gui.canvas import Canvas
+from utoolbox.apps.viewer.gui.canvas import Canvas
 
 __all__ = ["VolumeCanvas"]
 
