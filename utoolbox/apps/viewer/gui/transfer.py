@@ -5,7 +5,7 @@ from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QDialog, QLabel, QSlider, QVBoxLayout
 from vispy.scene import SceneCanvas, PanZoomCamera
 
-from utoolbox.apps.volview.gui.histogram import Histogram
+from utoolbox.apps.viewer.gui.histogram import Histogram
 
 __all__ = ["TransferFunctionWidget"]
 

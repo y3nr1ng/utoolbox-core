@@ -3,15 +3,15 @@ import sys
 
 from PySide2.QtWidgets import QApplication
 
-from utoolbox.apps.volview.gui import MainWindow
-from utoolbox.apps.volview.model import SimpleDataModel
+from utoolbox.apps.viewer.gui import MainWindow
+from utoolbox.apps.viewer.model import SimpleDataModel
 
-__all__ = ["volview"]
+__all__ = ["viewer"]
 
 logger = logging.getLogger(__name__)
 
 
-def volview(data, cmap="gray", show=True):
+def viewer(data, cmap="gray", show=True):
     # TODO datastore/ndarray
 
     model = SimpleDataModel(data)
@@ -34,9 +34,13 @@ if __name__ == "__main__":
         level="DEBUG", fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
     )
 
-<<<<<<< HEAD
-    data = imageio.volread("/scratch/t1-head-demo.tif")
-=======
-    data = imageio.volread("G:/t1-head-demo.tif")
->>>>>>> 9886c19f25c11cf39fc41b0230e3a4a71525c079
-    volview(data)
+    # DEBUG data source, somewhere
+    for path in ("/scratch/t1-head-demo.tif", "G:/t1-head-demo.tif"):
+        try:
+            data = imageio.volread(path)
+            break
+        except FileNotFoundError:
+            pass
+    else:
+        raise FileNotFoundError("unable to find the test data")
+    viewer(data)

@@ -3,8 +3,8 @@ import logging
 from PySide2.QtCore import Signal, Slot
 from PySide2.QtWidgets import QAction, QMainWindow
 
-from utoolbox.apps.volview.gui.volume import VolumeCanvas
-from utoolbox.apps.volview.model import TransformModel
+from utoolbox.apps.viewer.gui.volume import VolumeCanvas
+from utoolbox.apps.viewer.model import TransformModel
 
 __all__ = ["MainWindow"]
 
