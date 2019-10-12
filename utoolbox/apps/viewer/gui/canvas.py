@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from collections.abc import MutableMapping
 import logging
 
 from PySide2.QtCore import QObject, Signal

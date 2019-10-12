@@ -1,7 +1,6 @@
 import logging
 
-from PySide2.QtCore import Signal, Slot
-from PySide2.QtWidgets import QAction, QMainWindow
+from PySide2.QtWidgets import QMainWindow
 
 from utoolbox.apps.viewer.gui.volume import VolumeCanvas
 from utoolbox.apps.viewer.model import TransformModel
@@ -109,4 +108,3 @@ class MainWindow(QMainWindow):
         self.canvas = VolumeCanvas(cmap=cmap)
         self.setCentralWidget(self.canvas.native)
         self.tranfsorm = TransformModel()
-

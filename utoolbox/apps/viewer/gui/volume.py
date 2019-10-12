@@ -1,7 +1,5 @@
 import logging
 
-from vispy.scene.visuals import Volume
-
 from utoolbox.apps.viewer.gui.canvas import Canvas
 
 __all__ = ["VolumeCanvas"]
@@ -40,4 +38,3 @@ class VolumeCanvas(Canvas):
             self._viewbox = self.grid.add_view(0, 0)
             self._viewbox.camera = self.camera
         return self._viewbox
-
