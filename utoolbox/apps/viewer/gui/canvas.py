@@ -14,14 +14,13 @@ class Canvas(QObject, SceneCanvas):
     model_changed = Signal()
 
     def __init__(self):
+        self._model = []
+
         # NOTE somehow, super() failed to __init__ both parent class
         # super().__init__()
         QObject.__init__(self)
         SceneCanvas.__init__(self)
         self.unfreeze()
-
-        # model
-        self._model = None
 
         # view
         self._grid = self.central_widget.add_grid()
@@ -32,10 +31,37 @@ class Canvas(QObject, SceneCanvas):
 
         self.freeze()
 
+    def __delitem__(self, key):
+        # TODO remove parent from model
+        model = self[key]
+        self.model.remove(model)
+
+    def __getitem__(self, key):
+        try:
+            return self.model[key]
+        except KeyError:
+            # partial match
+            for model in self.model:
+                if model.id.startswith(key):
+                    return model
+            else:
+                raise KeyError(f"unable to find model {key}")
+
+    def __setitem__(self, key, value):
+        self.model.append(value)
+        self.model_changed.emit()
+
+    def __iter__(self):
+        return self.model
+
+    def __len__(self):
+        return len(self.model)
+
     ##
 
     @abstractmethod
     def on_model_changed(self):
+        # update canvas
         raise NotImplementedError()
 
     ##
@@ -47,8 +73,3 @@ class Canvas(QObject, SceneCanvas):
     @property
     def model(self):
         return self._model
-
-    @model.setter
-    def model(self, model):
-        self._model = model
-        self.model_changed.emit()

@@ -5,9 +5,9 @@ from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QDialog, QLabel, QSlider, QVBoxLayout
 from vispy.scene import SceneCanvas, PanZoomCamera
 
-from utoolbox.apps.volview.gui.histogram import Histogram
+from utoolbox.apps.viewer.gui.histogram import Histogram
 
-__all__ = ["TransferFunctionWidget"]
+__all__ = ["TransferFunctionDialog"]
 
 logger = logging.getLogger(__name__)
 
@@ -73,8 +73,6 @@ class TransferFunctionDialog(QDialog):
 
         self.setLayout(layout)
 
-<<<<<<< HEAD
-=======
     ##
 
     @property
@@ -107,20 +105,13 @@ class TransferFunctionDialog(QDialog):
 
         return canvas.native
 
->>>>>>> 9886c19f25c11cf39fc41b0230e3a4a71525c079
 
 if __name__ == "__main__":
     import sys
     from PySide2.QtWidgets import QApplication
 
     app = QApplication(sys.argv)
-<<<<<<< HEAD
 
-    tf = TransferFunctionDialog()
-    tf.show()
-
-=======
-    
     # generate random data
     np.random.seed(42)
 
@@ -137,11 +128,10 @@ if __name__ == "__main__":
     data = data[:lasti]
 
     histogram = np.histogram(data, bins=256)
-    
+
     tf = TransferFunctionDialog()
     tf.show()
 
-    print('.. pass tf.show()')
+    print(".. pass tf.show()")
 
->>>>>>> 9886c19f25c11cf39fc41b0230e3a4a71525c079
     sys.exit(app.exec_())
