@@ -1,10 +1,9 @@
 import logging
 
-from PySide2.QtCore import Signal, Slot
-from PySide2.QtWidgets import QAction, QMainWindow
+from PySide2.QtWidgets import QMainWindow
 
-from utoolbox.apps.volview.gui.volume import VolumeCanvas
-from utoolbox.apps.volview.model import TransformModel
+from utoolbox.apps.viewer.gui.volume import VolumeCanvas
+from utoolbox.apps.viewer.model import TransformModel
 
 __all__ = ["MainWindow"]
 
@@ -13,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 class MainWindow(QMainWindow):
     def __init__(self, size=(512, 512)):
+        self._models = []
+
         super().__init__()
 
         self.setWindowTitle("Demo")
@@ -26,8 +27,18 @@ class MainWindow(QMainWindow):
         # use stylesheet to setup dark mode
         # self.setStyleSheet("background-color:black; color:white;")
 
-    def set_model(self, model):
-        self.canvas.model = model
+    def add_model(self, model):
+        self.models.append(model)
+        # TODO trigger canvas update
+
+    def remove_model(self, model):
+        self.models.remove(model)
+
+    ##
+
+    @property
+    def models(self):
+        return self._models
 
     ##
 
@@ -97,4 +108,3 @@ class MainWindow(QMainWindow):
         self.canvas = VolumeCanvas(cmap=cmap)
         self.setCentralWidget(self.canvas.native)
         self.tranfsorm = TransformModel()
-
