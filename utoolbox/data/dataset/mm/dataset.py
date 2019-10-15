@@ -52,7 +52,7 @@ class MicroManagerDataset(MultiChannelDataset):
 
     def _deserialize_info_from_metadata(self):
         info, summary = self.info, self.metadata["Summary"]
-        
+
         ver_str = summary["MicroManagerVersion"]
         if ver_str.startswith("1."):
             self._deserialize_info_from_metadata_v1()
@@ -145,7 +145,7 @@ class MicroManagerDataset(MultiChannelDataset):
         info.n_slices = summary["Slices"]
         info.z_step = abs(summary["z-step_um"])
 
-         # deserialize position extents
+        # deserialize position extents
         if summary["Positions"] > 1:
             # tiled dataset
             grids = summary["StagePositions"]
@@ -155,14 +155,16 @@ class MicroManagerDataset(MultiChannelDataset):
 
                 # extent
                 extent = []
-                for label in ('DefaultZStage', 'DefaultXYStage'):
+                for label in ("DefaultZStage", "DefaultXYStage"):
                     label = grid[label]
-                    for device in grid['DevicePositions']:
-                        if device['Device'] == label:
-                            extent += value[::-1]
+                    for device in grid["DevicePositions"]:
+                        if device["Device"] == label:
+                            extent += device["Position_um"][::-1]
                             break
                     else:
-                        raise RuntimeError(f'stage {label} in use, but position info is missing')
+                        raise RuntimeError(
+                            f"stage {label} in use, but position info is missing"
+                        )
                 extent = tuple(extent)
 
                 # save
