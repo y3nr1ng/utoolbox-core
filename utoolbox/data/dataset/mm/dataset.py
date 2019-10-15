@@ -51,16 +51,18 @@ class MicroManagerDataset(MultiChannelDataset):
             raise NoSummarySectionError()
 
     def _deserialize_info_from_metadata(self):
-        ver_str = self.metadata["Summary"]["MicroManagerVersion"]
+        info, summary = self.info, self.metadata["Summary"]
+        
+        ver_str = summary["MicroManagerVersion"]
         if ver_str.startswith("1."):
             self._deserialize_summary_v1()
         elif ver_str.startswith("2."):
             self._deserialize_summary_v2()
 
         # deserialize position extents
-        if self.metadata["Positions"] > 1:
+        if summary["Positions"] > 1:
             # tiled dataset
-            grids = self.metadata["InitialPositionList"]
+            grids = summary["InitialPositionList"]
             for grid in grids:
                 # index
                 index = (grid["GridRowIndex"], grid["GridColumnIndex"])
@@ -93,9 +95,7 @@ class MicroManagerDataset(MultiChannelDataset):
             self._root, _ = os.path.split(self.root)
 
     def _deserialize_summary_v1(self):
-        info = self.info
-
-        summary = self.metadata["Summary"]
+        info, summary = self.info, self.metadata["Summary"]
 
         # time
         info.frames = summary["Frames"]
@@ -116,13 +116,12 @@ class MicroManagerDataset(MultiChannelDataset):
         info.z_step = abs(summary["z-step_um"])
 
     def _deserialize_summary_v2(self):
-        info = self.info
-
-        summary = self.metadata["Summary"]
+        info, summary = self.info, self.metadata["Summary"]
         sample_frame = None
         for key in self.metadata.keys():
             if key.startswith("Metadata"):
                 sample_frame = self.metadata[key]
+                break
         else:
             raise RuntimeError(
                 "malformed metadata format, unable to find sample frame info"
