@@ -84,7 +84,7 @@ setup(
         "mako",
         "click",
         "coloredlogs",
-        "prompt_toolkit",
+        "prompt_toolkit>2.0.0",
         "tqdm",
     ],
     # additional groups of dependencies here for the "extras" syntax
