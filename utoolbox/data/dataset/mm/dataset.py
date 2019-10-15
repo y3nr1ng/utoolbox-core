@@ -157,14 +157,16 @@ class MicroManagerDataset(MultiChannelDataset):
                 extent = []
                 for label in ("DefaultZStage", "DefaultXYStage"):
                     label = grid[label]
-                    for device in grid["DevicePositions"]:
-                        if device["Device"] == label:
-                            extent += device["Position_um"][::-1]
-                            break
-                    else:
-                        raise RuntimeError(
-                            f"stage {label} in use, but position info is missing"
-                        )
+                    if label:
+                        # sanity check before extracting positions
+                        for device in grid["DevicePositions"]:
+                            if device["Device"] == label:
+                                extent += device["Position_um"][::-1]
+                                break
+                        else:
+                            raise RuntimeError(
+                                f"stage {label} in use, but position info is missing"
+                            )
                 extent = tuple(extent)
 
                 # save
