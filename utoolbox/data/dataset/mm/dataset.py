@@ -135,15 +135,15 @@ class MicroManagerDataset(MultiChannelDataset):
 
         # stack, 2D
         info.shape = (sample_frame["Height"], sample_frame["Width"])
-        dx, matrix = sample_frame["PixelSizeUm"], self.metadata["PixelSizeAffine"]
+        dx, matrix = sample_frame["PixelSizeUm"], sample_frame["PixelSizeAffine"]
         # calculate affine matrix
         #   [ 1.0, 0.0, 0.0; 0.0, 1.0, 0.0 ]
         matrix = [float(m) for m in matrix.split(";")]
         info.pixel_size = (matrix[4] * dx + matrix[5], matrix[0] * dx + matrix[2])
 
         # stack, 3D
-        info.n_slices = self.metadata["Slices"]
-        info.z_step = abs(self.metadata["z-step_um"])
+        info.n_slices = summary["Slices"]
+        info.z_step = abs(summary["z-step_um"])
 
     def _find_channels(self):
         return self.info.channels
