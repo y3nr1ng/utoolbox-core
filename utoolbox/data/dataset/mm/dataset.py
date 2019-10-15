@@ -55,9 +55,30 @@ class MicroManagerDataset(MultiChannelDataset):
         
         ver_str = summary["MicroManagerVersion"]
         if ver_str.startswith("1."):
-            self._deserialize_summary_v1()
+            self._deserialize_info_from_metadata_v1()
         elif ver_str.startswith("2."):
-            self._deserialize_summary_v2()
+            self._deserialize_info_from_metadata_v2()
+
+    def _deserialize_info_from_metadata_v1(self):
+        info, summary = self.info, self.metadata["Summary"]
+
+        # time
+        info.frames = summary["Frames"]
+
+        # color
+        info.channels = summary["ChNames"]
+
+        # stack, 2D
+        info.shape = (summary["Height"], summary["Width"])
+        dx, r = summary["PixelSize_um"], summary["PixelAspect"]
+        if dx == 0:
+            logger.warning("pixel size undefined, default to 1")
+            dx = 1
+        info.pixel_size = (r * dx, dx)
+
+        # stack, 3D
+        info.n_slices = summary["Slices"]
+        info.z_step = abs(summary["z-step_um"])
 
         # deserialize position extents
         if summary["Positions"] > 1:
@@ -94,28 +115,7 @@ class MicroManagerDataset(MultiChannelDataset):
             # reset root folder one level up, we are one level down in one of the tile
             self._root, _ = os.path.split(self.root)
 
-    def _deserialize_summary_v1(self):
-        info, summary = self.info, self.metadata["Summary"]
-
-        # time
-        info.frames = summary["Frames"]
-
-        # color
-        info.channels = summary["ChNames"]
-
-        # stack, 2D
-        info.shape = (summary["Height"], summary["Width"])
-        dx, r = summary["PixelSize_um"], summary["PixelAspect"]
-        if dx == 0:
-            logger.warning("pixel size undefined, default to 1")
-            dx = 1
-        info.pixel_size = (r * dx, dx)
-
-        # stack, 3D
-        info.n_slices = summary["Slices"]
-        info.z_step = abs(summary["z-step_um"])
-
-    def _deserialize_summary_v2(self):
+    def _deserialize_info_from_metadata_v2(self):
         info, summary = self.info, self.metadata["Summary"]
         sample_frame = None
         for key in self.metadata.keys():
@@ -144,6 +144,41 @@ class MicroManagerDataset(MultiChannelDataset):
         # stack, 3D
         info.n_slices = summary["Slices"]
         info.z_step = abs(summary["z-step_um"])
+
+         # deserialize position extents
+        if summary["Positions"] > 1:
+            # tiled dataset
+            grids = summary["StagePositions"]
+            for grid in grids:
+                # index
+                index = (grid["GridRow"], grid["GridCol"])
+
+                # extent
+                extent = []
+                for label in ('DefaultZStage', 'DefaultXYStage'):
+                    label = grid[label]
+                    for device in grid['DevicePositions']:
+                        if device['Device'] == label:
+                            extent += value[::-1]
+                            break
+                    else:
+                        raise RuntimeError(f'stage {label} in use, but position info is missing')
+                extent = tuple(extent)
+
+                # save
+                info.tiles.append(DatasetInfo.TileInfo(index=index, extent=extent))
+            logger.info(f"dataset is a {info.tile_shape} grid")
+
+            # extract prefix across folders
+            prefix = os.path.commonprefix([grid["Label"] for grid in grids])
+            i = prefix.rfind("_")
+            if i > 0:
+                prefix = prefix[:i]
+            logger.debug('folder prefix "{}"'.format(prefix))
+            self._folder_prefix = prefix
+
+            # reset root folder one level up, we are one level down in one of the tile
+            self._root, _ = os.path.split(self.root)
 
     def _find_channels(self):
         return self.info.channels
