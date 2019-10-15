@@ -132,6 +132,11 @@ class MicroManagerDataset(MultiChannelDataset):
 
         # color
         info.channels = summary["ChNames"]
+        # fix default color name
+        if len(info.channels) == 1:
+            if info.channels[0] == "Default":
+                # wildcard, select every file in the folder
+                info.channels[0] = "*"
 
         # stack, 2D
         info.shape = (sample_frame["Height"], sample_frame["Width"])

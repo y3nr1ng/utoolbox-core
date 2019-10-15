@@ -59,7 +59,7 @@ def load_from_folder(path):
             "Pleae choose a channel to proceed: ", ds.info.channels
         )
     else:
-        channel = next(iter(ds.info.channels.keys()))
+        channel = ds.info.channels[0]
 
     with ds[channel] as datastore:
         yield datastore
