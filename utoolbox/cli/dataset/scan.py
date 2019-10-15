@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 @generator
 def determine_format(path, skip):
     """
-    Different dataset are identified and reinterpret to a common format before going 
+    Different dataset are identified and reinterpreted to a common format before going 
     further into the pipeline.
     """
     if os.path.isdir(path):
