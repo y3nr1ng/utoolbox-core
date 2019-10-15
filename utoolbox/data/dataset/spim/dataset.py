@@ -106,7 +106,7 @@ class SPIMDataset(MultiChannelDataset):
         lx, ly, rx, ry = metadata.camera.roi
         info.shape = (ry - ly, rx - lx)
 
-        pxsize = prompt_float("What is the size of the pixel? ")
+        pxsize = prompt_float("What is the size of a single pixel? ")
         info.pixel_size = (pxsize,) * 2
 
         # stack, 3D
