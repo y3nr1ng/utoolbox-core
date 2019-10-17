@@ -33,7 +33,7 @@ setup(
     #   bumpversion release
     # to next version
     #   bump patch/minor/major
-    version="0.5.21",
+    version="0.5.25",
     # one-line description for the summary field
     description="A Python image processing package for LLSM.",
     long_description=long_description,
@@ -84,7 +84,7 @@ setup(
         "mako",
         "click",
         "coloredlogs",
-        "prompt_toolkit",
+        "prompt_toolkit>2.0.0",
         "tqdm",
     ],
     # additional groups of dependencies here for the "extras" syntax

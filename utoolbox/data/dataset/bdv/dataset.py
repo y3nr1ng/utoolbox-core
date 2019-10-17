@@ -61,8 +61,13 @@ class BigDataViewerXML(object):
         def reset_transform(self):
             self.transforms = []
 
+            voxel_size = self.voxel_size[::-1]
+            # upsample low-res axes
+            min_voxel_size = min(voxel_size)
+            voxel_size = tuple(s / min_voxel_size for s in voxel_size)
+
             matrix = np.zeros((3, 4))
-            matrix[range(3), range(3)] = self.voxel_size[::-1]
+            matrix[range(3), range(3)] = voxel_size
             self.add_transform("calibration", matrix)
 
         def serialize(self):
