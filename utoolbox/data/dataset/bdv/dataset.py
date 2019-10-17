@@ -62,8 +62,9 @@ class BigDataViewerXML(object):
             self.transforms = []
 
             voxel_size = self.voxel_size[::-1]
-            max_voxel_size = max(voxel_size)
-            voxel_size = tuple(s/max_voxel_size for s in voxel_size)
+            # upsample low-res axes
+            min_voxel_size = min(voxel_size)
+            voxel_size = tuple(s / min_voxel_size for s in voxel_size)
 
             matrix = np.zeros((3, 4))
             matrix[range(3), range(3)] = voxel_size
