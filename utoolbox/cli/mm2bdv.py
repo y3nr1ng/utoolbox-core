@@ -91,7 +91,7 @@ def save_to_hdf(
 
 
 def find_voxel_size(info):
-    return (info.z_step, ) + info.shape
+    return (info.z_step, ) + info.pixel_size
 
 
 @click.command()
