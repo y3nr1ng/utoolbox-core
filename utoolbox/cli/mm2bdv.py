@@ -90,19 +90,8 @@ def save_to_hdf(
     handle.flush()
 
 
-def find_voxel_size(metadata):
-    # X
-    dx = metadata["PixelSize_um"]
-
-    # Y
-    r = metadata["PixelAspect"]
-    dy = r * dx
-
-    # Z
-    dz = metadata["z-step_um"]
-    dz = abs(dz)
-
-    return dz, dy, dx
+def find_voxel_size(info):
+    return (info.z_step, ) + info.shape
 
 
 @click.command()
@@ -143,7 +132,6 @@ def main(src_path, dst_dir=None, dry_run=False, downsamples=[(1, 1, 1), (2, 2, 2
     """
     dataset = MicroManagerDataset(src_path, force_stack=True)
 
-    # pprint(dataset.metadata)
     print("== info ==")
     for key, value in dataset.info.items():
         pprint(f"{key}: {value}")
@@ -158,7 +146,7 @@ def main(src_path, dst_dir=None, dry_run=False, downsamples=[(1, 1, 1), (2, 2, 2
     h5_path = os.path.join(dst_dir, f"dataset.h5")
 
     xml = BigDataViewerXML(h5_path)
-    voxel_size = find_voxel_size(dataset.metadata)
+    voxel_size = find_voxel_size(dataset.info)
 
     if dry_run:
         for channel, datastore in dataset.items():
