@@ -13,9 +13,9 @@ from skimage.feature import register_translation
 from utoolbox.container.datastore import ImageFolderDatastore
 from utoolbox.stitching import Sandbox
 #from utoolbox.feature import DftRegister
-#from utoolbox.util.logging import TqdmLoggingHandler
+#from utoolbox.utils.logging import TqdmLoggingHandler
 
-from utoolbox.util.decorator import timeit
+from utoolbox.utils.decorator import timeit
 
 ###
 # region: Configure logging facilities

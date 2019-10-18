@@ -1,9 +1,13 @@
+import logging
+
 import cupy as cp
 from mako.template import Template
 
-from utoolbox.algorithm import AttrDict
+from utoolbox.utils import AttrDict
 
 __all__ = ["RawKernelFile"]
+
+logger = logging.getLogger(__name__)
 
 
 class RawKernelFile(AttrDict):

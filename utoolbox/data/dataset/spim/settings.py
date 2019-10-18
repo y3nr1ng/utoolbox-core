@@ -4,7 +4,7 @@ from enum import Enum
 import logging
 import re
 
-from utoolbox.algorithm import AttrDict
+from utoolbox.utils import AttrDict
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ class AcquisitionMode(Enum):
 
 class ScanType(Enum):
     SAMPLE = "Sample piezo"
-    OBJECTIVE = "Z objective & galvo"
+    OBJECTIVE = "Z galvo & piezo"
 
 
 class TriggerMode(Enum):
@@ -30,12 +30,19 @@ Channel = namedtuple(
 
 
 class Settings(AttrDict):
+    """
+    Object-oriented modeling of the Settings.txt from LatticeScope.
+
+    Args:
+        lines (str): raw string from the file
+    """
+
     section_pattern = re.compile(
         r"^(?:\*{5}\s{1}){3}\s*(?P<title>[^\*]+)(?:\s{1}\*{5}){3}", re.MULTILINE
     )
 
     def __init__(self, lines):
-        super(Settings, self).__init__()
+        super().__init__()
 
         sections = Settings.identify_sections(lines)
         for title, start, end in sections:
@@ -81,16 +88,22 @@ class Settings(AttrDict):
             value = re.findall(pattern, lines, re.MULTILINE)[0]
             try:
                 value = converter[field](value)
-            except:
+            except KeyError:
                 # no need to convert
                 pass
             parsed[field] = value
 
         # merge timestamp
-        parsed["timestamp"] = datetime.strptime(
-            " ".join([parsed["date"], parsed["time"]]), "%Y/%m/%d %H:%M:%S"
-        )
-        del parsed["date"], parsed["time"]
+        datetime_str = " ".join([parsed["date"], parsed["time"]])
+        for timestamp_fmt in ("%Y/%m/%d %H:%M:%S", "%m/%d/%Y %H:%M:%S"):
+            try:
+                parsed["timestamp"] = datetime.strptime(datetime_str, timestamp_fmt)
+                del parsed["date"], parsed["time"]
+            except ValueError:
+                pass
+        else:
+            logger.warning("unable to parse the timestamp")
+            parsed["timestamp"] = datetime_str
 
         return "general", parsed
 
@@ -98,11 +111,19 @@ class Settings(AttrDict):
     def parse_waveform(lines):
         patterns = {
             "type": r"^Z motion :\t(.*)",
-            "obj_piezo_step": r"^Z PZT .* Interval \(um\), .* :\t\d+\.*\d*\t(\d+\.*\d*)\t\d+$",
-            "sample_piezo_step": r"^S PZT .* Interval \(um\), .* :\t\d+\.*\d*\t(\d+\.*\d*)\t\d+$",
+            "obj_piezo_step_size": r"Z PZT .* Interval \(um\), .* :\t\d*\.?\d+\t(\d*\.?\d+)\t\d+",
+            "obj_piezo_n_steps": r"Z PZT .* Interval \(um\), .* :\t\d*\.?\d+\t\d*\.?\d+\t(\d+)",
+            "sample_piezo_step_size": r"^S PZT .* Interval \(um\), .* :\t\d*\.?\d+\t(\d*\.?\d+)\t\d+",
+            "sample_piezo_n_steps": r"^S PZT .* Interval \(um\), .* :\t\d*\.?\d+\t\d*\.?\d+\t(\d+)",
         }
 
-        converter = {"type": ScanType}
+        converter = {
+            "type": ScanType,
+            "obj_piezo_step_size": float,
+            "obj_piezo_n_steps": int,
+            "sample_piezo_step_size": float,
+            "sample_piezo_n_steps": int,
+        }
 
         parsed = AttrDict()
         for field, pattern in patterns.items():
@@ -110,7 +131,7 @@ class Settings(AttrDict):
             value = re.findall(pattern, lines, re.MULTILINE)[0]
             try:
                 value = converter[field](value)
-            except:
+            except KeyError:
                 # no need to convert
                 pass
             parsed[field] = value
@@ -165,7 +186,7 @@ class Settings(AttrDict):
             value = re.findall(pattern, lines, re.MULTILINE)[0]
             try:
                 value = converter[field](value)
-            except:
+            except KeyError:
                 # no need to convert
                 pass
             parsed[field] = value
@@ -183,7 +204,7 @@ class Settings(AttrDict):
             value = re.findall(pattern, lines, re.MULTILINE)[0]
             try:
                 value = converter[field](value)
-            except:
+            except KeyError:
                 # no need to convert
                 pass
             parsed[field] = value
