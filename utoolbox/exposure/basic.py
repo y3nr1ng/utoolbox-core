@@ -3,8 +3,6 @@ import logging
 import numpy as np
 from scipy.ndimage import zoom
 
-from utoolbox.transform import imresize
-
 __all__ = ["BaSiC"]
 
 logger = logging.getLogger(__name__)
