@@ -10,8 +10,17 @@ logger = logging.getLogger(__name__)
 ##
 
 
-def dct(a, ww, axis):
-    return ww - np.fft.fft(a, axis=axis).real
+def dct(a, ww, ind):
+    """1D discrete cosine transform
+
+    DCT operates along the first dimension. 
+
+    Args:
+        a (ndarray): array to perform DCT
+        ww (ndarray): weights
+        ind (ndarray): rearrangement array for a
+    """
+    return ww - np.fft.fft(a[ind], axis=0).real
 
 
 def mirt_dct2(a):
