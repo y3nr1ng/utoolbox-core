@@ -69,9 +69,10 @@ class BaSiC(object):
         self._darkfield = darkfield
         self._lambda_flat, self._lambda_dark = lambda_flat, lambda_dark
         self._tol = tol
-        self._max_iter = max_iter
+        self._max_iter = max_iter  # pca
 
         self._wsize = wsize
+        self._max_reweight_iter = max_reweight_iter
         self._epsilon = epsilon
         self._reweight_tol = reweight_tol
 
@@ -112,10 +113,10 @@ class BaSiC(object):
             None,
         )
         XA, XAoffset = None, None
-        for i in range(self._max_iter):
+        for i in range(self._max_reweight_iter):
             logger.debug(f"reweighting iteration {i}")
 
-            XA, XE, XAoffset = inexact_alm_rspca_l1()
+            XA, XE, XAoffset = self._inexact_alm_rspca_l1()
             XE_norm = XE / (XA.mean() + self._tol)
 
             weight = 1 / (np.abs(XE_norm) + self._epsilon)
@@ -128,7 +129,7 @@ class BaSiC(object):
             mad_flatfield = np.abs(flatfield_curr - flatfield_last).sum()
             mad_flatfield /= np.abs(flatfield_last).sum()
             mad_darkfield = np.abs(darkfield_curr - darkfield_last).sum()
-            if mad_darkfield < 1e-7:
+            if mad_darkfield < 1e-7:  # machine epsilon
                 mad_darkfield = 0
             else:
                 mad_darkfield /= max(np.abs(darkfield_last).sum(), self._tol)
@@ -145,10 +146,33 @@ class BaSiC(object):
         shading = XA.mean(axis=0) - XAoffset
         flatfield = zoom(shading, zoom_factor, order=1)
         flatfield /= flatfield.mean()
-        # summarize darkfield
-        darkfield = zoom(XAoffset, zoom_factor, order=1)
+        if self._darkfield:
+            # summarize darkfield
+            darkfield = zoom(XAoffset, zoom_factor, order=1)
+            return flatfield, darkfield
+        else:
+            return flatfield
 
-        return flatfield, darkfield
+    def _inexact_alm_rspca_l1(self, D, weight=1):
+        """
+        Inexact augmented Lagrange multiplier method for sparse low-rank matrix recovery.
+
+            while ~converged
+                minimize (inexactly, update A and E only once)
+                L(W, E, Y, u) = |E|_1 + lambda * |W|_1 + <Y2, D-repmat(QWQ^T)-E> + +mu/2 * |D-repmat(QWQ^T)-E|_F^2
+                Y1 = Y1 + \mu * (D-repmat(QWQ^T)-E)
+                \mu = \rho * \mu
+            end
+
+        Args:
+            D (ndarray): N x M x M matrix, N observations of M x M matrices
+
+        References:
+            - Adapted from `BaSiC` (QSCD), https://github.com/QSCD/BaSiC
+            - Modified from `Robust PCA`
+        """
+
+        pass
 
 
 ##
@@ -181,3 +205,7 @@ if __name__ == "__main__":
 
     algo = BaSiC(darkfield=True)
     flatfield, darkfield = algo(data)
+
+    # save
+    imageio.imwrite("flatfield.tif", flatfield.astype(np.float32))
+    imageio.imwrite("darkfield.tif", darkfield.astype(np.float32))
