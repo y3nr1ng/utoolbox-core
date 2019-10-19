@@ -28,6 +28,7 @@ class MainWindow(QMainWindow):
         # self.setStyleSheet("background-color:black; color:white;")
 
     def add_model(self, model):
+        # TODO add model to internal list -> assign parent
         self.models.append(model)
         # TODO trigger canvas update
 

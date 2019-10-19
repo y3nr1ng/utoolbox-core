@@ -61,6 +61,7 @@ jobs:
     
     steps:
       - task: UsePythonVersion@0
+
       - task: DownloadPipelineArtifact@2
         inputs:
           patterns: |
@@ -80,4 +81,3 @@ jobs:
       
       - script: python -m twine upload -r "utoolbox-nightly" --config-file "$(PYPIRC_PATH)" "$(Pipeline.Workspace)/*/*.whl"
         displayName: Upload wheels to Azure Artifacts feed
-      
