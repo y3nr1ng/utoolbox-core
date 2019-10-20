@@ -5,11 +5,21 @@ from operator import mul
 import os
 
 import cupy as cp
+from cupy.cuda import runtime
+from cupy.cuda.texture import (
+    ChannelFormatDescriptor,
+    CUDAArray,
+    ResourceDescriptor,
+    TextureDescriptor,
+    TextureObject,
+)
 import numpy as np
 
-logger = logging.getLogger(__name__)
 
 __all__ = ["Deskew", "deskew"]
+
+
+logger = logging.getLogger(__name__)
 
 ###
 # region: kernel definitions
@@ -164,6 +174,52 @@ class Deskew(object):
         return out
 
 
-def deskew(data, **kwargs):
-    """Helper function that wraps :class:`.Deskew` for one-off use."""
-    pass
+def deskew(data, angle, dx, dz, rotate=True, return_resolution=True, out=None):
+    """
+    Args:
+        data (ndarray): 3-D array to apply deskew
+        angle (float): angle between the objective and coverslip, in degree
+        dx (float): X resolution
+        dz (float): Z resolution
+        rotate (bool, optional): rotate and crop the output
+        return_resolution (bool, optional): return deskewed X/Z resolution
+        out (ndarray, optional): array to store the result
+    """
+    angle = radians(angle)
+
+    # shift along X axis, in pixels
+    shift = dz * cos(angle) / dx
+
+    # estimate new size
+
+    # transpose
+    data = np.swapaxes(data, 0, 1)
+
+    # upload texture
+    ch = ChannelFormatDescriptor(32, 0, 0, 0, runtime.cudaChannelFormatKindFloat)
+    arr = CUDAArray(ch, *data.shape[1:])
+    res = ResourceDescriptor(runtime.cudaResourceTypeArray, cuArr=arr)
+
+    address_mode = (runtime.cudaAddressModeClamp, runtime.cudaAddressModeClamp)
+    tex = TextureDescriptor(
+        address_mode, runtime.cudaFilterModePoint, runtime.cudaReadModeElementType
+    )
+
+    data_in = data.astype(np.float32)
+    data_out = cp.empty_like(data_in)  # TODO use estimated new size, pinned memory
+    for layer in data:
+        arr.copy_from(layer)  # TODO use stream
+        texobj = TextureObject(res, tex)
+
+        # TODO shifts
+        # TODO download
+
+    data_out = cp.swapaxes(data_out, 0, 1)
+    data_out = cp.asnumpy(data_out)
+
+    if return_resolution:
+        # new resolution
+        dz *= sin(angle)
+        return data_out, (dz, dx)
+    else:
+        return data_out

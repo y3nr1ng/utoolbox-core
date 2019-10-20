@@ -2,23 +2,35 @@
 
 extern "C" {
 
-__global__ 
-void ushort_to_float(
-    float *dst, const uint16_t *src, const int nelem
+__global__
+void shear_kernel(
+    float* dst,
+    cudaTextureObject_t src,
+    int nx, int ny, 
+    float shift
 ) {
-    int i = blockIdx.x*blockDim.x + threadIdx.x;
-    for (; i < nelem; i += blockDim.x) {
-        dst[i] = (float)src[i]
+    unsigned int ix = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned int iy = blockIdx.y * blockDim.y + threadIdx.y;
+    if ((ix >= nx) || (iy >= ny)) {
+        continue;
     }
+
+    float v = iy;
+    float u = ix + shift * (v-ny/2); // integer division, floor
+    
+    dst[iy * nx + ix] = tex2D<float>(src, u, v);
 }
 
 __global__
-void float_to_ushort(
-    uint16_t *dst, const float *src, const int nelem
+void rotate_kernel(
+    float *dst,
+    cudaTextureObject_t src,
+    int nx, int ny
 ) {
-    int i = blockIdx.x*blockDim.x + threadIdx.x;
-    for (; i < nelem; i += blockDim.x) {
-        dst[i] = (uint16_t)src[i]
+    unsigned int ix = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned int iy = blockIdx.y * blockDim.y + threadIdx.y;
+    if ((ix >= nx) || (iy >= ny)) {
+        continue;
     }
 }
 
