@@ -1,4 +1,3 @@
-#include <cstdint>
 
 extern "C" {
 
@@ -6,17 +5,17 @@ __global__
 void shear_kernel(
     float* dst,
     cudaTextureObject_t src,
-    int nx, int ny, 
+    int nx, int ny, int nu,
     float shift
 ) {
     unsigned int ix = blockIdx.x * blockDim.x + threadIdx.x;
     unsigned int iy = blockIdx.y * blockDim.y + threadIdx.y;
     if ((ix >= nx) || (iy >= ny)) {
-        continue;
+        return;
     }
 
     float v = iy;
-    float u = ix + shift * (v-ny/2); // integer division, floor
+    float u = ix - shift * (v-ny/2) - (nx-nu)/2; // integer division, floor
     
     dst[iy * nx + ix] = tex2D<float>(src, u, v);
 }
@@ -30,7 +29,7 @@ void rotate_kernel(
     unsigned int ix = blockIdx.x * blockDim.x + threadIdx.x;
     unsigned int iy = blockIdx.y * blockDim.y + threadIdx.y;
     if ((ix >= nx) || (iy >= ny)) {
-        continue;
+        return;
     }
 }
 

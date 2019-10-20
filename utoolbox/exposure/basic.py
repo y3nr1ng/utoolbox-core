@@ -37,7 +37,7 @@ def mirt_dct2(a):
         _ind = np.concatenate(
             (np.arange(0, n, 2), np.flipud(np.arange(1, n, 2))), axis=0
         )
-        _ind += np.arange(0, a.size - n + 1, n)
+        _ind += np.arange(0, a.size - n + 1, n)  # TODO validate this from MATLAB
         ind.append(_ind)
 
     return dct(dct(a, ww[0], ind[0]).T, ww[1], ind[1]).T
