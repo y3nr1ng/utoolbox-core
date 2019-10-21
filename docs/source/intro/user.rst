@@ -14,11 +14,13 @@ Some of the codes require CUDA dependency, please download the binary release fr
 
 Quick start
 -----------
-Create an empty workspace named `demo`, if you have your preferred environment, feel free to skip the following two lines.
+Create an empty workspace named `demo`, if you have your preferred environment, feel free to skip the following two lines. It is highly recommended to use `numpy` and `scipy` from `conda` instead of `pip`, since their version has `mkl`_ support directly.
+
+.. _mkl: https://software.intel.com/en-us/mkl
 
 .. code-block:: none
 
-   conda create -n demo python=3 numpy
+   conda create -n demo python=3 numpy scipy
    conda activate demo
 
 
@@ -43,4 +45,16 @@ Frequently Asked Questions
 
 What environment combinations are tested?
 -----------------------------------------
-Hello world!
++------------+------------------------------------+----------+
+| Platform   | Version                            | CUDA     |
++============+====================================+==========+
+| Windows    | Windows 7 (64-bit) SP1             | 9.2.88.1 |
+|            |                                    +----------+
+|            |                                    | 10.1.168 |
++------------+------------------------------------+----------+
+| Linux      | Debian 8.10, Linux 3.12.72         | 8.0.44   |
++------------+------------------------------------+----------+
+| macOS [*]_ | High Sierra 10.13.6, Darwin 17.7.0 | 9.2.64.1 |
++------------+------------------------------------+----------+
+
+.. [*] Since I no longer owned a macOS environment, macOS support is currently stalled.
