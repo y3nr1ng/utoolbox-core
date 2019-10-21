@@ -6,7 +6,7 @@ import imageio
 
 from utoolbox.data.datastore import SparseVolumeDatastore, SparseTiledVolumeDatastore
 from utoolbox.data.dataset.base import DatasetInfo, MultiChannelDataset
-from .error import NoMetadataInTileFolderError, NoSummarySectionError
+from .error import MetadataError, NoMetadataInTileFolderError, NoSummarySectionError
 
 __all__ = ["MicroManagerV1Dataset", "MicroManagerV2Dataset"]
 
