@@ -1,169 +1,103 @@
-from functools import reduce
 import logging
-from math import ceil, cos, degrees, radians, sin
-from operator import mul
+from math import ceil, cos, radians, sin
 import os
 
 import cupy as cp
+from cupy.cuda import runtime
+from cupy.cuda.texture import (
+    ChannelFormatDescriptor,
+    CUDAarray,
+    ResourceDescriptor,
+    TextureDescriptor,
+    TextureObject,
+)
 import numpy as np
+
+from utoolbox.parallel import RawKernelFile
+
+__all__ = ["deskew"]
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["Deskew", "deskew"]
-
-###
-# region: kernel definitions
-###
-
 cu_file = os.path.join(os.path.dirname(__file__), "deskew.cu")
-
-ushort_to_float = cp.ElementwiseKernel(
-    "uint16 src", "float32 dst", "dst = (float)src", "ushort_to_float"
-)
-
-float_to_ushort = cp.ElementwiseKernel(
-    "float32 src", "uint16 dst", "dst = (unsigned short)src", "float_to_ushort"
-)
-
-###
-# endregion
-###
+kernels = RawKernelFile(cu_file)
 
 
-class Deskew(object):
-    """Restore the actual spatial size of acquired lightsheet data."""
+def deskew(data, angle, dx, dz, rotate=True, return_resolution=True, out=None):
+    """
+    Args:
+        data (ndarray): 3-D array to apply deskew
+        angle (float): angle between the objective and coverslip, in degree
+        dx (float): X resolution
+        dz (float): Z resolution
+        rotate (bool, optional): rotate and crop the output
+        return_resolution (bool, optional): return deskewed X/Z resolution
+        out (ndarray, optional): array to store the result
+    """
+    angle = radians(angle)
 
-    def __init__(self, angle=32.8, dr=0.108, dz=0.5, rotate=True):
-        """
-        :param float angle: target objective angle
-        :param float dr: lateral resolution
-        :param float dz: step size of the piezo stage
-        :param bool rotate: rotate the result to conventional axis
-        """
-        self._angle = radians(angle)
-        self._in_res = (dr, dz)
-        self._rotate = rotate
+    # shift along X axis, in pixels
+    shift = dz * cos(angle) / dx
+    logger.debug(f"layer shift: {shift:.04f} px")
 
-        # DEBUG
-        if rotate:
-            raise NotImplementedError("not yet supported")
+    # estimate new size
+    nw, nv, nu = data.shape
+    nz, ny, nx = nw, nv, nu + ceil(shift * (nw - 1))
 
-        self._out_res = self._estimate_resolution()
+    # upload texture
+    ch = ChannelFormatDescriptor(32, 0, 0, 0, runtime.cudaChannelFormatKindFloat)
+    arr = CUDAarray(ch, nu, nw)
+    res = ResourceDescriptor(runtime.cudaResourceTypeArray, cuArr=arr)
 
-        self._in_shape, self._out_shape = None, None
-        self._template = None
+    address_mode = (runtime.cudaAddressModeBorder, runtime.cudaAddressModeBorder)
+    tex = TextureDescriptor(
+        address_mode, runtime.cudaFilterModeLinear, runtime.cudaReadModeElementType
+    )
 
-    @property
-    def angle(self):
-        """
-        Target objective angle in degrees
-        """
-        return degrees(self._angle)
+    # transpose
+    data = np.swapaxes(data, 0, 1)
+    data = np.ascontiguousarray(data)
 
-    @property
-    def dr(self):
-        """Output lateral resolution in microns."""
-        return self._out_res[0]
+    data_in = data.astype(np.float32)
+    data_out = cp.empty((ny, nz, nx), np.float32)
+    for i, layer in enumerate(data_in):
+        arr.copy_from(layer)  # TODO use stream
+        texobj = TextureObject(res, tex)
 
-    @property
-    def dz(self):
-        """Output axial resolution in microns."""
-        return self._out_res[1]
+        kernels["shear_kernel"](
+            (ceil(nx / 16), ceil(nz / 16)),
+            (16, 16),
+            (data_out[i, ...], texobj, nx, nz, nu, np.float32(shift)),
+        )
 
-    @property
-    def rotate(self):
-        """Rotate the result to conventional axis."""
-        return self._rotate
+    data_out = cp.swapaxes(data_out, 0, 1)
+    data_out = cp.asnumpy(data_out)
+    data_out = data_out.astype(data.dtype)
 
-    @property
-    def shape(self):
-        """Final shape after deskew."""
-        return self._out_shape
-
-    def _estimate_resolution(self):
-        """
-        Estimate output lateral and axial resolution.
-        
-        :return: (lateral, axial) resolution
-        :rtype: tuple(float,float)
-        """
-        dr, dz0 = self._in_res
-        dz = dz0 * sin(self._angle)
-        return (dr, dz)
-
-    def _refresh_internal_buffers(self, ref):
-        logger.info("updating internal buffers")
-
-        # reference for interpolation, on device
-        self._template = cp.empty_like(ref, dtype=cp.float32)
-
-        # store shape info
-        self._in_shape = ref.shape
-        self._out_shape = self._estimate_shape(ref)
-
-    def _estimate_shape(self, ref):
-        """
-        Estimate output shape.
-        
-        :return: numpy shape format, (nz, ny, nx)
-        :rtype: tuple(int,int,int)
-        """
-        # DEBUG
-        return ref.shape
-
-        dx = self._estimate_shift()
-        nz, ny, nx0 = ref.shape
-        nx = ceil(nx0 + dx * (nz - 1))
-        return (nz, ny, nx)
-
-    def _estimate_shift(self):
-        """
-        Estimate pixel shift per layer.
-        
-        :return: pixel shift
-        :rtype: float
-        """
-        dr0, dz0 = self._in_res
-        return dz0 * cos(self._angle) / dr0
-
-    def _upload(self, src):
-        """
-        Uplaod data to device.
-
-        :param np.ndarray src: source
-        """
-        ushort_to_float(cp.asarray(src), self._template)
-
-    def _download(self, dst):
-        """
-        Download data from device.
-
-        :param np.ndarray dst: destination
-
-        .. note::
-            Pinned memory and device memory are reused throughout the process.
-        """
-        buffer = cp.asarray(dst)
-        float_to_ushort(self._template, buffer)
-        dst[...] = cp.asnumpy(buffer)
-
-    def run(self, data, out=None):
-        try:
-            if data.shape != self._in_shape:
-                raise RuntimeError("incompatible buffer")
-        except:
-            self._refresh_internal_buffers(data)
-
-        self._upload(data)
-
-        # TODO execute conversion
-
-        if out is None:
-            out = np.empty(self._out_shape, data.dtype)
-        self._download(out)
-        return out
+    if return_resolution:
+        # new resolution
+        dz *= sin(angle)
+        return data_out, (dz, dx)
+    else:
+        return data_out
 
 
-def deskew(data, **kwargs):
-    """Helper function that wraps :class:`.Deskew` for one-off use."""
-    pass
+if __name__ == "__main__":
+    import coloredlogs
+    import imageio
+
+    logging.getLogger("tifffile").setLevel(logging.ERROR)
+
+    coloredlogs.install(
+        level="DEBUG", fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
+    )
+
+    data = imageio.volread(
+        "cell4_ch0_stack0000_488nm_0000000msec_0007934731msecAbs.tif"
+    )
+    print(data.shape)
+    result, res = deskew(data, 32.8, 0.103, 0.5, rotate=True)
+    print(res)
+    print(result.shape)
+    imageio.volwrite("result.tif", result)
+
