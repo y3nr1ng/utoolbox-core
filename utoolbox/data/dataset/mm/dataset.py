@@ -139,7 +139,7 @@ class MicroManagerV1Dataset(MultiChannelDataset):
             return SparseVolumeDatastore(self.root, sub_dir=False, **kwargs)
 
 
-class MicroManagerV2Dataset(MultiChannelDataset):
+class MicroManagerV2Dataset(MicroManagerV1Dataset):
     """
     Representation of Micro-Manager V2 dataset stored in sparse stack format.
     """
