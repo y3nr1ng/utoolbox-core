@@ -9,7 +9,12 @@ import coloredlogs
 import h5py
 import numpy as np
 
-from utoolbox.data.dataset import MicroManagerDataset, BigDataViewerXML
+from utoolbox.data.dataset import (
+    MicroManagerV1Dataset,
+    MicroManagerV2Dataset,
+    BigDataViewerXML,
+)
+from utoolbox.data.dataset.error import DatasetError
 from utoolbox.utils.decorator import timeit
 
 coloredlogs.install(
@@ -91,7 +96,7 @@ def save_to_hdf(
 
 
 def find_voxel_size(info):
-    return (info.z_step, ) + info.pixel_size
+    return (info.z_step,) + info.pixel_size
 
 
 @click.command()
@@ -130,7 +135,14 @@ def main(src_path, dst_dir=None, dry_run=False, downsamples=[(1, 1, 1), (2, 2, 2
         dry_run (bool, optinal): save XML only
         downsamples (tuple of int, optional): downsample ratio along (X, Y, Z) axis
     """
-    dataset = MicroManagerDataset(src_path, force_stack=True)
+    for klass in (MicroManagerV1Dataset, MicroManagerV2Dataset):
+        try:
+            dataset = klass(src_path, force_stack=True)
+            break
+        except DatasetError:
+            pass
+    else:
+        raise RuntimeError("unknown dataset format")
 
     print("== info ==")
     for key, value in dataset.info.items():
@@ -191,8 +203,5 @@ def main(src_path, dst_dir=None, dry_run=False, downsamples=[(1, 1, 1), (2, 2, 2
 
 
 if __name__ == "__main__":
-    main(
-        "Z:/charm/20181009_ExM_4x_hippocampus",
-        dry_run=True,
-    )
+    main("Z:/charm/20181009_ExM_4x_hippocampus", dry_run=True)
 

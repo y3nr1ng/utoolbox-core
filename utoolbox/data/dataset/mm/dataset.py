@@ -229,5 +229,5 @@ class MicroManagerV2Dataset(MultiChannelDataset):
 
     def _load_channel(self, channel):
         index = self.info.channels.index(channel)
-        return super()._load_channel(f'channel{index:03d}')
+        return super()._load_channel(f"channel{index:03d}")
 
