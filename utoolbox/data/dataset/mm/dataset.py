@@ -8,12 +8,14 @@ from utoolbox.data.datastore import SparseVolumeDatastore, SparseTiledVolumeData
 from utoolbox.data.dataset.base import DatasetInfo, MultiChannelDataset
 from .error import NoMetadataInTileFolderError, NoSummarySectionError
 
+__all__ = ["MicroManagerV1Dataset", "MicroManagerV2Dataset"]
+
 logger = logging.getLogger(__name__)
 
 
-class MicroManagerDataset(MultiChannelDataset):
+class MicroManagerV1Dataset(MultiChannelDataset):
     """
-    Representation of Micro-Manager dataset stored in sparse stack format.
+    Representation of Micro-Manager V1 dataset stored in sparse stack format.
 
     Args:
         root (str): source directory of the dataset
@@ -55,11 +57,11 @@ class MicroManagerDataset(MultiChannelDataset):
 
         ver_str = summary["MicroManagerVersion"]
         if ver_str.startswith("1."):
-            self._deserialize_info_from_metadata_v1()
-        elif ver_str.startswith("2."):
-            self._deserialize_info_from_metadata_v2()
+            self._parser()
+        else:
+            raise MetadataError("not v1 metadata")
 
-    def _deserialize_info_from_metadata_v1(self):
+    def _parser(self):
         info, summary = self.info, self.metadata["Summary"]
 
         # time
@@ -115,7 +117,43 @@ class MicroManagerDataset(MultiChannelDataset):
             # reset root folder one level up, we are one level down in one of the tile
             self._root, _ = os.path.split(self.root)
 
-    def _deserialize_info_from_metadata_v2(self):
+    def _find_channels(self):
+        return self.info.channels
+
+    def _load_channel(self, channel):
+        kwargs = {
+            "read_func": imageio.imread,
+            "folder_pattern": "{}*".format(self._folder_prefix),
+            "file_pattern": "*_{}_*".format(channel),
+            "extensions": ["tif"],
+        }
+        if self.info.is_tiled and not self._force_stack:
+            return SparseTiledVolumeDatastore(
+                self.root,
+                tile_shape=self.info.tile_shape,
+                tile_order="F",
+                merge=self._merge,
+                **kwargs,
+            )
+        else:
+            return SparseVolumeDatastore(self.root, sub_dir=False, **kwargs)
+
+
+class MicroManagerV2Dataset(MultiChannelDataset):
+    """
+    Representation of Micro-Manager V2 dataset stored in sparse stack format.
+    """
+
+    def _deserialize_info_from_metadata(self):
+        info, summary = self.info, self.metadata["Summary"]
+
+        ver_str = summary["MicroManagerVersion"]
+        if ver_str.startswith("2."):
+            self._parser()
+        else:
+            raise MetadataError("not v2 metadata")
+
+    def _parser(self):
         info, summary = self.info, self.metadata["Summary"]
         sample_frame = None
         for key in self.metadata.keys():
@@ -189,24 +227,7 @@ class MicroManagerDataset(MultiChannelDataset):
             # reset root folder one level up, we are one level down in one of the tile
             self._root, _ = os.path.split(self.root)
 
-    def _find_channels(self):
-        return self.info.channels
-
     def _load_channel(self, channel):
-        kwargs = {
-            "read_func": imageio.imread,
-            "folder_pattern": "{}*".format(self._folder_prefix),
-            "file_pattern": "*_{}_*".format(channel),
-            "extensions": ["tif"],
-        }
-        if self.info.is_tiled and not self._force_stack:
-            return SparseTiledVolumeDatastore(
-                self.root,
-                tile_shape=self.info.tile_shape,
-                tile_order="F",
-                merge=self._merge,
-                **kwargs,
-            )
-        else:
-            return SparseVolumeDatastore(self.root, sub_dir=False, **kwargs)
+        index = self.info.channels.index(channel)
+        return super()._load_channel(f'channel{index:03d}')
 
