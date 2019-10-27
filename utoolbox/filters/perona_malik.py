@@ -12,6 +12,8 @@ import numpy as np
 
 from utoolbox.parallel import RawKernelFile
 
+__all__ = ["PeronaMalik2D", "PeronaMalik3D"]
+
 logger = logging.getLogger(__name__)
 
 

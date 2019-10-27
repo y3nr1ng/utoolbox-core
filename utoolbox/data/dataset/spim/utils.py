@@ -52,9 +52,26 @@ def keys_to_filename_objs(keys):
         try:
             parsed = Filename(key)
             filenames.append(parsed)
-        except:
-            logger.warning('invalid format "{}", ignored'.format(basename))
+        except ValueError:
+            logger.warning(f'invalid format "{key}", ignored')
     return filenames
+
+
+def refactor_datastore_keys(datastore):
+    old_fno = keys_to_filename_objs(datastore.keys())
+    old_fno.sort(key=lambda fno: (fno.channel, fno.name, fno.stack))
+    logger.info("found {} entries to refactor".format(len(old_fno)))
+
+    new_fno = copy.deepcopy(old_fno)
+    merge_fragmented_timestamps(new_fno)
+
+    logger.info("remapping refactored keys")
+    new_uri = OrderedDict()
+    for new, old in zip(new_fno, old_fno):
+        new_uri[str(new)] = datastore._uri[str(old)]
+
+    # overwrite
+    datastore._uri = new_uri
 
 
 def merge_fragmented_timestamps(filenames):
@@ -80,18 +97,3 @@ def merge_fragmented_timestamps(filenames):
                     filename.timestamp_abs - ref_filename.timestamp_abs
                 )
             ref_filename = filename
-
-
-def refactor_datastore_keys(datastore):
-    old_fno = keys_to_filename_objs(datastore.keys())
-    old_fno.sort(key=lambda fno: (fno.channel, fno.name, fno.stack))
-    logger.info("found {} entries to refactor".format(len(old_fno)))
-
-    new_fno = copy.deepcopy(old_fno)
-    merge_fragmented_timestamps(new_fno)
-
-    logger.info("remapping refactored keys")
-    new_uri = OrderedDict()
-    for new, old in zip(new_fno, old_fno):
-        new_uri[str(new)] = datastore[str(old)]
-    datastore._uri = new_uri

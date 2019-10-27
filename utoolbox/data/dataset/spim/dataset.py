@@ -5,10 +5,11 @@ import re
 
 import imageio
 
+from utoolbox.cli.prompt import prompt_float
 from utoolbox.data.datastore import ImageFolderDatastore
 from ..base import MultiChannelDataset
 from .error import MultipleSettingsError, SettingsNotFoundError
-from .settings import Settings
+from .settings import ScanType, Settings
 from .utils import refactor_datastore_keys
 
 logger = logging.getLogger(__name__)
@@ -72,6 +73,9 @@ class SPIMDataset(MultiChannelDataset):
                 )
             return ds_names[index][1]
         else:
+            # disable unnecessary refactor request
+            self._refactor = False
+
             return ds_names[0][1]
 
     def _load_metadata(self):
@@ -83,8 +87,36 @@ class SPIMDataset(MultiChannelDataset):
             lines = fd.read()
         return Settings(lines)
 
-    def _find_channels(self):
-        return [ch.id for ch in self.metadata.waveform.channels]
+    def _deserialize_info_from_metadata(self, dxy=0.103):
+        metadata, info = self.metadata, self.info
+
+        # time
+        # .. iterate through channels
+        n_stacks = set(channel.stacks for channel in metadata.waveform.channels)
+        if len(n_stacks) > 1:
+            logger.warning("number of saved stacks are inconsistent across channels")
+            info.frames = max(n_stacks)
+        else:
+            info.frames = n_stacks.pop()
+
+        # color
+        info.channels = [ch.id for ch in metadata.waveform.channels]
+
+        # stack, 2D
+        lx, ly, rx, ry = metadata.camera.roi
+        info.shape = (ry - ly, rx - lx)
+
+        pxsize = prompt_float("What is the size of a single pixel? ")
+        info.pixel_size = (pxsize,) * 2
+
+        # stack, 3D
+        if metadata.waveform.type == ScanType.OBJECTIVE:
+            info.n_slices = metadata.waveform.obj_piezo_n_steps
+            info.z_step = abs(metadata.waveform.obj_piezo_step_size)
+        elif metadata.waveform.type == ScanType.SAMPLE:
+            logger.warning("sample scanned data requires deskew")
+            info.n_slices = metadata.waveform.sample_piezo_n_steps
+            info.z_step = abs(metadata.waveform.sample_piezo_step_size)
 
     def _load_channel(self, channel):
         # NOTE
