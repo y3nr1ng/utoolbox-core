@@ -3,6 +3,7 @@ import logging
 import click
 import cupy as cp
 from cupyx.scipy.ndimage import zoom
+import numpy as np
 
 from utoolbox.exposure import auto_contrast
 from utoolbox.cli.utils import processor
@@ -17,11 +18,11 @@ logger = logging.getLogger(__name__)
 @click.option(
     "-m",
     "--method",
-    type=click.Choice(["zstack", "rotate", "montage"]),
+    type=click.Choice(["zstack", "mip"]),
     default="zstack",
 )
 @click.option(
-    "-s", "--size", type=click.Choice(["4K", "QHD", "FHD", "HD"]), default="4K"
+    "-s", "--size", type=click.Choice(["4K", "QHD", "FHD", "HD"]), default="FHD"
 )
 @processor
 def preview_datastore(stream, method, size):
@@ -48,11 +49,15 @@ def preview_datastore(stream, method, size):
             # frame
             yield data
 
-    elif method == "rotate":
-        raise NotImplementedError()
-    elif method == "montage":
-        raise NotImplementedError()
-
+    elif method == "mip":
+        result = None
+        for data in stream:
+            data = cp.asarray(data) 
+            try:
+                np.maximum(result, data, out=result)
+            except TypeError:
+                result = data.copy()
+        yield result
 
 @run_once
 def shape_to_zoom_factor(in_shape, out_shape):
