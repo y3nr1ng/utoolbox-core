@@ -74,13 +74,13 @@ setup(
         "tifffile",
         "h5py",
         # gui
-        "PySide2",
         "vispy",
         "pyopengl",
         # parallel
         'cupy-cuda101 ; platform_system!="Darwin"',
         'cupy ; platform_system=="Darwin"',
         # utils
+        "lark",
         "mako",
         "click",
         "coloredlogs",
