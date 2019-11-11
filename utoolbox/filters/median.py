@@ -28,8 +28,6 @@ def median(image, kernel_size=3, tile_width=8):
     image = cp.asarray(image)
     result = cp.empty_like(image)
 
-    print(f"{result.shape}, {result.dtype}")
-
     kernel(grid_sz, (tile_width,) * 3, (result, image, nx, ny, nz))
 
     return result
