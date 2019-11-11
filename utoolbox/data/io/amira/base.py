@@ -12,7 +12,7 @@ class Amira(object):
     def __init__(self, path):
         self._path = path
 
-        with open(path, "r") as fd:
+        with open(path, "r", errors="surrogateescape") as fd:
             file_def = fd.readline()
 
             if not self.is_file_valid(file_def):

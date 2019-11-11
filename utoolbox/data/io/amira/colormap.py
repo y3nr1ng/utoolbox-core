@@ -42,6 +42,17 @@ class AmiraColormap(Amira):
         return self.data[index, :]
 
 
+class AmiraPointCloud(Amira):
+    def __init__(self, path):
+        super().__init__(path)
+
+        from pprint import pprint
+
+        pprint(self.data)
+
+
 if __name__ == "__main__":
-    cm = AmiraColormap("pureGreen.col")
-    print(cm[4])
+    # cm = AmiraColormap("pureGreen.col")
+    # print(cm[4])
+    pc = AmiraPointCloud("c6_rawpoints_0042.am")
+
