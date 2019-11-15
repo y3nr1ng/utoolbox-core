@@ -1,22 +1,17 @@
 from lark import Lark
 
 am_grammar = r"""
-?start: format
-        | define
+?start: section
 
-?format: FORMAT_KW FORMAT FLOAT 
-FORMAT_KW.2: "# AmiraMesh"
-FORMAT: "3D ASCII" | "BINARY-LITTLE-ENDIAN"
+?section: CNAME content
 
-?define: DEFINE_KW CLASS INT 
-DEFINE_KW: "define"i
-CLASS: "lattice"i | "vertex"i | "edge"i | "point"i
+?content: CNAME value
+        | "{" [section*] "}"
 
-COMMENT: "#" /.*/
+?value: NUMBER+
 
-%import common (WS, INT, FLOAT)
+%import common (WS, NUMBER, CNAME)
 %ignore WS
-%ignore COMMENT
 """
 
 
@@ -24,12 +19,9 @@ def test():
     parser = Lark(am_grammar, parser="lalr")
 
     lines = r"""
-# AmiraMesh 3D ASCII 2.0
-# CreationDate: Mon May  8 14:12:39 2000
-
-define VERTEX 748
-define EDGE 832
-define POINT 12870
+    define VERTEX 748
+    define EDGE 832
+    define POINT 12870
     """
 
     print("===")
