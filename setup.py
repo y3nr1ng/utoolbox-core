@@ -77,7 +77,7 @@ setup(
         "vispy",
         "pyopengl",
         # parallel
-        'cupy-cuda101 ; platform_system!="Darwin"',
+        'cupy-cuda100 ; platform_system!="Darwin"',
         'cupy ; platform_system=="Darwin"',
         # utils
         "lark-parser",
