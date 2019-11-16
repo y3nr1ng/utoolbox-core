@@ -1,37 +1,53 @@
-from lark import Lark
+from pprint import pprint
 
-am_grammar = r"""
-?start: section
+from pyparsing import (
+    Or,
+    Group,
+    CaselessKeyword,
+    alphas,
+    nestedExpr,
+    nums,
+    Word,
+    OneOrMore,
+    QuotedString,
+    Optional,
+)
 
-?section: CNAME content
+object_type = (
+    CaselessKeyword("lattice")
+    | CaselessKeyword("vertex")
+    | CaselessKeyword("edge")
+    | CaselessKeyword("point")
+)
+object_definition = Group(CaselessKeyword("define") + object_type + Word(nums))
 
-?content: CNAME value
-        | "{" [section*] "}"
+parameter_keyword = CaselessKeyword("ContentType") | CaselessKeyword("MinMax")
+single_value = parameter_keyword + QuotedString('"', '"')
+numeric_array = parameter_keyword + Group(OneOrMore(Word(nums)))
+parameter_definition = Group(single_value | numeric_array) + Optional(",")
+parameters = Group(
+    CaselessKeyword("Parameters") + nestedExpr("{", "}", parameter_definition)
+)
 
-?value: NUMBER+
 
-%import common (WS, NUMBER, CNAME)
-%ignore WS
+data = r"""
+define VERTEX 748
+define EDGE 832
+define POINT 12870
+
+Parameters {
+    ContentType "Colormap",
+    MinMax 0 255
+}
+
 """
 
 
 def test():
-    parser = Lark(am_grammar, parser="lalr")
 
-    lines = r"""
-    define VERTEX 748
-    define EDGE 832
-    define POINT 12870
-    """
+    result = OneOrMore(object_definition | parameters).parseString(data).asList()
 
-    print("===")
-    for i, line in enumerate(lines.split("\n")):
-        print(f"{i:03d}\t{line}")
-    print("===")
-
-    result = parser.parse(lines)
-
-    print(result.pretty())
+    pprint(result)
 
 
 if __name__ == "__main__":
