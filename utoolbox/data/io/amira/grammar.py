@@ -1,27 +1,18 @@
 from pprint import pprint
 
 from pyparsing import (
-    Or,
-    Group,
     CaselessKeyword,
-    alphas,
+    Combine,
+    Dict,
+    Group,
+    Literal,
+    MatchFirst,
+    OneOrMore,
+    Optional,
+    QuotedString,
+    Word,
     alphanums,
     nestedExpr,
-    nums,
-    MatchFirst,
-    Word,
-    OneOrMore,
-    QuotedString,
-    Dict,
-    Optional,
-    Suppress,
-    Literal,
-    SkipTo,
-    originalTextFor,
-    Combine,
-    lineStart,
-    lineEnd,
-    stringEnd,
     restOfLine,
 )
 from pyparsing import pyparsing_common as pc
@@ -71,14 +62,18 @@ parameters = CaselessKeyword("Parameters").suppress() + nestedExpr(
 element_type = (CaselessKeyword("float") | CaselessKeyword("int")).setResultsName(
     "type"
 )
+# .. array
 element_counts = pc.integer.setResultsName("counts")
 element_array = Group(
     element_type + Word("[") + element_counts + Word("]")
 ).setResultsName("array")
+# .. single
 element_single = element_type
+# .. structure
 element_name = Word(alphanums).setResultsName("name")
 element = (element_single ^ element_array) + element_name
 section_id = Combine(Literal("@") + pc.integer).setResultsName("section_id")
+# .. prototype
 prototype = Group(
     object_type + nestedExpr("{", "}", element).setResultsName("data_type") + section_id
 ).setDebug()

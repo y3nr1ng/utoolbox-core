@@ -52,7 +52,7 @@ class AmiraPointCloud(Amira):
 
 
 if __name__ == "__main__":
-    # cm = AmiraColormap("pureGreen.col")
-    # print(cm[4])
+    cm = AmiraColormap("pureGreen.col")
+    print(cm[4])
     pc = AmiraPointCloud("c6_rawpoints_0042.am")
 
