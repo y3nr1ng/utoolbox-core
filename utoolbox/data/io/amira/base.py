@@ -80,7 +80,7 @@ section_id = Combine(Literal("@") + pc.integer).setResultsName("section_id")
 # .. prototype
 prototype = Group(
     object_type + nestedExpr("{", "}", element).setResultsName("data_type") + section_id
-).setDebug()
+)
 
 grammar = OneOrMore(
     comment.setResultsName("comments", listAllMatches=True)
@@ -94,11 +94,9 @@ class Amira(object):
     def __init__(self, path):
         self._path = path
 
-        self._parse_metadata()
-
+        self._metadata = self._parse_metadata()
         self._validate_file()
 
-        self._metadata = self._parse_metadata()
         self._data = self._parse_data_prototype()
 
     ##
@@ -144,7 +142,7 @@ class Amira(object):
             if "file_format" in comment:
                 break
         else:
-            raise RuntimeError("not an Amira/Avizo-generated file")
+            raise RuntimeError("not an Amira-generated file")
 
     def _parse_data_prototype(self):
         """Parse data block info, but NOT loaded yet."""
@@ -191,6 +189,7 @@ if __name__ == "__main__":
 
     files = ["pureGreen.col", "c6_rawpoints_0042.am", "c6_spatialgraph_0042.am"]
     for path in files:
+        print(path)
         am = Amira(path)
         pprint(am.metadata)
         pprint(am._data)

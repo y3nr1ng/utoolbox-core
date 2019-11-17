@@ -2,7 +2,7 @@ import logging
 
 import numpy as np
 
-from utoolbox.data.io.amira.base import Amira
+from .base import Amira
 
 __all__ = ["AmiraColormap"]
 
@@ -41,6 +41,13 @@ class AmiraColormap(Amira):
     def __getitem__(self, index):
         return self.data[index, :]
 
+    ##
+
+    def _validate_file(self):
+        ctype = self.metadata["parameters"]["ContentType"]
+        if ctype != "Colormap":
+            raise RuntimeError("not an Amira colormap")
+
 
 class AmiraPointCloud(Amira):
     def __init__(self, path):
@@ -53,6 +60,5 @@ class AmiraPointCloud(Amira):
 
 if __name__ == "__main__":
     cm = AmiraColormap("pureGreen.col")
-    print(cm[4])
-    pc = AmiraPointCloud("c6_rawpoints_0042.am")
+    print(cm[:3])
 
