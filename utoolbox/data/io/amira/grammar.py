@@ -5,87 +5,116 @@ from pyparsing import (
     Group,
     CaselessKeyword,
     alphas,
+    alphanums,
     nestedExpr,
     nums,
+    MatchFirst,
     Word,
     OneOrMore,
     QuotedString,
+    Dict,
     Optional,
     Suppress,
     Literal,
+    SkipTo,
+    originalTextFor,
+    Combine,
+    lineStart,
+    lineEnd,
+    stringEnd,
+    restOfLine,
 )
+from pyparsing import pyparsing_common as pc
 
+
+# comment
+# .. file format
+file_format_options = CaselessKeyword("BINARY-LITTLE-ENDIAN") | CaselessKeyword(
+    "3D ASCII"
+).setResultsName("format")
+file_format_version = pc.real.setResultsName("version")
+file_format = Group(
+    CaselessKeyword("AmiraMesh").suppress() + file_format_options + file_format_version
+).setResultsName("file_format")
+# .. comment
+comment_string = restOfLine
+comment = Group(Word("#", min=1).suppress() + MatchFirst([file_format, comment_string]))
+
+
+# declaration
 object_type = (
     CaselessKeyword("lattice")
     | CaselessKeyword("vertex")
     | CaselessKeyword("edge")
     | CaselessKeyword("point")
+    | CaselessKeyword("points")
+).setResultsName("object_type")
+object_size = pc.integer.setResultsName("object_size")
+declaration = Group(CaselessKeyword("define").suppress() + object_type + object_size)
+
+# parameter
+key = CaselessKeyword("ContentType") | CaselessKeyword("MinMax")
+value = (
+    QuotedString('"', '"')
+    | Group(OneOrMore(pc.integer | pc.real))
+    | nestedExpr("{", "}")
 )
-object_definition = Group(CaselessKeyword("define") + object_type + Word(nums))
-
-parameter_keyword = CaselessKeyword("ContentType") | CaselessKeyword("MinMax")
-single_value = parameter_keyword + QuotedString('"', '"')
-numeric_array = parameter_keyword + Group(OneOrMore(Word(nums)))
-unknown = Word(alphas + "_") + nestedExpr("{", "}")
-parameter_definition = Group(single_value | numeric_array | unknown) + Suppress(
-    Optional(",")
+parameter = Dict(
+    Group(key + value + Optional(",").suppress())
+    | Group(Word("_" + alphanums) + value + Optional(",")).suppress()
 )
-parameters = Group(
-    CaselessKeyword("Parameters") + nestedExpr("{", "}", parameter_definition)
+parameters = CaselessKeyword("Parameters").suppress() + nestedExpr(
+    "{", "}", parameter
+).setResultsName("parameters")
+
+# prototype
+element_type = (CaselessKeyword("float") | CaselessKeyword("int")).setResultsName(
+    "type"
+)
+element_counts = pc.integer.setResultsName("counts")
+element_array = Group(
+    element_type + Word("[") + element_counts + Word("]")
+).setResultsName("array")
+element_single = element_type
+element_name = Word(alphanums).setResultsName("name")
+element = (element_single ^ element_array) + element_name
+section_id = Combine(Literal("@") + pc.integer).setResultsName("section_id")
+prototype = Group(
+    object_type + nestedExpr("{", "}", element).setResultsName("data_type") + section_id
+).setDebug()
+
+grammar = OneOrMore(
+    comment.setResultsName("comments", listAllMatches=True)
+    | declaration.setResultsName("declarations", listAllMatches=True)
+    | parameters
+    | prototype.setResultsName("prototypes", listAllMatches=True)
 )
 
-comment = Suppress(CaselessKeyword("#"))
 
-header_flag = CaselessKeyword("AmiraMesh")
-file_type = CaselessKeyword("BINARY-LITTLE-ENDIAN") | CaselessKeyword("3D ASCII")
-file_type_version = Word(nums + ".")
-file_format = Group(comment + header_flag + file_type + file_type_version)
+def test(path):
+    # locate metadata section
+    with open(path, "r", errors="ignore") as fd:
+        lines = []
+        for line in fd:
+            if line.startswith("# Data section follows"):
+                break
+            lines.append(line)
 
-data_type = CaselessKeyword("float") | CaselessKeyword("int")
-array = data_type + nestedExpr("[", "]", Word(nums))
-single = data_type
-data_section_flag = Suppress(Literal("@")) + nums
-data_shape = Group((array | single) + Word(alphas))
-data_definition = Group(object_type + nestedExpr("{", "}", data_shape))
+    lines = "".join(lines)
+    parsed = grammar.parseString(lines)
 
-data = r"""
-# AmiraMesh BINARY-LITTLE-ENDIAN 3.0
-
-define VERTEX 748
-define EDGE 832
-define POINT 12870
-
-Parameters {
-    _symbols {
-    }
-    HistoryLogHead {
-        HistoryLog {
-            UID:2282e508-4780-4f85-a2f3-b01f90056530 {
-            }
-        }
-    }
-    ContentType "Colormap",
-    MinMax 0 255
-}
-
-Points { float[3] Coordinates } @1
-Points { int Ids } @2
-"""
-
-
-def test():
-    result = (
-        OneOrMore(file_format | object_definition | parameters | data_definition)
-        .parseString(data)
-        .asList()
-    )
-
-    pprint(result)
+    return parsed.asDict()
 
 
 if __name__ == "__main__":
+    import json
     import logging
 
     logging.basicConfig(level=logging.DEBUG)
 
-    test()
+    files = ["pureGreen.col", "c6_rawpoints_0042.am", "c6_spatialgraph_0042.am"]
+    for path in files:
+        print(path)
+        result = test(path)
+        print(json.dumps(result, indent=2))
+        print()
