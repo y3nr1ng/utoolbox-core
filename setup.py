@@ -33,7 +33,7 @@ setup(
     #   bumpversion release
     # to next version
     #   bump patch/minor/major
-    version="0.5.27.dev3",
+    version="0.5.33.dev1",
     # one-line description for the summary field
     description="A Python image processing package for LLSM.",
     long_description=long_description,
@@ -74,13 +74,13 @@ setup(
         "tifffile",
         "h5py",
         # gui
-        "PySide2",
         "vispy",
         "pyopengl",
         # parallel
         'cupy-cuda101 ; platform_system!="Darwin"',
         'cupy ; platform_system=="Darwin"',
         # utils
+        "pyparsing",
         "mako",
         "click",
         "coloredlogs",
@@ -98,11 +98,12 @@ setup(
     # executable scripts
     entry_points={
         "console_scripts": [
-            "deskew=utoolbox.cli.deskew:main",
-            "zpatch=utoolbox.cli.zpatch:main",
-            "dataset=utoolbox.cli.dataset:main",
+            "am2csv=utoolbox.cli.am2csv:main",
             "analyze=utoolbox.cli.analyze:main",
+            "dataset=utoolbox.cli.dataset:main",
+            "deskew=utoolbox.cli.deskew:main",
             "mm2bdv=utoolbox.cli.mm2bdv:main",
+            "zpatch=utoolbox.cli.zpatch:main",
         ]
     },
     # command hooks

@@ -1,35 +1,103 @@
 import logging
-import re
 
 import numpy as np
+from pyparsing import (
+    CaselessKeyword,
+    Combine,
+    Dict,
+    Group,
+    Literal,
+    MatchFirst,
+    OneOrMore,
+    Optional,
+    QuotedString,
+    Word,
+    alphanums,
+    nestedExpr,
+    restOfLine,
+)
+from pyparsing import pyparsing_common as pc
 
 __all__ = ["Amira"]
 
 logger = logging.getLogger(__name__)
 
 
+# comment
+# .. file format
+file_format_options = CaselessKeyword("BINARY-LITTLE-ENDIAN") | CaselessKeyword(
+    "3D ASCII"
+).setResultsName("format")
+file_format_version = pc.real.setResultsName("version")
+file_format = Group(
+    CaselessKeyword("AmiraMesh").suppress() + file_format_options + file_format_version
+).setResultsName("file_format")
+# .. comment
+comment_string = restOfLine
+comment = Group(Word("#", min=1).suppress() + MatchFirst([file_format, comment_string]))
+
+
+# declaration
+object_type = (
+    CaselessKeyword("lattice")
+    | CaselessKeyword("vertex")
+    | CaselessKeyword("edge")
+    | CaselessKeyword("point")
+    | CaselessKeyword("points")
+).setResultsName("object_type")
+object_size = pc.integer.setResultsName("size")
+declaration = Group(CaselessKeyword("define").suppress() + object_type + object_size)
+
+# parameter
+key = CaselessKeyword("ContentType") | CaselessKeyword("MinMax")
+value = (
+    QuotedString('"', '"')
+    | Group(OneOrMore(pc.integer | pc.real))
+    | nestedExpr("{", "}")
+)
+parameter = Dict(
+    Group(key + value + Optional(",").suppress())
+    | Group(Word("_" + alphanums) + value + Optional(",")).suppress()
+)
+parameters = CaselessKeyword("Parameters").suppress() + nestedExpr(
+    "{", "}", parameter
+).setResultsName("parameters")
+
+# prototype
+element_type = (CaselessKeyword("float") | CaselessKeyword("int")).setResultsName(
+    "type"
+)
+# .. array
+element_counts = pc.integer.setResultsName("counts")
+# .. structure
+element_name = Word(alphanums).setResultsName("name")
+element = (
+    element_type
+    + Optional(Word("[").suppress() + element_counts + Word("]").suppress())
+    + element_name
+)
+section_id = Combine(Literal("@") + pc.integer).setResultsName("section_id")
+# .. prototype
+prototype = Group(
+    object_type + nestedExpr("{", "}", element).setResultsName("data_type") + section_id
+)
+
+grammar = OneOrMore(
+    comment.setResultsName("comments", listAllMatches=True)
+    | declaration.setResultsName("declarations", listAllMatches=True)
+    | parameters
+    | prototype.setResultsName("prototypes", listAllMatches=True)
+)
+
+
 class Amira(object):
     def __init__(self, path):
         self._path = path
 
-        with open(path, "r") as fd:
-            file_def = fd.readline()
+        self._metadata = self._parse_metadata()
+        self._validate_file()
 
-            if not self.is_file_valid(file_def):
-                raise TypeError("not an Amira file")
-            self._encoding = self.encoding(file_def)
-
-            # scan until start of the data section
-            lines = []
-            for line in fd:
-                if line.startswith("# Data section follows"):
-                    break
-                else:
-                    lines.append(line.strip())
-            lines = "".join(lines)
-
-        self._parameters = self.parse_parameters(lines)
-        self._data = self.parse_data_definitions(lines)
+        self._data = self._parse_data_prototype()
 
     ##
 
@@ -38,16 +106,8 @@ class Amira(object):
         return self._data
 
     @property
-    def is_ascii(self):
-        return self._encoding == "ascii"
-
-    @property
-    def is_binary(self):
-        return self._encoding == "binary"
-
-    @property
-    def parameters(self):
-        return self._parameters
+    def metadata(self):
+        return self._metadata
 
     @property
     def path(self):
@@ -55,72 +115,82 @@ class Amira(object):
 
     ##
 
-    @classmethod
-    def parse_parameters(cls, lines, pattern=r"Parameters {([^{]+)}"):
-        parameters = dict()
-        lines = re.findall(pattern, lines)[0].split(",")
-        for line in lines:
-            name, *options = tuple(line.split(" "))
-            # force as tuple
-            options = tuple(options)
-            parameters[name] = {
-                "ContentType": cls._parse_content_type,
-                "MinMax": cls._parse_min_max,
-            }[name](*options)
-        return parameters
+    def _parse_metadata(self):
+        lines = []
+        with open(self.path, "r", errors="ignore") as fd:
+            for line in fd:
+                if line.startswith("# Data section follows"):
+                    break
+                lines.append(line)
+        lines = "".join(lines)
 
-    @classmethod
-    def _parse_content_type(cls, text):
-        return text[1:-1]
+        metadata = grammar.parseString(lines).asDict()
 
-    @classmethod
-    def _parse_min_max(cls, vmin, vmax):
-        return float(vmin), float(vmax)
+        # simplify blocks nested 1 level deeper in a list
+        # TODO how to fix this in grammar?
+        def extract(d, key):
+            d[key] = d[key][0]
 
-    ##
+        extract(metadata, "parameters")
+        for prototype in metadata["prototypes"]:
+            extract(prototype, "data_type")
 
-    @classmethod
-    def parse_data_definitions(cls, lines):
+        return metadata
+
+    def _validate_file(self):
+        for comment in self.metadata["comments"]:
+            if "file_format" in comment:
+                break
+        else:
+            raise RuntimeError("not an Amira-generated file")
+
+    def _parse_data_prototype(self):
+        """Parse data block info, but NOT loaded yet."""
+        types = self._parse_object_types()
+
         data = dict()
-        for name, shape in cls._parse_tag_sections(lines):
-            fmt, tag = re.findall(name + " {([^{]+)} (@\d+)", lines)[0]
-            fmt = fmt.strip()
-            data[name] = (tag, cls._preallocate_memory(shape, fmt))
+        for source in self.metadata["prototypes"]:
+            name = source["data_type"]["name"]
+            if name in data:
+                raise RuntimeError(f'data block "{name}" already exists')
+            size = types[source["object_type"]]
+            sid = source["section_id"]
+
+            shape, dtype = self._interpret_data_layout(size, source["data_type"])
+            data[name] = (sid, shape, dtype)
         return data
 
-    @classmethod
-    def _parse_tag_sections(cls, lines, pattern=r"define ([^\s]+) ([\d\s]+)"):
-        lines = re.findall(pattern, lines)
-        for name, shape in lines:
-            yield name, cls._parse_shape(shape)
+    def _parse_object_types(self):
+        types = dict()
+        for source in self.metadata["declarations"]:
+            name, size = source["object_type"], source["size"]
+            if name in types:
+                raise RuntimeError(f'malformed declaration, "{name}" already exists')
+            types[name] = size
+        return types
 
     @classmethod
-    def _parse_shape(cls, shape):
-        return tuple(int(s) for s in shape.split(" "))
+    def _interpret_data_layout(cls, size, element):
+        dtype = {"float": np.float32, "int": np.int32}[element["type"]]
 
-    @classmethod
-    def _preallocate_memory(cls, shape, fmt, pattern=r"(\S+)\[(\d+)\]"):
-        dtype, nelem = re.findall(pattern, fmt)[0]
-        dtype = {"float": np.float32}[dtype]
-        nelem = (int(nelem),)
-        return np.empty(shape + nelem, dtype=dtype)
+        # element
+        shape = (element.get("counts", 1),)
+        # overall
+        shape = (size,) + shape
 
-    ##
+        return shape, dtype
 
-    @classmethod
-    def is_file_valid(cls, line):
-        line = line.strip()
-        for keyword in ("Amira", "Avizo"):
-            if keyword in line:
-                return True
-        return False
 
-    @classmethod
-    def encoding(cls, line):
-        if "ASCII" in line:
-            return "ascii"
-        elif "BINARY" in line:
-            return "binary"
-        else:
-            raise ValueError("unable to determine encoding")
+if __name__ == "__main__":
+    from pprint import pprint
+    import logging
 
+    logging.basicConfig(level=logging.DEBUG)
+
+    files = ["pureGreen.col", "c6_rawpoints_0042.am", "c6_spatialgraph_0042.am"]
+    for path in files:
+        print(path)
+        am = Amira(path)
+        pprint(am.metadata)
+        pprint(am._data)
+        print()
