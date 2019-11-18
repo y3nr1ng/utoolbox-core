@@ -16,23 +16,26 @@ class AmiraColormap(Amira):
         super().__init__(path)
 
         # load data stream
-        tag, array = self.data["Lattice"]
-        with open(path, "r") as fd:
-            # search until tag
+        if len(self.data) > 1:
+            logger.warning("colormap format should contain 1 data section only")
+
+        _, (sid, shape, dtype) = next(iter(self.data.items()))
+        array = np.empty(shape, dtype)
+
+        # search location
+        with open(self.path, "r") as fd:
             for line in fd:
-                if line.startswith(tag):
+                if line.startswith(sid):
                     break
-            # start parsing...
+            else:
+                raise RuntimeError("unable to find data section marker")
             for i, line in enumerate(fd):
                 line = line.strip()
                 if not line:
                     continue
                 array[i, :] = np.array(
-                    [float(v) for v in line.split(" ")], dtype=array.dtype
+                    [float(v) for v in line.split(" ")], dtype=data.dtype
                 )
-
-        # overwrite data
-        logger.debug(f"replace internal data as a {array.shape} array")
         self._data = array
 
     def __len__(self):
@@ -41,18 +44,10 @@ class AmiraColormap(Amira):
     def __getitem__(self, index):
         return self.data[index, :]
 
+    ##
 
-class AmiraPointCloud(Amira):
-    def __init__(self, path):
-        super().__init__(path)
-
-        from pprint import pprint
-
-        pprint(self.data)
-
-
-if __name__ == "__main__":
-    # cm = AmiraColormap("pureGreen.col")
-    # print(cm[4])
-    pc = AmiraPointCloud("c6_rawpoints_0042.am")
+    def _validate_file(self):
+        ctype = self.metadata["parameters"]["ContentType"]
+        if ctype != "Colormap":
+            raise RuntimeError("not an Amira colormap")
 

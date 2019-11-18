@@ -1,1 +1,3 @@
-from .colormap import AmiraColormap
+from .colormap import *
+from .pointcloud import *
+from .spatialgraph import *
