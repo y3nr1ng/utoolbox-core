@@ -7,6 +7,8 @@ import coloredlogs
 from utoolbox.data.datastore import FolderDatastore
 from utoolbox.data.io.amira import AmiraPointCloud
 
+logger = logging.getLogger(__name__)
+
 
 @click.command()
 @click.argument("src", type=click.Path(exists=True))
@@ -42,4 +44,8 @@ def main(src, dst=None):
 
 
 if __name__ == "__main__":
+    coloredlogs.install(
+        level="DEBUG", fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
+    )
+
     main()
