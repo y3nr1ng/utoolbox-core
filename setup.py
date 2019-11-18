@@ -98,11 +98,12 @@ setup(
     # executable scripts
     entry_points={
         "console_scripts": [
-            "deskew=utoolbox.cli.deskew:main",
-            "zpatch=utoolbox.cli.zpatch:main",
-            "dataset=utoolbox.cli.dataset:main",
+            "am2csv=utoolbox.cli.am2csv:main",
             "analyze=utoolbox.cli.analyze:main",
+            "dataset=utoolbox.cli.dataset:main",
+            "deskew=utoolbox.cli.deskew:main",
             "mm2bdv=utoolbox.cli.mm2bdv:main",
+            "zpatch=utoolbox.cli.zpatch:main",
         ]
     },
     # command hooks
