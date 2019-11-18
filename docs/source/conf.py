@@ -25,9 +25,9 @@ copyright = "2019, Liu, Yen-Ting"
 author = "Liu, Yen-Ting"
 
 # The short X.Y version
-version = "0.5.26.dev0"
+version = "0.5.33.dev1"
 # The full version, including alpha/beta/rc tags
-release = "0.5.26.dev0"
+release = "0.5.33.dev1"
 
 
 # -- General configuration ---------------------------------------------------

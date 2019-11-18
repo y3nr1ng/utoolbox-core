@@ -5,7 +5,7 @@ import click
 import imageio
 
 from utoolbox.cli.prompt import prompt_options
-from utoolbox.data import MicroManagerDataset, SPIMDataset
+from utoolbox.data import MicroManagerV1Dataset, MicroManagerV2Dataset, SPIMDataset
 from utoolbox.data.dataset.error import DatasetError
 
 from utoolbox.cli.utils import generator
@@ -44,7 +44,7 @@ def determine_format(path, skip):
 
 
 def load_from_folder(path):
-    for klass in (SPIMDataset, MicroManagerDataset):
+    for klass in (SPIMDataset, MicroManagerV1Dataset, MicroManagerV2Dataset):
         try:
             ds = klass(path)
             break
