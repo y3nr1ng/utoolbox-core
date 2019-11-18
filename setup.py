@@ -65,7 +65,7 @@ setup(
     #   requirements.txt
     install_requires=[
         # numeric and processing
-        "numpy",
+        "numpy>=1.17",
         "scipy",
         "pandas",
         # file io
