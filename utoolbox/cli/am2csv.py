@@ -39,10 +39,16 @@ def main(src, dst=None):
         ds_out = FolderDatastore(dst, write_func=write_func)
 
         logger.info(f"{len(ds_in)} file(s) to process")
-        for name, pc in ds_in.items():
+        i = 0
+        for name in ds_in.keys():
             print(f".. {name}")
-            ds_out[name] = pc
-
+            if i < 760 and i < 770:
+                i += 1
+                continue                
+            try:
+                ds_out[name] = ds_in[name]
+            except ValueError as err:
+                logger.exception(f'ERROR! {str(err)}')
 
 if __name__ == "__main__":
     coloredlogs.install(

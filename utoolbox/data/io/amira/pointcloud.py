@@ -16,6 +16,8 @@ class AmiraPointCloud(Amira):
 
         sid_ranges = self._extract_sid_ranges()
 
+        damaged = False
+
         arrays = dict()
         for sid, (start, end) in sid_ranges:
             # find data type
@@ -27,15 +29,34 @@ class AmiraPointCloud(Amira):
             logger.info(f'loading "{name}" from "{path}" (offset: {start})')
             # load from file
             count = (end - start) // np.dtype(dtype).itemsize
-            arrays[name] = (
-                np.fromfile(path, dtype=dtype, count=count, offset=start)
-                .reshape(shape)
-                .squeeze()
-            )
-
+            try:
+                array = (
+                    np.fromfile(path, dtype=dtype, count=count, offset=start)
+                    .reshape(shape)
+                    .squeeze()
+                )
+            except ValueError:
+                # only fix last dimension
+                entries = count // shape[-1]
+                shape = (entries, shape[-1])
+                # reduce overall elements
+                _count = entries * shape[-1]
+                logger.error(f'array size coerced from {count} to {_count} {shape}')
+                # reshape again
+                array = (
+                    np.fromfile(path, dtype=dtype, count=_count, offset=start)
+                    .reshape(shape)
+                    .squeeze()
+                )
+                damaged = True
+            arrays[name] = array
+        
+        if damaged:
+            arrays['Ids'] = arrays['Ids'][:-1]
+            
         df_source = {"Point ID": arrays["Ids"]}
-        for i, name in enumerate(["X", "Y", "Z"]):
-            df_source[name] = arrays["Coordinates"][:, i]
+        for i, ax in enumerate(["X", "Y", "Z"]):
+            df_source[f"{ax} Coord"] = arrays["Coordinates"][:, i]
         df = pd.DataFrame(df_source)
 
         self._data = df
