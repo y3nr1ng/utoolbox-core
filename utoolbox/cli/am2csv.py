@@ -28,11 +28,12 @@ def main(src, dst=None):
         AmiraPointCloud(src).to_csv(dst, index=False)
     else:
         if dst is None:
-            parent, dst = os.path.split(src)
+            parent, dst = os.path.split(os.path.abspath(src))
             dst = os.path.join(parent, f"{dst}_csv")
-
+            print(dst)
         def write_func(uri, df):
-            df.to_csv(uri, index=False)
+            dst = f'{uri}.csv'
+            df.to_csv(dst, index=False)
 
         ds_in = FolderDatastore(src, read_func=AmiraPointCloud)
         ds_out = FolderDatastore(dst, write_func=write_func)
