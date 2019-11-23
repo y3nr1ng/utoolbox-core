@@ -4,12 +4,15 @@ __all__ = ["ImageDataset", "VolumeDataset"]
 
 
 class DenseDataset(GenericDataset):
-    pass
+    def __init__(self):
+        super().__init__()
 
 
 class ImageDataset(DenseDataset):
-    pass
+    def __init__(self):
+        super().__init__()
 
 
 class VolumeDataset(ImageDataset):
-    pass
+    def __init__(self):
+        super().__init__()

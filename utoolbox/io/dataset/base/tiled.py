@@ -4,4 +4,5 @@ __all__ = ["TiledDataset"]
 
 
 class TiledDataset(GenericDataset):
-    pass
+    def __init__(self):
+        super().__init__()

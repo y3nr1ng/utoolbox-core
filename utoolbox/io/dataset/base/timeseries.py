@@ -4,4 +4,5 @@ __all__ = ["TimeSeriesDataset"]
 
 
 class TimeSeriesDataset(GenericDataset):
-    pass
+    def __init__(self):
+        super().__init__()

@@ -4,4 +4,5 @@ __all__ = ["SparseDataset"]
 
 
 class SparseDataset(GenericDataset):
-    pass
+    def __init__(self):
+        super().__init__()
