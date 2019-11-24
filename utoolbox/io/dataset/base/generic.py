@@ -12,6 +12,12 @@ class GenericDataset(ABCMeta):
     def __init__(self):
         self._dataset = xr.Dataset()
 
+    def __getattr__(self, attr):
+        return getattr(self._dataset, attr)
+
+    def __setattr__(self, attr, value):
+        setattr(self._dataset, attr, value)
+
     ##
 
     def isel(self, indexers):
