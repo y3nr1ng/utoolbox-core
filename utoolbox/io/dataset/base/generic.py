@@ -10,19 +10,7 @@ logger = logging.getLogger(__name__)
 
 class GenericDataset(ABCMeta):
     def __init__(self):
-        pass
-
-    @abstractmethod
-    def _register_coords(self):
-        pass
-
-    @abstractmethod
-    def _register_data_vars(self):
-        pass
-
-    @abstractmethod
-    def _build_array(self):
-        pass
+        self._dataset = xr.Dataset()
 
     ##
 
