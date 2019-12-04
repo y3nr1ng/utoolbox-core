@@ -1,18 +1,22 @@
+from abc import ABCMeta, abstractmethod
+
 from .generic import GenericDataset
 
-__all__ = ["ImageDataset", "VolumeDataset"]
+__all__ = ["DenseDataset"]
 
 
-class DenseDataset(GenericDataset):
+class DenseDataset(GenericDataset, metaclass=ABCMeta):
     def __init__(self):
         super().__init__()
 
+    ##
 
-class ImageDataset(DenseDataset):
-    def __init__(self):
-        super().__init__()
+    ##
 
+    @abstractmethod
+    def _load_array_info(self):
+        pass
 
-class VolumeDataset(ImageDataset):
-    def __init__(self):
-        super().__init__()
+    @abstractmethod
+    def _load_data(self):
+        pass
