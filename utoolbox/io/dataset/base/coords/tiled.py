@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from .generic import GenericDataset
+from ..generic import GenericDataset
 
 __all__ = ["TiledDataset"]
 

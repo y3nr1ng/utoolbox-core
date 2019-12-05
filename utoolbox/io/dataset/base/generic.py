@@ -18,11 +18,18 @@ class GenericDataset(metaclass=ABCMeta):
         if not self._can_read():
             raise UnsupportedDatasetError()
 
+        self._files = self._enumerate_files()
+        logger.info(f"found {len(self.files)} file(s)")
+
     ##
 
     @property
     def dataset(self):
         return self._dataset
+
+    @property
+    def files(self):
+        return self._files
 
     @property
     def metadata(self):
@@ -33,6 +40,10 @@ class GenericDataset(metaclass=ABCMeta):
     @abstractmethod
     def _can_read(self):
         """Whether this dataset can read data from the specified URI."""
+        pass
+
+    @abstractmethod
+    def _enumerate_files(self):
         pass
 
     @abstractmethod

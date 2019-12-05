@@ -17,4 +17,4 @@ if __name__ == "__main__":
     )
     ds = MicroManagerV1Dataset(src_dir)
 
-    print(ds.dataset.coords)
+    print(ds.dataset)

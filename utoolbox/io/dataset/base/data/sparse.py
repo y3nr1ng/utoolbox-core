@@ -1,4 +1,4 @@
-from .generic import GenericDataset
+from ..generic import GenericDataset
 
 __all__ = ["SparseDataset"]
 
