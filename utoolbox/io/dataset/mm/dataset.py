@@ -1,10 +1,14 @@
 import glob
 import json
 import logging
+from operator import itemgetter
 import os
 
+from dask import delayed
+import dask.array as da
 import imageio
 import numpy as np
+import xarray as xr
 
 from ..base import DenseDataset, MultiChannelDataset, TiledDataset
 
@@ -27,7 +31,23 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
 
     @property
     def read_func(self):
-        return imageio.imread
+        def func(uri, shape, dtype):
+            # layered volume
+            nz, shape = shape[0], shape[1:]
+            data = da.stack(
+                [
+                    da.from_delayed(
+                        delayed(imageio.imread, pure=True)(file_path), shape, dtype
+                    )
+                    for file_path in uri
+                ]
+            )
+            if data.shape[0] != nz:
+                logger.warning(f"retrieved layer mis-matched")
+            array = xr.DataArray(data, dims=["z", "y", "x"])
+            return array
+
+        return func
 
     @property
     def root_dir(self):
@@ -59,8 +79,9 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
     def _load_channel_info(self):
         return self.metadata["ChNames"]
 
-    def _retrieve_file_list(self, data_var, coords):
-        pass
+    def _retrieve_file_list(self, data_var, coord):
+        prefix = self._tile_prefix[itemgetter("tile_x", "tile_y")(coord)]
+        return glob.glob(os.path.join(self.root_dir, prefix, f"*_{data_var}_*.tif"))
 
     def _load_metadata(self, metadata_name="metadata.txt"):
         # find all `metadata.txt` and try to open until success
@@ -76,17 +97,42 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
         else:
             raise MissingMetadataError()
 
-    def _load_tiling_positions(self):
+    def _load_tiling_coordinates(self):
         positions = self.metadata["InitialPositionList"]
 
         coords = {k: [] for k in ("tile_x", "tile_y")}
+        labels = dict()
         for position in positions:
-            coord_x, coord_y = tuple(position["DeviceCoordinatesUm"]["XY Stage"])
-            coords["tile_x"].append(coord_x)
-            coords["tile_y"].append(coord_y)
+            # coordinate
+            coord_dict = position["DeviceCoordinatesUm"]
+            try:
+                coord_x, coord_y = tuple(coord_dict["XY Stage"])
+                coords["tile_x"].append(coord_x)
+                coords["tile_y"].append(coord_y)
+            except KeyError:
+                pass
+            try:
+                coord_z = coord_dict["Z Stage"][0]
+                coords["tile_z"].append(coord_z)
+            except KeyError:
+                pass
 
-        # NOTE use `set` to ensure no duplicate items
-        coords = {
-            k: np.array(list(set(v)), dtype=np.float32) for k, v in coords.items()
-        }
-        return coords
+            # label
+            # NOTE MicroManager only tiles in 2D, no need to include Z for indexing
+            labels[(np.float32(coord_x), np.float32(coord_y))] = position["Label"]
+
+        # internal bookkeeping
+        self._tile_prefix = labels
+
+        return {k: np.array(v, dtype=np.float32) for k, v in coords.items()}
+
+    def _load_tiling_info(self):
+        index, coords = super()._load_tiling_info()
+        try:
+            # NOTE MicroManger does not have Z tiling, drop it if it exists
+            del index["tile_z"]
+        except KeyError:
+            pass
+
+        return index, coords
+

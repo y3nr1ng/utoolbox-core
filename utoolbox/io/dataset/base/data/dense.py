@@ -1,11 +1,14 @@
 from abc import ABCMeta, abstractmethod
+import logging
+from itertools import product
 
-from dask import delayed
-import dask.array as da
+import xarray as xr
 
 from ..generic import GenericDataset
 
 __all__ = ["DenseDataset"]
+
+logger = logging.getLogger(__name__)
 
 
 class DenseDataset(GenericDataset, metaclass=ABCMeta):
@@ -17,6 +20,9 @@ class DenseDataset(GenericDataset, metaclass=ABCMeta):
     @property
     @abstractmethod
     def read_func(self):
+        """
+        callable(URI, SHAPE, DTYPE)
+        """
         pass
 
     ##
@@ -25,15 +31,28 @@ class DenseDataset(GenericDataset, metaclass=ABCMeta):
         shape, dtype = self._load_array_info()
 
         data_vars = self.dataset.data_vars.keys()
-        coords = self.dataset.coords.items()
+        coords = self.dataset.coords
+        coord_keys, coord_values = (
+            list(coords.keys()),
+            list(v.values for v in coords.values()),
+        )
 
+        logger.debug("preloading...")
         for data_var in data_vars:
-            # TODO how to generate coords
-            file_list = self._retrieve_file_list(data_var, coords)
-            data = [
-                da.from_delayed(delayed(self.read_func)(file_path), shape, dtype)
-                for file_path in file_list
-            ]
+            logger.debug(f"> data_var: {data_var}")
+            for coord in product(*coord_values):
+                coord = {k: v for k, v in zip(coord_keys, coord)}
+                logger.debug(f">> coord: {coord}")
+                file_list = self._retrieve_file_list(data_var, coord)
+                if file_list:
+                    array = self.read_func(file_list, shape, dtype)
+                    array = array.assign_coords(coord)
+                    self.dataset[data_var] = array
+                else:
+                    logger.warning(
+                        f'missing data, DATA_VAR "{data_var}", COORD "{coord}"'
+                    )
+                
 
     ##
 
