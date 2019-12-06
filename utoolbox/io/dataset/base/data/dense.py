@@ -2,6 +2,7 @@ from abc import ABCMeta, abstractmethod
 import logging
 from itertools import product
 
+import numpy as np
 import xarray as xr
 
 from ..generic import GenericDataset
@@ -38,21 +39,32 @@ class DenseDataset(GenericDataset, metaclass=ABCMeta):
         )
 
         logger.debug("preloading...")
+        arrays, coords = [], []
         for data_var in data_vars:
             logger.debug(f"> data_var: {data_var}")
-            for coord in product(*coord_values):
-                coord = {k: v for k, v in zip(coord_keys, coord)}
-                logger.debug(f">> coord: {coord}")
-                file_list = self._retrieve_file_list(data_var, coord)
+            for raw_coord in product(*coord_values):
+                coord_dict = {k: v for k, v in zip(coord_keys, raw_coord)}
+                logger.debug(f">> coord: {coord_dict}")
+                file_list = self._retrieve_file_list(data_var, coord_dict)
                 if file_list:
                     array = self.read_func(file_list, shape, dtype)
-                    array = array.assign_coords(coord)
-                    self.dataset[data_var] = array
+                    array = array.expand_dims(coord_keys)
+                    print(array)
+                    coord_dict = {
+                        k: np.array(v) for k, v in zip(coord_keys, raw_coord)
+                    }
+                    array = xr.Dataset({data_var: array}, coords=coord_dict)
+                    print(array)
+                    arrays.append(array)
+                    coords.append(coord_dict)
                 else:
                     logger.warning(
-                        f'missing data, DATA_VAR "{data_var}", COORD "{coord}"'
+                        f'missing data, DATA_VAR "{data_var}", COORD "{coord_dict}"'
                     )
-                
+
+        logger.debug("merging...")
+        self._dataset = xr.combine_by_coords(arrays, coords=coord_keys, join="all")
+        # self.dataset.update({data_var: arrays})
 
     ##
 
