@@ -2,12 +2,12 @@ from abc import ABCMeta, abstractmethod
 
 import numpy as np
 
-from ..generic import GenericDataset
+from ..generic import BaseDataset
 
 __all__ = ["TiledDataset"]
 
 
-class TiledDataset(GenericDataset, metaclass=ABCMeta):
+class TiledDataset(BaseDataset, metaclass=ABCMeta):
     def __init__(self):
         super().__init__()
 
@@ -15,7 +15,7 @@ class TiledDataset(GenericDataset, metaclass=ABCMeta):
         assert any(
             key in index.keys() for key in ("tile_x", "tile_y", "tile_z")
         ), "unable to find definition of tiling coordinates"
-        self._dataset = self.dataset.assign_coords(index)
+        self.inventory.update(index)
 
     ##
 

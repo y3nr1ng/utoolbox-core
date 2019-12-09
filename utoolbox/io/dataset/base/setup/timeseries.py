@@ -1,9 +1,9 @@
-from ..generic import GenericDataset
+from ..generic import BaseDataset
 
 __all__ = ["TimeSeriesDataset"]
 
 
-class TimeSeriesDataset(GenericDataset):
+class TimeSeriesDataset(BaseDataset):
     def __init__(self):
         super().__init__()
 

@@ -8,7 +8,7 @@ from dask import delayed
 import dask.array as da
 import imageio
 import numpy as np
-import xarray as xr
+from sparse import COO
 
 from ..base import DenseDataset, MultiChannelDataset, TiledDataset
 
@@ -34,7 +34,7 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
         def func(uri, shape, dtype):
             # layered volume
             nz, shape = shape[0], shape[1:]
-            data = da.stack(
+            array = da.stack(
                 [
                     da.from_delayed(
                         delayed(imageio.imread, pure=True)(file_path), shape, dtype
@@ -42,9 +42,8 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
                     for file_path in uri
                 ]
             )
-            if data.shape[0] != nz:
+            if array.shape[0] != nz:
                 logger.warning(f"retrieved layer mis-matched")
-            array = xr.DataArray(data, dims=["z", "y", "x"])
             return array
 
         return func
@@ -79,9 +78,15 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
     def _load_channel_info(self):
         return self.metadata["ChNames"]
 
-    def _retrieve_file_list(self, data_var, coord):
-        prefix = self._tile_prefix[itemgetter("tile_x", "tile_y")(coord)]
-        return glob.glob(os.path.join(self.root_dir, prefix, f"*_{data_var}_*.tif"))
+    def _missing_data(self):
+        shape, dtype = self._load_array_info()
+        return delayed(np.zeros)(shape, dtype)
+
+    def _retrieve_file_list(self, coord_dict):
+        prefix = self._tile_prefix[itemgetter("tile_x", "tile_y")(coord_dict)]
+        return glob.glob(
+            os.path.join(self.root_dir, prefix, f"*_{coord_dict['channel']}_*.tif")
+        )
 
     def _load_metadata(self, metadata_name="metadata.txt"):
         # find all `metadata.txt` and try to open until success
