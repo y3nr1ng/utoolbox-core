@@ -13,7 +13,7 @@ from ..base import DenseDataset, MultiChannelDataset, TiledDataset
 
 from .error import MissingMetadataError
 
-__all__ = ["MicroManagerV1Dataset"]
+__all__ = ["MicroManagerV1Dataset", "MicroManagerV2Dataset"]
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +69,8 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
             shape = (nz,) + shape
 
         # dtype
-        bits = self.metadata["BitDepth"]
-        dtype = {8: np.uint8, 16: np.uint16}[bits]
+        ptype = self.metadata["PixelType"].lower()
+        dtype = {'gray16': np.uint16}[ptype]
 
         return shape, dtype
 
@@ -140,3 +140,56 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
 
         return index, coords
 
+
+class MicroManagerV2Dataset(MicroManagerV1Dataset):
+
+    ##
+
+    def _can_read(self):
+        version = self.metadata["MicroManagerVersion"]
+        return version.startswith("2.")
+
+    def _load_channel_info(self):
+        channels = self.metadata["ChNames"]
+        if len(channels) == 1 and channels[0] == "Default":
+            channels = ["*"]
+
+        # internal bookkeeping
+        self._channel_order = channels
+
+        return channels
+
+    def _load_tiling_coordinates(self):
+        positions = self.metadata["StagePositions"]
+
+        coords = {k: [] for k in ("tile_x", "tile_y")}
+        labels = dict()
+        for position in positions:
+            devices = position["DevicePositions"]
+            xy_stage, z_stage = position["DefaultXYStage"], position["DefaultZStage"]
+            for device in devices:
+                if device["Device"] == xy_stage:
+                    coord_y, coord_x = tuple(device["Position_um"])
+                    coords["tile_x"].append(coord_x)
+                    coords["tile_y"].append(coord_y)
+                elif device["Device"] == z_stage:
+                    coord_z = device["Position_um"][0]
+                    coords["tile_z"].append(coord_z)
+                else:
+                    logger.warning(f"unknown device {device['Device']}")
+
+            # label
+            # NOTE MicroManager only tiles in 2D, no need to include Z for indexing
+            labels[(np.float32(coord_x), np.float32(coord_y))] = position["Label"]
+
+        # internal bookkeeping
+        self._tile_prefix = labels
+
+        return {k: np.array(v, dtype=np.float32) for k, v in coords.items()}
+
+    def _retrieve_file_list(self, coord_dict):
+        prefix = self._tile_prefix[itemgetter("tile_x", "tile_y")(coord_dict)]
+        i_ch = self._channel_order.index(coord_dict["channel"])
+        return glob.glob(
+            os.path.join(self.root_dir, prefix, f"*_channel{i_ch:03d}_*.tif")
+        )

@@ -10,7 +10,7 @@ from dask.diagnostics import ProgressBar
 from dask.distributed import Client
 import numpy as np
 
-from utoolbox.io.dataset.mm import MicroManagerV1Dataset
+from utoolbox.io.dataset.mm import MicroManagerV2Dataset
 
 
 def create_dst_dir(name, root_dir="_debug"):
@@ -172,11 +172,6 @@ if __name__ == "__main__":
         level="DEBUG", fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
     )
 
-    src_dir = "C:/Users/Andy/Downloads/20191119_ExM_kidney_10XolympusNA06_zp5_7x8_DKO_4-2_Nkcc2_488_slice_2_1"
-    ds = MicroManagerV1Dataset(src_dir)
-
-    print("== loaded")
-
     client = Client()
     print(client)
     print()
@@ -184,5 +179,14 @@ if __name__ == "__main__":
     cache = Cache(2e9)
     cache.register()
 
-    images, links = load_valid_tiles(ds, save=False)
-    calculate_link_shifts(ds, links)
+    # src_dir = "C:/Users/Andy/Downloads/20191119_ExM_kidney_10XolympusNA06_zp5_7x8_DKO_4-2_Nkcc2_488_slice_2_1"
+    src_dir = "Y:/charm/20191011_Clarity_brain_Wt94_RCCS_1"
+    ds = MicroManagerV2Dataset(src_dir)
+
+    print("== dataset inventory ==")
+    print(ds.inventory)
+
+    client.close()
+
+    # images, links = load_valid_tiles(ds, save=False)
+    # calculate_link_shifts(ds, links)

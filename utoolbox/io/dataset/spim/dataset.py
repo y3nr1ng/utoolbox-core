@@ -7,6 +7,6 @@ __all__ = ["SpimDataset"]
 logger = logging.getLogger(__name__)
 
 
-class SpimDataset(BaseDataset):
+class SpimDataset(De):
     pass
 
