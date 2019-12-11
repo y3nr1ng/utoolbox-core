@@ -8,7 +8,6 @@ from dask import delayed
 import dask.array as da
 import imageio
 import numpy as np
-from sparse import COO
 
 from ..base import DenseDataset, MultiChannelDataset, TiledDataset
 
@@ -78,9 +77,9 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
     def _load_channel_info(self):
         return self.metadata["ChNames"]
 
-    def _missing_data(self):
-        shape, dtype = self._load_array_info()
-        return delayed(np.zeros)(shape, dtype)
+    # def _missing_data(self):
+    #    shape, dtype = self._load_array_info()
+    #    return delayed(np.zeros)(shape, dtype)
 
     def _retrieve_file_list(self, coord_dict):
         prefix = self._tile_prefix[itemgetter("tile_x", "tile_y")(coord_dict)]
