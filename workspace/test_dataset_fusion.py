@@ -5,15 +5,16 @@ import os
 from pprint import pprint
 
 import coloredlogs
+from dask import delayed
 from dask.cache import Cache
 from dask.diagnostics import ProgressBar
-from dask.distributed import Client
+from dask.distributed import Client, fire_and_forget
 import numpy as np
 
 from utoolbox.io.dataset.mm import MicroManagerV2Dataset
 
 
-def create_dst_dir(name, root_dir="_debug"):
+def create_dst_dir(name, root_dir="S:/Andy/_debug/HD91"):
     path = os.path.join(root_dir, name)
     try:
         os.makedirs(path)
@@ -34,17 +35,18 @@ def load_valid_tiles(ds, save=False):
         for i, (_, tile) in enumerate(ds_x.groupby("tile_x")):
             print(f".. iter (i: {i}, j: {j})")
 
-            uuid = tile.values[0]
+            uuid = tile.loc["488_1X"].values[0]
             # ignore missing tiles
             if not uuid:
                 continue
 
             if save:
-                with ProgressBar():
-                    data = ds[uuid].max(axis=0).compute()
-
+                data = ds[uuid].max(axis=0)
                 dst_path = os.path.join(dst_dir, f"tile-{i:03d}-{j:03d}_mip.tif")
-                imageio.imwrite(dst_path, data)
+                # delayed(imageio.imwrite)(dst_path, data)
+
+                future = client.submit(imageio.imwrite, dst_path, data)
+                fire_and_forget(future)
 
             images.append(((j, i), uuid))
 
@@ -172,21 +174,20 @@ if __name__ == "__main__":
         level="DEBUG", fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
     )
 
-    client = Client()
+    client = Client("10.109.20.6:8786")
     print(client)
     print()
 
     cache = Cache(2e9)
     cache.register()
 
-    # src_dir = "C:/Users/Andy/Downloads/20191119_ExM_kidney_10XolympusNA06_zp5_7x8_DKO_4-2_Nkcc2_488_slice_2_1"
-    src_dir = "Y:/charm/20191011_Clarity_brain_Wt94_RCCS_1"
+    src_dir = "Y:/charm/20191015_Clarity_brain_HD91_RCCS_1"
     ds = MicroManagerV2Dataset(src_dir)
 
     print("== dataset inventory ==")
     print(ds.inventory)
 
-    client.close()
-
-    # images, links = load_valid_tiles(ds, save=False)
+    images, links = load_valid_tiles(ds, save=True)
     # calculate_link_shifts(ds, links)
+
+    client.close()

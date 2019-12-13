@@ -180,7 +180,7 @@ class MicroManagerV2Dataset(MicroManagerV1Dataset):
 
             # label
             # NOTE MicroManager only tiles in 2D, no need to include Z for indexing
-            labels[(np.float32(coord_x), np.float32(coord_y))] = position["Label"]
+            labels[(np.float32(coord_y), np.float32(coord_x))] = position["Label"]
 
         # internal bookkeeping
         self._tile_prefix = labels
@@ -188,7 +188,7 @@ class MicroManagerV2Dataset(MicroManagerV1Dataset):
         return {k: np.array(v, dtype=np.float32) for k, v in coords.items()}
 
     def _retrieve_file_list(self, coord_dict):
-        prefix = self._tile_prefix[itemgetter("tile_x", "tile_y")(coord_dict)]
+        prefix = self._tile_prefix[itemgetter("tile_y", "tile_x")(coord_dict)]
         i_ch = self._channel_order.index(coord_dict["channel"])
         return glob.glob(
             os.path.join(self.root_dir, prefix, f"*_channel{i_ch:03d}_*.tif")
