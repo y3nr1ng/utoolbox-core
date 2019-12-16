@@ -8,20 +8,19 @@ from dask.cache import Cache
 from dask.distributed import as_completed, Client
 import imageio
 import numpy as np
-from skimage.transform import downscale_local_mean
 
 
 def load_data(src_path):
     return delayed(imageio.volread)(src_path)
 
 
-def rescale(data, scale=(1, 4, 4)):
-    return delayed(downscale_local_mean)(data, scale)
+def mip(data, axis=0):
+    return delayed(np.amax)(data, axis=axis)
 
 
 def save_data(dst_path, data):
     data = data.compute().astype(np.float32)
-    imageio.volwrite(dst_path, data)
+    imageio.imwrite(dst_path, data)
     return dst_path
 
 
@@ -39,8 +38,8 @@ if __name__ == "__main__":
     cache = Cache(2e9)
     cache.register()
 
-    src_dir = "S:/ARod/20191212_4F/flybrain_1"
-    dst_dir = "U:/ARod/20191212_4F/flybrain_1"
+    src_dir = "U:/Vins/20191213/10x-fly-brain-64246_naked-brain_zp6um"
+    dst_dir = "U:/Vins/20191213/10x-fly-brain-64246_naked-brain_zp6um_mip"
 
     file_list = glob.glob(os.path.join(src_dir, "**", "*.tif"), recursive=True)
     logger.info(f"{len(file_list)} file(s) to process")
@@ -53,7 +52,7 @@ if __name__ == "__main__":
     futures = []
     for file_path in file_list:
         data = load_data(file_path)
-        data = rescale(data)
+        data = mip(data)
 
         parent, fname = os.path.split(file_path)
         try:
