@@ -6,12 +6,7 @@ from dask import delayed
 import dask.array as da
 import imageio
 
-from io.dataset.base import (
-    DenseDataset,
-    MultiChannelDataset,
-    MultiViewDataset,
-    TiledDataset,
-)
+from ..base import DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset
 
 __all__ = ["SpimDataset"]
 
