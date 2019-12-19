@@ -21,9 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 class LatticeScopeDataset(DenseDataset, MultiChannelDataset, MultiViewDataset):
-    def __init__(self, root_dir, pixe_size=None):
+    def __init__(self, root_dir):
         self._root_dir = root_dir
-        self._pixe_size = pixe_size
 
         super().__init__()
 
@@ -115,9 +114,8 @@ class LatticeScopeDataset(DenseDataset, MultiChannelDataset, MultiViewDataset):
                 raise MalformedSettingsFileError("cannot find twin camera flag")
 
     def _load_voxel_size(self):
-        if not self._pixe_size:
-            self._pixel_size = prompt_float("What is the size of a single pixel? ")
-        size = (self._pixe_size,) * 2
+        self._pixel_size = prompt_float("What is the size of a single pixel? ")
+        size = (self._pixel_size,) * 2
 
         if self.metadata["general"]["mode"] == AcquisitionMode.Z_STACK:
             scan_type = self.metadata["waveform"]["type"]
@@ -180,11 +178,11 @@ class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
             script_raw = StringIO("".join(lines))
 
         # ln 3-N, position list
-        df = pd.read_csv(script_raw, skiprows=2)
-        df.dropna(how="all", axis="columns", inplace=True)
+        coords = pd.read_csv(script_raw, skiprows=2)
+        coords.dropna(how="all", axis="columns", inplace=True)
 
         # rename to internal header
-        df.rename(
+        coords.rename(
             {
                 "Absolute X (um)": "tile_x",
                 "Absolute Y (um)": "tile_y",
@@ -194,10 +192,6 @@ class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
             inplace=True,
         )
         # keep the scanning order, LatticeScope use this as saving order
-        self._scan_order = df
-
-        # remap
-        coords = {c: df[c].values for c in ("tile_x", "tile_y", "tile_z")}
         return coords
 
     def _retrieve_file_list(self, coord_dict):
@@ -207,7 +201,7 @@ class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
         statements = [f"{k}=={coord_dict[k]}" for k in ("tile_x", "tile_y", "tile_z")]
         query_stmt = " & ".join(statements)
         # find tile linear index
-        index = self._scan_order.query(query_stmt).index.values
+        index = self.tile_coords.query(query_stmt).index.values
         # stacked data, only 1 file
         index = index[0]
 

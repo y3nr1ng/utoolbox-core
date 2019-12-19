@@ -8,6 +8,7 @@ from dask import delayed
 import dask.array as da
 import imageio
 import numpy as np
+import pandas as pd
 
 from ..base import DenseDataset, MultiChannelDataset, TiledDataset
 
@@ -123,7 +124,9 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
         # internal bookkeeping
         self._tile_prefix = labels
 
-        return {k: np.array(v, dtype=np.float32) for k, v in coords.items()}
+        return pd.DataFrame(
+            {k: np.array(v, dtype=np.float32) for k, v in coords.items()}
+        )
 
     def _load_tiling_info(self):
         index, coords = super()._load_tiling_info()
@@ -199,7 +202,9 @@ class MicroManagerV2Dataset(MicroManagerV1Dataset):
         # internal bookkeeping
         self._tile_prefix = labels
 
-        return {k: np.array(v, dtype=np.float32) for k, v in coords.items()}
+        return pd.DataFrame(
+            {k: np.array(v, dtype=np.float32) for k, v in coords.items()}
+        )
 
     def _load_voxel_size(self):
         # extract sample frame from the metadata file

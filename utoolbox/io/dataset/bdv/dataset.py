@@ -234,7 +234,7 @@ class BDVDataset(DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDatas
         xml = BigDataViewerXML(h5_path)
         if not isinstance(dataset, DenseDataset):
             raise TypeError("dataset is not a DenseDataset")
-        voxel_size = dataset._load_voxel_info()
+        voxel_size = dataset._load_voxel_size()
 
         # estimate cache size
         chunk_size = (64, 64, 64)
@@ -242,12 +242,16 @@ class BDVDataset(DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDatas
         rdcc_nbytes = reduce(operator.mul, chunk_size, 1) * max_slots * 2
         logger.info(f"cache size: {rdcc_nbytes} bytes")
 
+        index = dataset.inventory.index.names
+        for coords, uuid in dataset.inventory.items():
+            coord_dict = {k: v for k, v in zip(index, coords)}
 
-        for _, row in dataset.inventory.iterrows():
-            print(row)
+            ss = xml.add_view(
+                coord_dict["channel"], None, name=uuid, voxel_size=voxel_size, tile=None
+            )
+            print(uuid)
             raise RuntimeError
 
-            
         with h5py.File(
             h5_path, "w", rdcc_nbytes=rdcc_nbytes, rdcc_nslots=max_slots
         ) as h:
@@ -255,7 +259,7 @@ class BDVDataset(DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDatas
             h["__DATA_TYPES__/Enum_Boolean"] = np.dtype("bool")
 
             for _, row in dataset.inventory.iterrows():
-                print(row['c1'], row['c2'])
+                print(row["c1"], row["c2"])
 
             for channel, datastore in dataset.items():
                 with datastore as source:
@@ -264,7 +268,7 @@ class BDVDataset(DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDatas
                             channel, data, name=key, voxel_size=voxel_size, tile=i_tile
                         )
                         logger.info(f".. [{ss}] {key}")
-                        #save_to_hdf(h, ss, data, downsamples, chunk_size)
+                        # save_to_hdf(h, ss, data, downsamples, chunk_size)
         xml.serialize()
 
     ##
