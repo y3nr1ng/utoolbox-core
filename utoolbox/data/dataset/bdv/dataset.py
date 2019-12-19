@@ -94,7 +94,7 @@ class BigDataViewerXML(object):
             transforms = Element("ViewRegistration")
             transforms.set("timepoint", str(0))
             transforms.set("setup", str(self.vid))
-            for name, matrix in self.transforms:
+            for name, matrix in reversed(self.transforms):
                 transform = SubElement(transforms, "ViewTransform")
                 transform.set("type", "affine")
                 SubElement(transform, "Name").text = name

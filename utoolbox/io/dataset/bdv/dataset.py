@@ -4,6 +4,7 @@ import operator
 import os
 from xml.etree.ElementTree import Element, ElementTree, SubElement
 
+from dask.distributed import as_completed
 import h5py
 import numpy as np
 
@@ -24,10 +25,10 @@ class BigDataViewerXML(object):
         attributes = dict()
 
         def __init__(
-            self, vid, data, name="untitled", voxel_size=(1, 1, 1), **attributes
+            self, vid, shape, name="untitled", voxel_size=(1, 1, 1), **attributes
         ):
             self.vid = vid
-            self.shape = data.shape
+            self.shape = shape
             self.name = name
             self.voxel_size = voxel_size
             self.attributes = {
@@ -118,14 +119,16 @@ class BigDataViewerXML(object):
 
         self._views = []
 
-    def add_view(self, channel, data, name="untitled", voxel_size=(1, 1, 1), tile=None):
+    def add_view(
+        self, channel, shape, name="untitled", voxel_size=(1, 1, 1), tile=None
+    ):
         """
         Add a new view and return its stored view ID.
         """
         vid = len(self._views)
         tile = vid if tile is None else tile
         view = BigDataViewerXML.View(
-            vid, data, name=name, voxel_size=voxel_size, channel=channel, tile=tile
+            vid, shape, name=name, voxel_size=voxel_size, channel=channel, tile=tile
         )
         self._views.append(view)
         return vid
@@ -224,6 +227,7 @@ class BDVDataset(DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDatas
         pyramid=[(1, 1, 1), (2, 4, 4)],
         chunks=(64, 128, 128),
         compression="gzip",
+        client=None,
     ):
         try:
             os.makedirs(dst_dir)
@@ -242,33 +246,92 @@ class BDVDataset(DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDatas
         rdcc_nbytes = reduce(operator.mul, chunk_size, 1) * max_slots * 2
         logger.info(f"cache size: {rdcc_nbytes} bytes")
 
-        index = dataset.inventory.index.names
-        for coords, uuid in dataset.inventory.items():
-            coord_dict = {k: v for k, v in zip(index, coords)}
-
-            ss = xml.add_view(
-                coord_dict["channel"], None, name=uuid, voxel_size=voxel_size, tile=None
-            )
-            print(uuid)
-            raise RuntimeError
+        shape, _ = dataset._load_array_info()
 
         with h5py.File(
             h5_path, "w", rdcc_nbytes=rdcc_nbytes, rdcc_nslots=max_slots
         ) as h:
-            # TODO Why declare this?
-            h["__DATA_TYPES__/Enum_Boolean"] = np.dtype("bool")
+            for coords, uuid in dataset.inventory.items():
+                coord_dict = {
+                    k: v for k, v in zip(dataset.inventory.index.names, coords)
+                }
 
-            for _, row in dataset.inventory.iterrows():
-                print(row["c1"], row["c2"])
+                # generate queries
+                statements = [
+                    f"{k}=={coord_dict[k]}" for k in ("tile_x", "tile_y", "tile_z")
+                ]
+                query_stmt = " & ".join(statements)
+                # find tile linear index
+                index = dataset.tile_coords.query(query_stmt).index.values
+                index = index[0]
 
-            for channel, datastore in dataset.items():
-                with datastore as source:
-                    for i_tile, (key, data) in enumerate(source.items()):
-                        ss = xml.add_view(
-                            channel, data, name=key, voxel_size=voxel_size, tile=i_tile
-                        )
-                        logger.info(f".. [{ss}] {key}")
-                        # save_to_hdf(h, ss, data, downsamples, chunk_size)
+                ss = xml.add_view(
+                    coord_dict["channel"],
+                    shape,
+                    name=uuid,
+                    voxel_size=voxel_size,
+                    tile=index,
+                )
+                logger.info(f" [{ss}] {uuid}")
+
+                # transformation
+                matrix = np.zeros((3, 4))
+                matrix[range(3), range(3)] = [
+                    coord_dict[k] for k in ("tile_x", "tile_y", "tile_z")
+                ]
+                xml.views[ss].add_transform("Translation to Regular Grid", matrix)
+
+                # resolutions and subdivisions
+                group = h.create_group(f"s{ss:02d}")
+                # resizeable axis to allow additional levels
+                _pyramid = np.array(pyramid)
+                group.create_dataset(
+                    "resolutions",
+                    data=np.fliplr(_pyramid),
+                    dtype="<f8",
+                    chunks=_pyramid.shape,
+                    maxshape=(None, 3),
+                )
+
+                # chunks
+                # expand chunk setup if necessary
+                if isinstance(chunks[0], int):
+                    chunks = (chunks,)
+                    chunks *= len(pyramid)
+                _chunks = np.array(chunks)
+                group.create_dataset(
+                    "subdivisions",
+                    data=np.fliplr(_chunks),
+                    dtype="<i4",
+                    chunks=_chunks.shape,
+                    maxshape=(None, 3),
+                )
+
+                # NOTE BDV cannot handle uint16
+                array = dataset[uuid].astype(np.int16)
+
+                for i, (bins, chunk) in enumerate(zip(pyramid, chunks)):
+                    logger.debug(f".. > subsample: {bins}, chunk: {chunk}")
+
+                    # downsample range
+                    ranges = tuple(slice(None, None, step) for step in bins)
+                    data = array[ranges].compute()
+
+                    # new dataset
+                    path = f"t{0:05d}/s{ss:02d}/{i}"
+                    logger.debug(f".. > {path}")
+                    group = h.create_group(path)
+                    group.create_dataset(
+                        "cells",
+                        data=data,
+                        chunks=chunk,
+                        scaleoffset=0,
+                        compression=compression,
+                        shuffle=True,
+                    )
+
+                h.flush()
+
         xml.serialize()
 
     ##
