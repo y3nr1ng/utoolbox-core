@@ -38,8 +38,8 @@ if __name__ == "__main__":
     cache = Cache(2e9)
     cache.register()
 
-    src_dir = "U:/Vins/20191213/10x-fly-brain-64246_naked-brain_zp6um"
-    dst_dir = "U:/Vins/20191213/10x-fly-brain-64246_naked-brain_zp6um_mip"
+    src_dir = "X:/ARod/20191218_4F/flybrain_41043_488"
+    dst_dir = "U:/ARod/20191218_4F/flybrain_41043_488_mip"
 
     file_list = glob.glob(os.path.join(src_dir, "**", "*.tif"), recursive=True)
     logger.info(f"{len(file_list)} file(s) to process")

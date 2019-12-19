@@ -1,9 +1,9 @@
 from ..base.error import DatasetError
 
 
-class SmartSpimDatasteError(DatasetError):
+class TeraStitcherDatasetError(DatasetError):
     """Generic MM dataset error."""
 
 
-class MissingMetadataError(SmartSpimDatasteError):
+class MissingMetadataError(TeraStitcherDatasetError):
     """Unable to locate a metadata."""

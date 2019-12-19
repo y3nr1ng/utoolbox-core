@@ -1,12 +1,12 @@
 from ..base.error import DatasetError
 
 
-class SpimDatasetError(DatasetError):
+class LatticeScopeDatasetError(DatasetError):
     """Generic SPIM dataset error."""
 
 
-class MissingSettingsFileError(SpimDatasetError):
+class MissingSettingsFileError(LatticeScopeDatasetError):
     """Unable to locate Settings.txt"""
 
-class MissingScriptFileError(SpimDatasetError):
+class MissingScriptFileError(LatticeScopeDatasetError):
     """Unable to locate script file in CSV format."""

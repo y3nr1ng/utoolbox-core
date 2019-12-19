@@ -8,12 +8,12 @@ import imageio
 
 from ..base import DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset
 
-__all__ = ["SpimDataset"]
+__all__ = ["LatticeScopeDataset", "LatticeScopeTiledDataset"]
 
 logger = logging.getLogger(__name__)
 
 
-class SpimDataset(DenseDataset, MultiChannelDataset, MultiViewDataset):
+class LatticeScopeDataset(DenseDataset, MultiChannelDataset, MultiViewDataset):
     def __init__(self, root_dir):
         self._root_dir = root_dir
 
@@ -45,8 +45,12 @@ class SpimDataset(DenseDataset, MultiChannelDataset, MultiViewDataset):
 
     def _can_read(self):
         # find common prefix
-        file_list = os.listdir(self.root_dir)
+        file_list = glob.glob(os.path.join(self.root_dir, "*.tif"))
         prefix = os.path.commonprefix(file_list)
+
+        # strip until ends with an underscore
+        if prefix[-1] != "_":
+            prefix = prefix.rsplit("_", 1)[0]
 
         # find settings
         settings_path = f"{prefix}_Settings.txt"
@@ -77,7 +81,7 @@ class SpimDataset(DenseDataset, MultiChannelDataset, MultiViewDataset):
         pass
 
 
-class SpimTiledDataset(SpimDataset, TiledDataset):
+class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
     @property
     def script_path(self):
         return self._script_path

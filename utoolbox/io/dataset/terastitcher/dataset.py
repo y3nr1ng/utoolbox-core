@@ -9,12 +9,12 @@ from ..base import DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDat
 
 from .error import MissingMetadataError
 
-__all__ = ["SmartSpimDataset"]
+__all__ = ["TeraStitcherDataset"]
 
 logger = logging.getLogger(__name__)
 
 
-class SmartSpimDataset(
+class TeraStitcherDataset(
     DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset
 ):
     def __init__(self, root_dir):

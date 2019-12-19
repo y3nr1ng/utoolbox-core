@@ -1,4 +1,4 @@
+from .latticescope import *
 from .mm import *
-from .smartspim import *
-from .spim import *
+from .terastitcher import *
 from .utils import *
