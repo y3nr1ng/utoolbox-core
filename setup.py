@@ -65,8 +65,8 @@ setup(
     #   requirements.txt
     install_requires=[
         # numeric and processing
-        'dask',
-        'distributed',
+        "dask",
+        "distributed",
         "numpy>=1.17",
         "scipy",
         "pandas",
