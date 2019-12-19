@@ -11,7 +11,7 @@ import numpy as np
 
 from ..base import DenseDataset, MultiChannelDataset, TiledDataset
 
-from .error import MissingMetadataError
+from .error import MalformedMetadataError, MissingMetadataError
 
 __all__ = ["MicroManagerV1Dataset", "MicroManagerV2Dataset"]
 
@@ -27,6 +27,10 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
         self.preload()
 
     ##
+
+    @property
+    def metadata_path(self):
+        return self._metadata_path
 
     @property
     def read_func(self):
@@ -85,6 +89,7 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
                 with open(metadata_path, "r") as fd:
                     metadata = json.load(fd)
                     logger.info(f'found metadata at "{metadata_path}"')
+                    self._metadata_path = metadata_path
                     return metadata["Summary"]
             except KeyError:
                 pass
@@ -130,6 +135,18 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
 
         return index, coords
 
+    def _load_voxel_size(self):
+        dx, r = self.metadata["PixelSize_um"], self.metadata["PixelAspect"]
+        if dx == 0:
+            logger.warning("pixel size undefined, default to 1")
+            dx = 1
+        size = (r * dx, dx)
+
+        if self.metadata["Slices"] > 1:
+            size = (abs(self.metadata["z-step_um"]),) + size
+
+        return size
+
     # def _missing_data(self):
     #    shape, dtype = self._load_array_info()
     #    return delayed(np.zeros)(shape, dtype)
@@ -142,9 +159,6 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
 
 
 class MicroManagerV2Dataset(MicroManagerV1Dataset):
-
-    ##
-
     def _can_read(self):
         version = self.metadata["MicroManagerVersion"]
         return version.startswith("2.")
@@ -186,6 +200,29 @@ class MicroManagerV2Dataset(MicroManagerV1Dataset):
         self._tile_prefix = labels
 
         return {k: np.array(v, dtype=np.float32) for k, v in coords.items()}
+
+    def _load_voxel_size(self):
+        # extract sample frame from the metadata file
+        sample_frame = None
+        with open(self.metadata_path, "r") as fd:
+            metadata = json.load(fd)
+            for key in metadata.keys():
+                if key.startswith("Metadata"):
+                    sample_frame = self.metadata[key]
+                    break
+            else:
+                raise MalformedMetadataError()
+
+        dx, matrix = sample_frame["PixelSizeUm"], sample_frame["PixelSizeAffine"]
+        # calculate affine matrix
+        #   [ 1.0, 0.0, 0.0; 0.0, 1.0, 0.0 ]
+        matrix = [float(m) for m in matrix.split(";")]
+        size = (matrix[4] * dx + matrix[5], matrix[0] * dx + matrix[2])
+
+        if self.metadata["Slices"] > 1:
+            size = (abs(self.metadata["z-step_um"]),) + size
+
+        return size
 
     def _retrieve_file_list(self, coord_dict):
         prefix = self._tile_prefix[itemgetter("tile_y", "tile_x")(coord_dict)]

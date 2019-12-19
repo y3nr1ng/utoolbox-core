@@ -9,9 +9,11 @@ import imageio
 import numpy as np
 import pandas as pd
 
+from utoolbox.cli.prompt import prompt_float
+
 from ..base import DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset
 from .error import MalformedSettingsFileError, MissingSettingsFileError
-from .settings import AcquisitionMode, Settings
+from .settings import AcquisitionMode, ScanType, Settings
 
 __all__ = ["LatticeScopeDataset", "LatticeScopeTiledDataset"]
 
@@ -19,8 +21,9 @@ logger = logging.getLogger(__name__)
 
 
 class LatticeScopeDataset(DenseDataset, MultiChannelDataset, MultiViewDataset):
-    def __init__(self, root_dir):
+    def __init__(self, root_dir, pixe_size=None):
         self._root_dir = root_dir
+        self._pixe_size = pixe_size
 
         super().__init__()
 
@@ -76,7 +79,12 @@ class LatticeScopeDataset(DenseDataset, MultiChannelDataset, MultiViewDataset):
         shape = (bottom - top + 1, right - left + 1)
 
         if self.metadata["general"]["mode"] == AcquisitionMode.Z_STACK:
-            shape = (self.metadata["waveform"]["obj_piezo_n_steps"],) + shape
+            scan_type = self.metadata["waveform"]["type"]
+            key = {
+                ScanType.OBJECTIVE: "obj_piezo_n_steps",
+                ScanType.SAMPLE: "sample_piezo_n_steps",
+            }[scan_type]
+            shape = (self.metadata["waveform"][key],) + shape
 
         # NOTE assuming fixed at 16-bit
         return shape, np.uint16
@@ -89,7 +97,6 @@ class LatticeScopeDataset(DenseDataset, MultiChannelDataset, MultiViewDataset):
         settings_path = self._find_settings_path()
         with open(settings_path, "r", errors="ignore") as fd:
             metadata = Settings(fd.read())
-
         self._settings_path = settings_path
         return metadata
 
@@ -106,6 +113,21 @@ class LatticeScopeDataset(DenseDataset, MultiChannelDataset, MultiViewDataset):
                         return ("SINGLE",)
             else:
                 raise MalformedSettingsFileError("cannot find twin camera flag")
+
+    def _load_voxel_size(self):
+        if not self._pixe_size:
+            self._pixel_size = prompt_float("What is the size of a single pixel? ")
+        size = (self._pixe_size,) * 2
+
+        if self.metadata["general"]["mode"] == AcquisitionMode.Z_STACK:
+            scan_type = self.metadata["waveform"]["type"]
+            key = {
+                ScanType.OBJECTIVE: "obj_piezo_step_size",
+                ScanType.SAMPLE: "sample_piezo_step_size",
+            }[scan_type]
+            size = (self.metadata["waveform"][key],) + size
+
+        return size
 
     def _lookup_channel_id(self, wavelength):
         for channel in self.metadata["waveform"]["channels"]:

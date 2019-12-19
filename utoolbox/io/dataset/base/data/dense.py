@@ -49,5 +49,10 @@ class DenseDataset(BaseDataset, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def _retrieve_file_list(self, data_var, coords):
+    def _load_voxel_size(self):
+        """Load voxel size."""
+        pass
+
+    @abstractmethod
+    def _retrieve_file_list(self, coord_dict):
         pass

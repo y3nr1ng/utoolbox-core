@@ -70,12 +70,11 @@ class BaseDataset(metaclass=ABCMeta):
         """
         raise NotImplementedError("dataset is not readable")
 
-    @property
-    def write_func(self):
-        """
-        callable(URI, DATA)
-        """
-        raise NotImplementedError("dataset is not writable")
+    ##
+
+    @staticmethod
+    def dump(dataset):
+        raise NotImplementedError("serialization method undefined")
 
     ##
 
