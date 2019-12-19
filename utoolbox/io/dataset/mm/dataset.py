@@ -70,22 +70,12 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
 
         # dtype
         ptype = self.metadata["PixelType"].lower()
-        dtype = {'gray16': np.uint16}[ptype]
+        dtype = {"gray16": np.uint16}[ptype]
 
         return shape, dtype
 
     def _load_channel_info(self):
         return self.metadata["ChNames"]
-
-    # def _missing_data(self):
-    #    shape, dtype = self._load_array_info()
-    #    return delayed(np.zeros)(shape, dtype)
-
-    def _retrieve_file_list(self, coord_dict):
-        prefix = self._tile_prefix[itemgetter("tile_x", "tile_y")(coord_dict)]
-        return glob.glob(
-            os.path.join(self.root_dir, prefix, f"*_{coord_dict['channel']}_*.tif")
-        )
 
     def _load_metadata(self, metadata_name="metadata.txt"):
         # find all `metadata.txt` and try to open until success
@@ -139,6 +129,16 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
             pass
 
         return index, coords
+
+    # def _missing_data(self):
+    #    shape, dtype = self._load_array_info()
+    #    return delayed(np.zeros)(shape, dtype)
+
+    def _retrieve_file_list(self, coord_dict):
+        prefix = self._tile_prefix[itemgetter("tile_x", "tile_y")(coord_dict)]
+        return glob.glob(
+            os.path.join(self.root_dir, prefix, f"*_{coord_dict['channel']}_*.tif")
+        )
 
 
 class MicroManagerV2Dataset(MicroManagerV1Dataset):

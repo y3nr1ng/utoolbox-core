@@ -16,16 +16,6 @@ class DenseDataset(BaseDataset, metaclass=ABCMeta):
 
     ##
 
-    @property
-    @abstractmethod
-    def read_func(self):
-        """
-        callable(URI, SHAPE, DTYPE)
-        """
-        pass
-
-    ##
-
     def preload(self):
         self._consolidate_inventory()
         assert isinstance(self.inventory, pd.MultiIndex), "inventory not consolidated"

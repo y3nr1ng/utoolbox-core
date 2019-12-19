@@ -63,6 +63,20 @@ class BaseDataset(metaclass=ABCMeta):
     def metadata(self):
         return self._metadata
 
+    @property
+    def read_func(self):
+        """
+        callable(URI, SHAPE, DTYPE)
+        """
+        raise NotImplementedError("dataset is not readable")
+
+    @property
+    def write_func(self):
+        """
+        callable(URI, DATA)
+        """
+        raise NotImplementedError("dataset is not writable")
+
     ##
 
     @abstractmethod
