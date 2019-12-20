@@ -270,14 +270,7 @@ class BigDataViewerHDF5(object):
             sdata = data[ranges]
 
             group = self.handle.create_group(path)
-            group.create_dataset(
-                "cells",
-                data=sdata.compute(),
-                chunks=chunk,
-                scaleoffset=0,
-                compression=compression,
-                shuffle=True,
-            )
+            group.create_dataset("cells", data=sdata.compute(), chunks=chunk)
             self.handle.flush()
 
     ##
