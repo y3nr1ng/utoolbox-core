@@ -329,7 +329,25 @@ class BigDataViewerDataset(
 
         shape, _ = dataset._load_array_info()
 
-        with BigDataViewerHDF5(h5_path, "w") as h:
+        if dry_run:
+            class DummyHDF5(object):
+                def __init__(self, *args, **kwargs):
+                    pass
+
+                def __enter__(self):
+                    logger.info('BigDataViewerDataset DRY RUN dump()')
+                    return self
+                
+                def __exit__(self, exc_type, exc_val, exc_tb):
+                    pass
+
+                def add_view(self, *args, **kwargs):
+                    pass
+            klass = DummyHDF5
+        else:
+            klass = BigDataViewerHDF5
+
+        with klass(h5_path, "w") as h:
             for coords, uuid in dataset.inventory.items():
                 coord_dict = {
                     k: v for k, v in zip(dataset.inventory.index.names, coords)
@@ -353,16 +371,21 @@ class BigDataViewerDataset(
                     tile=index,
                 )
                 logger.info(f" [{ss}] {uuid}")
-
+                
+                # anisotropic factor
+                min_voxel_size = min(voxel_size)
+                factor = tuple(s / min_voxel_size for s in voxel_size)
+            
                 # transformation
                 matrix = np.zeros((3, 4))
                 matrix[range(3), range(3)] = 1
                 matrix[range(3), -1] = [
-                    coord_dict[k] / f * s
-                    for k, f, s in zip(
+                    coord_dict[k] / v * s * f
+                    for k, v, s, f in zip(
                         ("tile_y", "tile_z", "tile_x"),
                         reversed(voxel_size),
                         (-1, -1, -1),
+                        reversed(factor)
                     )
                 ]
                 xml.views[ss].add_transform("Translation to Regular Grid", matrix)
