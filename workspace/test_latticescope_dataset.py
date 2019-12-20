@@ -21,7 +21,7 @@ if __name__ == "__main__":
     src_ds = LatticeScopeTiledDataset("X:/ARod/4F/20191212_4F/flybrain_1")
     print(src_ds.inventory)
 
-    dst_dir = "U:/Andy/20191212_4F/flybrain_1_bdv_vds_5"
+    dst_dir = "U:/Andy/20191212_4F/flybrain_1_bdv_vds_6"
     BigDataViewerDataset.dump(
         dst_dir, src_ds, pyramid=[(1, 1, 1), (1, 4, 4)], client=client, dry_run=True
     )

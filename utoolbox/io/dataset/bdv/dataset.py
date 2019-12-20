@@ -260,11 +260,6 @@ class BigDataViewerHDF5(object):
         # NOTE BDV reads int16 instead of uint16 internally
         data = data.astype(np.int16)
 
-        # generate VDS filename
-        fname, fext = os.path.splitext(self.path)
-        fname = f"{fname}_{ss:02d}{fext}"
-
-        tasks = []
         for i, (bins, chunk) in enumerate(zip(pyramid, chunks)):
             # new dataset
             path = f"t{0:05d}/s{ss:02d}/{i}"
@@ -274,42 +269,16 @@ class BigDataViewerHDF5(object):
             ranges = tuple(slice(None, None, step) for step in bins)
             sdata = data[ranges]
 
-            print(f"{sdata.shape}, {sdata.dtype}")
-
-            layout = h5py.VirtualLayout(shape=sdata.shape, dtype=sdata.dtype)
-            layout[:] = h5py.VirtualSource(
-                fname, f"{i}", shape=sdata.shape, dtype=sdata.dtype
-            )
-
-            # data and assignments
-            tasks.append((f"{i}", sdata))
-
             group = self.handle.create_group(path)
-            group.create_virtual_dataset("cells", layout)
-
-            # group.create_dataset(
-            #    "cells",
-            #    data=sdata,
-            #    chunks=chunk,
-            #    scaleoffset=0,
-            #    compression=compression,
-            #    shuffle=True,
-            # )
-
-            ## Assemble virtual dataset
-            # layout = h5py.VirtualLayout(shape=(4, 100), dtype="i4")
-            # for n in range(4):
-            #    filename = "{}.h5".format(n)
-            #    vsource = h5py.VirtualSource(filename, "data", shape=(100,))
-            #    layout[n] = vsource
-
-            ## Add virtual dataset to output file
-            # with h5py.File("VDS.h5", "w", libver="latest") as f:
-            #    f.create_virtual_dataset("vdata", layout, fillvalue=-5)
-
-        self.handle.flush()
-
-        return fname, tasks
+            group.create_dataset(
+                "cells",
+                data=sdata.compute(),
+                chunks=chunk,
+                scaleoffset=0,
+                compression=compression,
+                shuffle=True,
+            )
+            self.handle.flush()
 
     ##
 
@@ -367,18 +336,6 @@ class BigDataViewerDataset(
 
         shape, _ = dataset._load_array_info()
 
-        def _serialize_h5(fname, level, data):
-            print(f".. {fname}, {level}, LOAD")
-            data = data.compute()
-            with h5py.File(fname, "a") as h:
-                print(f".. {fname}, {level}, SAVE")
-                h.create_dataset(level, data=data)
-            print(f".. {fname}, {level}, DELETE")
-            del data
-
-            return fname
-
-        futures = []
         with BigDataViewerHDF5(h5_path, "w") as h:
             for coords, uuid in dataset.inventory.items():
                 coord_dict = {
@@ -418,16 +375,9 @@ class BigDataViewerDataset(
                 xml.views[ss].add_transform("Translation to Regular Grid", matrix)
 
                 # write data
-                fname, levels = h.add_view(ss, dataset[uuid], pyramid, chunks, "gzip")
-                for name, data in levels:
-                    future = client.submit(_serialize_h5, fname, name, data)
-                    futures.append(future)
+                h.add_view(ss, dataset[uuid], pyramid, chunks, "gzip")
 
         xml.serialize()
-
-        logger.info(f"{len(futures)} file(s) to generate")
-        for i, (future, result) in enumerate(as_completed(futures, with_results=True)):
-            logger.debug(f".. {i+1}/{len(futures)}, {result}")
 
     ##
 
