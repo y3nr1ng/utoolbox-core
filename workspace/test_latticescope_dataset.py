@@ -13,14 +13,16 @@ if __name__ == "__main__":
 
     logger = logging.getLogger(__name__)
 
-    cluster = LocalCluster(n_workers=1, threads_per_worker=4)
+    cluster = LocalCluster(n_workers=4, threads_per_worker=1)
     client = Client(cluster)
     logger.info(client)
 
-    src_ds = LatticeScopeTiledDataset("X:/ARod/20191212_4F/flybrain_1")
+    src_ds = LatticeScopeTiledDataset("X:/ARod/4F/20191212_4F/flybrain_1")
     print(src_ds.inventory)
 
     dst_dir = "U:/Andy/20191212_4F/flybrain_1_bdv_vds"
     BigDataViewerDataset.dump(
-        dst_dir, src_ds, pyramid=[(1, 4, 4)], client=client, dry_run=True
+        dst_dir, src_ds, pyramid=[(1, 1, 1), (1, 4, 4)], client=client, dry_run=True
     )
+
+    client.close()
