@@ -2,6 +2,7 @@ import glob
 from io import StringIO
 import logging
 import os
+from pprint import pprint
 
 import pandas as pd
 
@@ -49,9 +50,6 @@ class TeraStitcherDataset(
 
     def _load_channel_info(self):
         return self.metadata["channels"]["Power"].values
-
-    def _retrieve_file_list(self, coord_dict):
-        pass
 
     def _load_metadata(self):
         metadata_path = os.path.join(self.root_dir, "metadata.txt")
@@ -113,13 +111,19 @@ class TeraStitcherDataset(
                 # typical summaries, remap as dict
                 metadata.update({k: v for k, v in zip(df.columns, df.iloc[0])})
 
+        pprint(metadata)
+
         return metadata
 
     def _load_tiling_coordinates(self):
         pass
 
-    def _load_tiling_info(self):
-        pass
-
     def _load_view_info(self):
         return self.metadata["coords"]["Side"].unique().values
+
+    def _load_voxel_size(self):
+        dxy, dz = self.metadata["µm/pix"], self.metadata["Z step (µm)"]
+        return (dz, dxy, dxy)
+
+    def _retrieve_file_list(self, coord_dict):
+        pass
