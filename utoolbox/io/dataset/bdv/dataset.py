@@ -367,11 +367,15 @@ class BigDataViewerDataset(
 
         shape, _ = dataset._load_array_info()
 
-        def _serialize_h5(fname, levels):
-            with h5py.File(fname, 'w') as h:
-                for name, data in levels:
-                    print(f'.. {fname}, {name}')
-                    h.create_dataset(name, data=data)
+        def _serialize_h5(fname, level, data):
+            print(f".. {fname}, {level}, LOAD")
+            data = data.compute()
+            with h5py.File(fname, "a") as h:
+                print(f".. {fname}, {level}, SAVE")
+                h.create_dataset(level, data=data)
+            print(f".. {fname}, {level}, DELETE")
+            del data
+
             return fname
 
         futures = []
@@ -415,14 +419,15 @@ class BigDataViewerDataset(
 
                 # write data
                 fname, levels = h.add_view(ss, dataset[uuid], pyramid, chunks, "gzip")
-                future = client.submit(_serialize_h5, fname, levels)
-                futures.append(future)
+                for name, data in levels:
+                    future = client.submit(_serialize_h5, fname, name, data)
+                    futures.append(future)
 
         xml.serialize()
 
-        logger.info(f'{len(futures)} file(s) to generate')
-        for i, future in enumerate(as_completed(futures, with_results=True)):
-            logger.debug(f'.. {i+1}/{len(futures)}, {future.result()}')
+        logger.info(f"{len(futures)} file(s) to generate")
+        for i, (future, result) in enumerate(as_completed(futures, with_results=True)):
+            logger.debug(f".. {i+1}/{len(futures)}, {result}")
 
     ##
 
