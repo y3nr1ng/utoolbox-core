@@ -1,7 +1,7 @@
 import logging
 import numpy as np
 import os
-from xml.etree.ElementTree import Element, ElementTree, SubElement
+from xml.etree import Element, ElementTree, SubElement
 
 from utoolbox.data.dataset.base import MultiChannelDataset
 
@@ -56,7 +56,7 @@ class BigDataViewerXML(object):
             self.reset_transform()
 
         def add_transform(self, name, matrix):
-            self.transforms.append((name, matrix))
+            self.transforms.insert(0, (name, matrix))
 
         def reset_transform(self):
             self.transforms = []
@@ -94,7 +94,7 @@ class BigDataViewerXML(object):
             transforms = Element("ViewRegistration")
             transforms.set("timepoint", str(0))
             transforms.set("setup", str(self.vid))
-            for name, matrix in reversed(self.transforms):
+            for name, matrix in self.transforms:
                 transform = SubElement(transforms, "ViewTransform")
                 transform.set("type", "affine")
                 SubElement(transform, "Name").text = name
@@ -136,14 +136,15 @@ class BigDataViewerXML(object):
 
         self._views = []
 
-    def add_view(self, channel, data, name="untitled", voxel_size=(1, 1, 1), tile=None):
+    def add_view(self, data, name="untitled", voxel_size=(1, 1, 1), **kwargs):
         """
         Add a new view and return its stored view ID.
         """
         vid = len(self._views)
-        tile = vid if tile is None else tile
+        if "tile" not in kwargs:
+            kwargs["tile"] = vid
         view = BigDataViewerXML.View(
-            vid, data, name=name, voxel_size=voxel_size, channel=channel, tile=tile
+            vid, data, name=name, voxel_size=voxel_size, **kwargs
         )
         self._views.append(view)
         return vid

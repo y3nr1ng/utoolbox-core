@@ -10,7 +10,7 @@ import numpy as np
 
 from ..base import DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset
 
-__all__ = ["BDVDataset"]
+__all__ = ["BigDataViewerDataset"]
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ class BigDataViewerXML(object):
             transforms = Element("ViewRegistration")
             transforms.set("timepoint", str(0))
             transforms.set("setup", str(self.vid))
-            for name, matrix in self.transforms:
+            for name, matrix in reversed(self.transforms):
                 transform = SubElement(transforms, "ViewTransform")
                 transform.set("type", "affine")
                 SubElement(transform, "Name").text = name
@@ -109,26 +109,43 @@ class BigDataViewerXML(object):
                 cls.attributes[key] = [value]
                 return 0
 
-    def __init__(self, h5_path):
-        h5_path = os.path.realpath(h5_path)
-        self._init_tree(h5_path)
+    ##
+
+    def __init__(self, path):
+        path = os.path.realpath(path)
+        self._init_tree(path)
 
         # XML will place next to the dataset
-        fname, _ = os.path.splitext(h5_path)
+        fname, _ = os.path.splitext(path)
         self._path = f"{fname}.xml"
 
         self._views = []
 
-    def add_view(
-        self, channel, shape, name="untitled", voxel_size=(1, 1, 1), tile=None
-    ):
+    ##
+
+    @property
+    def path(self):
+        return self._path
+
+    @property
+    def root(self):
+        return self._root
+
+    @property
+    def views(self):
+        return self._views
+
+    ##
+
+    def add_view(self, data, name="untitled", voxel_size=(1, 1, 1), **kwargs):
         """
         Add a new view and return its stored view ID.
         """
         vid = len(self._views)
-        tile = vid if tile is None else tile
+        if "tile" not in kwargs:
+            kwargs["tile"] = vid
         view = BigDataViewerXML.View(
-            vid, shape, name=name, voxel_size=voxel_size, channel=channel, tile=tile
+            vid, data, name=name, voxel_size=voxel_size, **kwargs
         )
         self._views.append(view)
         return vid
@@ -150,20 +167,6 @@ class BigDataViewerXML(object):
         tree = ElementTree(self.root)
         tree.write(self.path)
         logger.info(f'XML saved to "{self.path}"')
-
-    ##
-
-    @property
-    def path(self):
-        return self._path
-
-    @property
-    def root(self):
-        return self._root
-
-    @property
-    def views(self):
-        return self._views
 
     ##
 
@@ -200,7 +203,106 @@ class BigDataViewerXML(object):
         self._setups, self._registrations = setups, registrations
 
 
-class BDVDataset(DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset):
+class BigDataViewerHDF5(object):
+    def __init__(
+        self, path, mode, cache_chunk_size=(64, 64, 64), cache_n_chunks=(1, 4, 4)
+    ):
+        self._path = path
+
+        nslots = reduce(operator.mul, cache_n_chunks, 1)
+        nbytes = reduce(operator.mul, cache_chunk_size, 1) * nslots * 2
+        logger.info(f"cache size: {nbytes} bytes")
+
+        self._handle = h5py.File(
+            self.path, mode, rdcc_nbytes=nbytes, rdcc_nslots=nslots
+        )
+
+    def __enter__(self):
+        self.open()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    ##
+
+    @property
+    def handle(self):
+        self._handle
+
+    @property
+    def path(self):
+        self._path
+
+    ##
+
+    def close(self):
+        self.handle.close()
+
+    def open(self):
+        self.handle.open()
+
+    def add_view(self, ss, data, pyramid, chunks, compression):
+        sname = f"s{ss:02d}"
+        info = self.handle.create_group(sname)
+        self._write_matrix(info, "resolutions", pyramid)
+        if isinstance(chunks[0], int):
+            # reuse same chunk size for each level
+            chunks = (chunks,)
+            chunks *= len(pyramid)
+        self._write_matrix(info, "subdivisions", chunks)
+
+        # NOTE BDV reads int16 instead of uint16 internally
+        data = data.astype(np.int16)
+
+        for i, (bins, chunk) in enumerate(zip(pyramid, chunks)):
+            # new dataset
+            path = f"t{0:5d}/s{ss:02d}/{i}"
+            logger.debug(f".. > {path}, bin:{bins}, chunk:{chunk}")
+
+            group = self.handle.create_group(path)
+
+            # downsample range
+            ranges = tuple(slice(None, None, step) for step in bins)
+            sdata = data[ranges].compute()
+
+            raise RuntimeError()
+
+            group.create_dataset(
+                "cells",
+                data=sdata,
+                chunks=chunk,
+                scaleoffset=0,
+                compression=compression,
+                shuffle=True,
+            )
+
+            # Assemble virtual dataset
+            layout = h5py.VirtualLayout(shape=(4, 100), dtype="i4")
+            for n in range(4):
+                filename = "{}.h5".format(n)
+                vsource = h5py.VirtualSource(filename, "data", shape=(100,))
+                layout[n] = vsource
+
+            # Add virtual dataset to output file
+            with h5py.File("VDS.h5", "w", libver="latest") as f:
+                f.create_virtual_dataset("vdata", layout, fillvalue=-5)
+
+        self.handle.flush()
+
+    ##
+
+    @classmethod
+    def _write_matrix(cls, handle, name, matrix, can_append=True):
+        matrix = np.array(matrix)
+        matrix = np.fliplr(matrix)  # HDF5 use different order
+        if can_append:
+            shape = (None,) + matrix.shape[1:]
+        handle.create_dataset(name, data=matrix, maxshape=shape)
+
+
+class BigDataViewerDataset(
+    DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset
+):
     def __init__(self, root_dir):
         self._root_dir = root_dir
 
@@ -228,6 +330,7 @@ class BDVDataset(DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDatas
         chunks=(64, 128, 128),
         compression="gzip",
         client=None,
+        dry_run=False,
     ):
         try:
             os.makedirs(dst_dir)
@@ -240,17 +343,9 @@ class BDVDataset(DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDatas
             raise TypeError("dataset is not a DenseDataset")
         voxel_size = dataset._load_voxel_size()
 
-        # estimate cache size
-        chunk_size = (64, 64, 64)
-        max_slots = reduce(operator.mul, (1024 // c for c in chunk_size[1:]), 1)
-        rdcc_nbytes = reduce(operator.mul, chunk_size, 1) * max_slots * 2
-        logger.info(f"cache size: {rdcc_nbytes} bytes")
-
         shape, _ = dataset._load_array_info()
 
-        with h5py.File(
-            h5_path, "w", rdcc_nbytes=rdcc_nbytes, rdcc_nslots=max_slots
-        ) as h:
+        with BigDataViewerHDF5(h5_path, "w") as h:
             for coords, uuid in dataset.inventory.items():
                 coord_dict = {
                     k: v for k, v in zip(dataset.inventory.index.names, coords)
@@ -266,71 +361,30 @@ class BDVDataset(DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDatas
                 index = index[0]
 
                 ss = xml.add_view(
-                    coord_dict["channel"],
                     shape,
                     name=uuid,
                     voxel_size=voxel_size,
+                    channel=coord_dict["channel"],
+                    illumination=coord_dict["view"],
                     tile=index,
                 )
                 logger.info(f" [{ss}] {uuid}")
 
                 # transformation
                 matrix = np.zeros((3, 4))
-                matrix[range(3), range(3)] = [
-                    coord_dict[k] for k in ("tile_x", "tile_y", "tile_z")
+                matrix[range(3), range(3)] = 1
+                matrix[range(3), -1] = [
+                    coord_dict[k] / f * s
+                    for k, f, s in zip(
+                        ("tile_y", "tile_z", "tile_x"),
+                        reversed(voxel_size),
+                        (-1, -1, -1),
+                    )
                 ]
                 xml.views[ss].add_transform("Translation to Regular Grid", matrix)
 
-                # resolutions and subdivisions
-                group = h.create_group(f"s{ss:02d}")
-                # resizeable axis to allow additional levels
-                _pyramid = np.array(pyramid)
-                group.create_dataset(
-                    "resolutions",
-                    data=np.fliplr(_pyramid),
-                    dtype="<f8",
-                    chunks=_pyramid.shape,
-                    maxshape=(None, 3),
-                )
-
-                # chunks
-                # expand chunk setup if necessary
-                if isinstance(chunks[0], int):
-                    chunks = (chunks,)
-                    chunks *= len(pyramid)
-                _chunks = np.array(chunks)
-                group.create_dataset(
-                    "subdivisions",
-                    data=np.fliplr(_chunks),
-                    dtype="<i4",
-                    chunks=_chunks.shape,
-                    maxshape=(None, 3),
-                )
-
-                # NOTE BDV cannot handle uint16
-                array = dataset[uuid].astype(np.int16)
-
-                for i, (bins, chunk) in enumerate(zip(pyramid, chunks)):
-                    logger.debug(f".. > subsample: {bins}, chunk: {chunk}")
-
-                    # downsample range
-                    ranges = tuple(slice(None, None, step) for step in bins)
-                    data = array[ranges].compute()
-
-                    # new dataset
-                    path = f"t{0:05d}/s{ss:02d}/{i}"
-                    logger.debug(f".. > {path}")
-                    group = h.create_group(path)
-                    group.create_dataset(
-                        "cells",
-                        data=data,
-                        chunks=chunk,
-                        scaleoffset=0,
-                        compression=compression,
-                        shuffle=True,
-                    )
-
-                h.flush()
+                # write data
+                h.add_view(ss, dataset[uuid], pyramid, chunks, "gzip")
 
         xml.serialize()
 

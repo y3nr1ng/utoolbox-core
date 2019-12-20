@@ -74,7 +74,7 @@ setup(
         "imageio",
         "imageio-ffmpeg",
         "tifffile",
-        "h5py",
+        "h5py>=2.9",
         # gui
         "vispy",
         "pyopengl",
