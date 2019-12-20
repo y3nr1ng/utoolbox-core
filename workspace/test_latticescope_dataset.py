@@ -13,9 +13,9 @@ if __name__ == "__main__":
 
     logger = logging.getLogger(__name__)
 
-    #cluster = LocalCluster(n_workers=4, threads_per_worker=4)
-    #client = Client(cluster)
-    client = Client("10.109.20.6:8786")
+    cluster = LocalCluster(n_workers=4, threads_per_worker=4)
+    client = Client(cluster)
+    #client = Client("10.109.20.6:8786")
     logger.info(client)
 
     src_ds = LatticeScopeTiledDataset("X:/ARod/4F/20191212_4F/flybrain_1")
