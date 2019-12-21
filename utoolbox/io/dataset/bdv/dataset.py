@@ -4,7 +4,6 @@ import operator
 import os
 from xml.etree.ElementTree import Element, ElementTree, SubElement
 
-from dask.distributed import as_completed
 import h5py
 import numpy as np
 
@@ -209,10 +208,6 @@ class BigDataViewerHDF5(object):
     ):
         self._path = path
 
-        print(path)
-        print(self._path)
-        print(self.path)
-
         nslots = reduce(operator.mul, cache_n_chunks, 1)
         nbytes = reduce(operator.mul, cache_chunk_size, 1) * nslots * 2
         logger.info(f"cache size: {nbytes} bytes")
@@ -269,8 +264,11 @@ class BigDataViewerHDF5(object):
             ranges = tuple(slice(None, None, step) for step in bins)
             sdata = data[ranges]
 
+            # kick start
+            sdata = sdata.compute()
+
             group = self.handle.create_group(path)
-            group.create_dataset("cells", data=sdata.compute(), chunks=chunk)
+            group.create_dataset("cells", data=sdata, chunks=chunk)
             self.handle.flush()
 
     ##
@@ -330,19 +328,21 @@ class BigDataViewerDataset(
         shape, _ = dataset._load_array_info()
 
         if dry_run:
+
             class DummyHDF5(object):
                 def __init__(self, *args, **kwargs):
                     pass
 
                 def __enter__(self):
-                    logger.info('BigDataViewerDataset DRY RUN dump()')
+                    logger.info("BigDataViewerDataset DRY RUN dump()")
                     return self
-                
+
                 def __exit__(self, exc_type, exc_val, exc_tb):
                     pass
 
                 def add_view(self, *args, **kwargs):
                     pass
+
             klass = DummyHDF5
         else:
             klass = BigDataViewerHDF5
@@ -371,11 +371,11 @@ class BigDataViewerDataset(
                     tile=index,
                 )
                 logger.info(f" [{ss}] {uuid}")
-                
+
                 # anisotropic factor
                 min_voxel_size = min(voxel_size)
                 factor = tuple(s / min_voxel_size for s in voxel_size)
-            
+
                 # transformation
                 matrix = np.zeros((3, 4))
                 matrix[range(3), range(3)] = 1
@@ -385,7 +385,7 @@ class BigDataViewerDataset(
                         ("tile_y", "tile_z", "tile_x"),
                         reversed(voxel_size),
                         (-1, -1, -1),
-                        reversed(factor)
+                        reversed(factor),
                     )
                 ]
                 xml.views[ss].add_transform("Translation to Regular Grid", matrix)
