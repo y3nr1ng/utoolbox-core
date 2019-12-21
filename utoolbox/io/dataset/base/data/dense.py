@@ -16,16 +16,6 @@ class DenseDataset(BaseDataset, metaclass=ABCMeta):
 
     ##
 
-    @property
-    @abstractmethod
-    def read_func(self):
-        """
-        callable(URI, SHAPE, DTYPE)
-        """
-        pass
-
-    ##
-
     def preload(self):
         self._consolidate_inventory()
         assert isinstance(self.inventory, pd.MultiIndex), "inventory not consolidated"
@@ -59,5 +49,10 @@ class DenseDataset(BaseDataset, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def _retrieve_file_list(self, data_var, coords):
+    def _load_voxel_size(self):
+        """Load voxel size."""
+        pass
+
+    @abstractmethod
+    def _retrieve_file_list(self, coord_dict):
         pass

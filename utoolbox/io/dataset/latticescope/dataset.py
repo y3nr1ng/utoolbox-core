@@ -1,12 +1,19 @@
 import glob
+from io import StringIO
 import logging
 import os
 
 from dask import delayed
 import dask.array as da
 import imageio
+import numpy as np
+import pandas as pd
+
+from utoolbox.cli.prompt import prompt_float
 
 from ..base import DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset
+from .error import MalformedSettingsFileError, MissingSettingsFileError
+from .settings import AcquisitionMode, ScanType, Settings
 
 __all__ = ["LatticeScopeDataset", "LatticeScopeTiledDataset"]
 
@@ -44,6 +51,13 @@ class LatticeScopeDataset(DenseDataset, MultiChannelDataset, MultiViewDataset):
     ##
 
     def _can_read(self):
+        return bool(self.metadata)
+
+    def _enumerate_files(self):
+        search_path = os.path.join(self.root_dir, "*.tif")
+        return glob.glob(search_path)
+
+    def _find_settings_path(self):
         # find common prefix
         file_list = glob.glob(os.path.join(self.root_dir, "*.tif"))
         prefix = os.path.commonprefix(file_list)
@@ -55,30 +69,79 @@ class LatticeScopeDataset(DenseDataset, MultiChannelDataset, MultiViewDataset):
         # find settings
         settings_path = f"{prefix}_Settings.txt"
         if not os.path.exists(settings_path):
-            return False
-
-        self._settings_path = settings_path
-        return True
-
-    def _enumerate_files(self):
-        search_path = os.path.join(self.root_dir, "*.tif")
-        return glob.glob(search_path)
+            raise MissingSettingsFileError()
+        return settings_path
 
     def _load_array_info(self):
-        pass
+        camera = self.metadata["camera"]
+        left, top, right, bottom = camera["roi"]
+        shape = (bottom - top + 1, right - left + 1)
+
+        if self.metadata["general"]["mode"] == AcquisitionMode.Z_STACK:
+            scan_type = self.metadata["waveform"]["type"]
+            key = {
+                ScanType.OBJECTIVE: "obj_piezo_n_steps",
+                ScanType.SAMPLE: "sample_piezo_n_steps",
+            }[scan_type]
+            shape = (self.metadata["waveform"][key],) + shape
+
+        # NOTE assuming fixed at 16-bit
+        return shape, np.uint16
 
     def _load_channel_info(self):
-        pass
-
-    def _retrieve_file_list(self, coord_dict):
-        pass
+        channels = self.metadata["waveform"]["channels"]
+        return [c.wavelength for c in channels]
 
     def _load_metadata(self):
-        # TODO parse Settings.txt
-        pass
+        settings_path = self._find_settings_path()
+        with open(settings_path, "r", errors="ignore") as fd:
+            metadata = Settings(fd.read())
+        self._settings_path = settings_path
+        return metadata
 
     def _load_view_info(self):
-        pass
+        # TODO dirty patch, fix this
+        with open(self.settings_path, "r", errors="ignore") as fd:
+            for line in fd:
+                if line.startswith("Twin cam mode?"):
+                    _, flag = line.split("=")
+                    flag = flag.strip()
+                    if flag == "TRUE":
+                        return ("CamA", "CamB")
+                    else:
+                        return ("SINGLE",)
+            else:
+                raise MalformedSettingsFileError("cannot find twin camera flag")
+
+    def _load_voxel_size(self):
+        self._pixel_size = prompt_float("What is the size of a single pixel? ")
+        size = (self._pixel_size,) * 2
+
+        if self.metadata["general"]["mode"] == AcquisitionMode.Z_STACK:
+            scan_type = self.metadata["waveform"]["type"]
+            key = {
+                ScanType.OBJECTIVE: "obj_piezo_step_size",
+                ScanType.SAMPLE: "sample_piezo_step_size",
+            }[scan_type]
+            size = (self.metadata["waveform"][key],) + size
+
+        return size
+
+    def _lookup_channel_id(self, wavelength):
+        for channel in self.metadata["waveform"]["channels"]:
+            if channel.wavelength == wavelength:
+                return channel.id
+        else:
+            raise ValueError(f'channel "{channel}" is not enlisted in the settings')
+
+    def _retrieve_file_list(self, coord_dict):
+        # filter by view...
+        filtered = [f for f in self.files if coord_dict["view"] in f]
+        # .. and channel
+        ich = self._lookup_channel_id(coord_dict["channel"])
+        filtered = [f for f in filtered if f"ch{ich}" in f]
+
+        return filtered
 
 
 class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
@@ -94,22 +157,54 @@ class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
 
         # find script file
         script_path = glob.glob(os.path.join(self.root_dir, "*.csv"))
-
         if len(script_path) == 0:
             return False
         elif len(script_path) > 1:
-            script_path = script_path[0]
             logger.warning(
                 f'found multiple script file candidates, using "{script_path}"'
             )
 
-        self._script_path = script_path
+        self._script_path = script_path[0]
         return True
 
     def _load_tiling_coordinates(self):
-        pass
+        # cleanup the file
+        with open(self.script_path, "r", encoding="unicode_escape") as fd:
+            lines = []
+            for line in fd:
+                if line.startswith("----"):
+                    continue
+                lines.append(line)
+            script_raw = StringIO("".join(lines))
 
-    def _load_tiling_info(self):
-        pass
-        # TODO ln 1-2, summary
-        # TODO ln 3-N, position list
+        # ln 3-N, position list
+        coords = pd.read_csv(script_raw, skiprows=2)
+        coords.dropna(how="all", axis="columns", inplace=True)
+
+        # rename to internal header
+        coords.rename(
+            {
+                "Absolute X (um)": "tile_x",
+                "Absolute Y (um)": "tile_y",
+                "Absolute Z (um)": "tile_z",
+            },
+            axis="columns",
+            inplace=True,
+        )
+        # keep only these columns
+        coords = coords[["tile_x", "tile_y", "tile_z"]]
+        # keep the scanning order, LatticeScope use this as saving order
+        return coords
+
+    def _retrieve_file_list(self, coord_dict):
+        file_list = super()._retrieve_file_list(coord_dict)
+
+        # generate queries
+        statements = [f"{k}=={coord_dict[k]}" for k in ("tile_x", "tile_y", "tile_z")]
+        query_stmt = " & ".join(statements)
+        # find tile linear index
+        index = self.tile_coords.query(query_stmt).index.values
+        # stacked data, only 1 file
+        index = index[0]
+
+        return file_list[index]

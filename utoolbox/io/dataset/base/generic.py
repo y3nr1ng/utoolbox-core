@@ -63,6 +63,19 @@ class BaseDataset(metaclass=ABCMeta):
     def metadata(self):
         return self._metadata
 
+    @property
+    def read_func(self):
+        """
+        callable(URI, SHAPE, DTYPE)
+        """
+        raise NotImplementedError("dataset is not readable")
+
+    ##
+
+    @staticmethod
+    def dump(dataset):
+        raise NotImplementedError("serialization method undefined")
+
     ##
 
     @abstractmethod

@@ -65,8 +65,8 @@ setup(
     #   requirements.txt
     install_requires=[
         # numeric and processing
-        'dask',
-        'distributed',
+        "dask",
+        "distributed",
         "numpy>=1.17",
         "scipy",
         "pandas",
@@ -74,7 +74,7 @@ setup(
         "imageio",
         "imageio-ffmpeg",
         "tifffile",
-        "h5py",
+        "h5py>=2.9",
         # gui
         "vispy",
         "pyopengl",

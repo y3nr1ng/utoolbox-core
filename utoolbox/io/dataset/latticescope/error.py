@@ -8,5 +8,6 @@ class LatticeScopeDatasetError(DatasetError):
 class MissingSettingsFileError(LatticeScopeDatasetError):
     """Unable to locate Settings.txt"""
 
-class MissingScriptFileError(LatticeScopeDatasetError):
-    """Unable to locate script file in CSV format."""
+
+class MalformedSettingsFileError(LatticeScopeDatasetError):
+    """Structural error in settings file."""

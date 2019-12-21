@@ -31,9 +31,5 @@ class TiledDataset(BaseDataset, metaclass=ABCMeta):
 
     def _load_tiling_info(self):
         coords = self._load_tiling_coordinates()
-        unique_coords = {
-            # NOTE np.unique returns sorted unique values
-            k: np.unique(v)
-            for k, v in coords.items()
-        }
+        unique_coords = {ax: coords[ax].unique() for ax in coords}
         return unique_coords, coords
