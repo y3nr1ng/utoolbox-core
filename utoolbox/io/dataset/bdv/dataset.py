@@ -235,13 +235,6 @@ class BigDataViewerHDF5(object):
 
     ##
 
-    def close(self):
-        self.handle.close()
-        self._handle = None
-
-    def open(self):
-        self._handle = self._func()
-
     def add_view(self, ss, data, pyramid, chunks, compression):
         sname = f"s{ss:02d}"
         info = self.handle.create_group(sname)
@@ -268,8 +261,17 @@ class BigDataViewerHDF5(object):
             sdata = sdata.compute()
 
             group = self.handle.create_group(path)
-            group.create_dataset("cells", data=sdata, chunks=chunk)
+            group.create_dataset(
+                "cells", data=sdata, chunks=chunk, compression=compression
+            )
             self.handle.flush()
+
+    def close(self):
+        self.handle.close()
+        self._handle = None
+
+    def open(self):
+        self._handle = self._func()
 
     ##
 
@@ -391,7 +393,7 @@ class BigDataViewerDataset(
                 xml.views[ss].add_transform("Translation to Regular Grid", matrix)
 
                 # write data
-                h.add_view(ss, dataset[uuid], pyramid, chunks, "gzip")
+                h.add_view(ss, dataset[uuid], pyramid, chunks, compression)
 
         xml.serialize()
 
