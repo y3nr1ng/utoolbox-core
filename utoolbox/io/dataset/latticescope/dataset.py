@@ -59,12 +59,14 @@ class LatticeScopeDataset(DenseDataset, MultiChannelDataset, MultiViewDataset):
 
     def _find_settings_path(self):
         # find common prefix
-        file_list = glob.glob(os.path.join(self.root_dir, "*.tif"))
+        file_list = []
+        for ext in ("tif", "txt"):
+            file_list.extend(glob.glob(os.path.join(self.root_dir, f"*.{ext}")))
         prefix = os.path.commonprefix(file_list)
-
         # strip until ends with an underscore
-        if prefix[-1] != "_":
-            prefix = prefix.rsplit("_", 1)[0]
+        if prefix[-1] == "_":
+            prefix = prefix[:-1]
+        logger.debug(f'dataet prefix "{prefix}"')
 
         # find settings
         settings_path = f"{prefix}_Settings.txt"
