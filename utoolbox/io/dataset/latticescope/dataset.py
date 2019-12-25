@@ -172,12 +172,28 @@ class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
     def _load_tiling_coordinates(self):
         # cleanup the file
         with open(self.script_path, "r", encoding="unicode_escape") as fd:
-            lines = []
-            for line in fd:
+            ignore_start, ignore_end = -1, -1
+            for i, line in enumerate(fd):
                 if line.startswith("----"):
-                    continue
-                lines.append(line)
-            script_raw = StringIO("".join(lines))
+                    if ignore_start < 0:
+                        # first encounter
+                        ignore_start = i
+                    else:
+                        # latest encounter
+                        ignore_end = i
+
+            fd.seek(0)
+
+            if ignore_start < 0:
+                script_raw = StringIO(fd.readlines())
+            else:
+                # requires filtering
+                lines = []
+                for i, line in enumerate(fd):
+                    if i >= ignore_start and i <= ignore_end:
+                        continue
+                    lines.append(line)
+                script_raw = StringIO("".join(lines))
 
         # ln 3-N, position list
         coords = pd.read_csv(script_raw, skiprows=2)
