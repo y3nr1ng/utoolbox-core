@@ -90,7 +90,7 @@ setup(
             'cupy-cuda101 ; platform_system!="Darwin"',
             'cupy ; platform_system=="Darwin"',
         ],
-        "visualize": ["pyopengl", "pyside2", "vispy"],
+        "viewer": ["napari"],
     },
     # data files included in packages
     package_data={"": ["*.cu"]},

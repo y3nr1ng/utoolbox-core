@@ -161,12 +161,13 @@ class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
         script_path = glob.glob(os.path.join(self.root_dir, "*.csv"))
         if len(script_path) == 0:
             return False
-        elif len(script_path) > 1:
+        self._script_path = script_path[0]
+
+        if len(script_path) > 1:
             logger.warning(
-                f'found multiple script file candidates, using "{script_path}"'
+                f'found multiple script file candidates, using "{self._script_path}"'
             )
 
-        self._script_path = script_path[0]
         return True
 
     def _load_tiling_coordinates(self):
@@ -187,12 +188,12 @@ class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
             if ignore_start < 0:
                 script_raw = StringIO(fd.readlines())
             else:
+                logger.info("found correction scan info, filtering lines...")
                 # requires filtering
                 lines = []
                 for i, line in enumerate(fd):
-                    if i >= ignore_start and i <= ignore_end:
-                        continue
-                    lines.append(line)
+                    if i < ignore_start or i > ignore_end:
+                        lines.append(line)
                 script_raw = StringIO("".join(lines))
 
         # ln 3-N, position list
@@ -225,4 +226,8 @@ class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
         # stacked data, only 1 file
         index = index[0]
 
-        return file_list[index]
+        try:
+            return file_list[index]
+        except IndexError:
+            # secondary filter failed
+            return None
