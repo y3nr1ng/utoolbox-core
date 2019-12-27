@@ -36,7 +36,7 @@ if __name__ == "__main__":
     client = Client("10.109.20.6:8786")
     logger.info(client)
 
-    ds = load_dataset("Y:/ARod/4F/20191226/")
+    ds = load_dataset("Y:/ARod/4F/20191227/flybrain")
 
     # import ipdb; ipdb.set_trace()
 
@@ -61,7 +61,8 @@ if __name__ == "__main__":
                 print(tile)
                 uuid = tile.values[0]
                 data = ds[uuid].max(axis=0)
-                row.append(data)
+                future = client.scatter(data)
+                row.append(future)
             layer.append(row)
         layers.append(layer)
     preview = da.block(layers)

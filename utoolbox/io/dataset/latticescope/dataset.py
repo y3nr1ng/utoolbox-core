@@ -186,7 +186,7 @@ class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
             fd.seek(0)
 
             if ignore_start < 0:
-                script_raw = StringIO(fd.readlines())
+                script_raw = StringIO(fd.read())
             else:
                 logger.info("found correction scan info, filtering lines...")
                 # requires filtering
