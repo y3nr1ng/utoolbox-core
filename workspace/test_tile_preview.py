@@ -4,6 +4,7 @@ import os
 import coloredlogs
 import dask.array as da
 from dask.distributed import Client, LocalCluster, progress
+import imageio
 import napari
 import numpy as np
 
@@ -58,11 +59,12 @@ if __name__ == "__main__":
         for y, tile_x in tile_xy.groupby("tile_y"):
             row = []
             for x, tile in tile_x.groupby("tile_x"):
-                print(tile)
                 uuid = tile.values[0]
+                print(uuid)
+
                 data = ds[uuid].max(axis=0)
-                future = client.scatter(data)
-                row.append(future)
+
+                row.append(data)
             layer.append(row)
         layers.append(layer)
     preview = da.block(layers)
@@ -71,6 +73,9 @@ if __name__ == "__main__":
     preview = preview.persist()
     progress(preview)
     preview = preview.compute()
+
+    logger.info("save preview")
+    imageio.volwrite("preview.tif", preview)
 
     logger.info("launching napari")
     with napari.gui_qt():
