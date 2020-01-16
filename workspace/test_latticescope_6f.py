@@ -23,16 +23,10 @@ if __name__ == "__main__":
         client = Client("10.109.20.6:8786")
     logger.info(client)
 
-    src_ds = LatticeScopeTiledDataset("Y:/ARod/4F/20191224/flybrain")
+    src_ds = LatticeScopeTiledDataset(None)
     print(src_ds.inventory)
 
     logger.info(f"tile by {src_ds.tile_shape}")
-
-    # INPUT (x, y, z) -> TRUE (z, x, y)
-    src_ds.remap_tiling_axes({"x": "z", "y": "x", "z": "y"})
-    src_ds.flip_tiling_axes(["x", "y"])
-
-    print(src_ds.inventory)
 
     # import ipdb; ipdb.set_trace()
 

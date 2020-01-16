@@ -29,7 +29,11 @@ class BaseDataset(metaclass=ABCMeta):
         return self.inventory.__getattr__(key)
 
     def __getitem__(self, key):
-        if isinstance(key, dict):
+        if isinstance(key, pd.Series):
+            if len(key) > 1:
+                raise KeyError('multiple keys provided')
+            uuid = key.values[0]
+        elif isinstance(key, dict):
             # rebuild coordinate
             coord_list = tuple(key[k] for k in self.inventory.index.names)
             uuid = self.inventory.__getitem__(coord_list)

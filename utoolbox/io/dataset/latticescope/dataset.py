@@ -85,7 +85,9 @@ class LatticeScopeDataset(DenseDataset, MultiChannelDataset, MultiViewDataset):
                 ScanType.OBJECTIVE: "obj_piezo_n_steps",
                 ScanType.SAMPLE: "sample_piezo_n_steps",
             }[scan_type]
-            shape = (self.metadata["waveform"][key],) + shape
+            nz = self.metadata["waveform"][key]
+            if nz > 1:
+                shape = (nz,) + shape
 
         # NOTE assuming fixed at 16-bit
         return shape, np.uint16
@@ -138,7 +140,10 @@ class LatticeScopeDataset(DenseDataset, MultiChannelDataset, MultiViewDataset):
 
     def _retrieve_file_list(self, coord_dict):
         # filter by view...
-        filtered = [f for f in self.files if coord_dict["view"] in f]
+        if coord_dict["view"] == "SINGLE":
+            filtered = self.files
+        else:
+            filtered = [f for f in self.files if coord_dict["view"] in f]
         # .. and channel
         ich = self._lookup_channel_id(coord_dict["channel"])
         filtered = [f for f in filtered if f"ch{ich}" in f]

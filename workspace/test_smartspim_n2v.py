@@ -64,7 +64,7 @@ def infer(images, name="untitled", model_dir="."):
         yield model.predict(image, axes="YX")
 
 
-def run(src_dir, dst_dir):
+def run(src_im, dst_im):
     ds = SmartSpimDataset(src_dir)
     print(ds.inventory)
 
@@ -86,6 +86,8 @@ def run(src_dir, dst_dir):
     for i, image in enumerate(infer(images, name="642")):
         imageio.imwrite(os.path.join(dst_dir, f"tile_{i:04d}.tif"), image)
 
+def run_batch(src_dir, dst_dir):
+    pass
 
 if __name__ == "__main__":
     import coloredlogs
@@ -94,5 +96,6 @@ if __name__ == "__main__":
         level="DEBUG", fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
     )
 
+    src_dir
     run("C:/Users/Andy/Desktop/20191217_16_50_20_cerebellum_tile", "_debug")
 

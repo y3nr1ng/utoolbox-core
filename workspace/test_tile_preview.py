@@ -37,32 +37,20 @@ if __name__ == "__main__":
     client = Client("10.109.20.6:8786")
     logger.info(client)
 
-    ds = load_dataset("Y:/ARod/4F/20191227/flybrain")
+    ds = load_dataset("Y:/ARod/4F/20200114_flybrain_No2/640")
 
     # import ipdb; ipdb.set_trace()
 
-    tile_xy = ds.loc[:, "CamA"]
-    z = ds.index.get_level_values("tile_z").unique().values
-
-    # index for lookup
-    x = ds.index.get_level_values("tile_x").unique().values
-    y = ds.index.get_level_values("tile_y").unique().values
-
-    def abs2rel(*args):
-        return y.index(args[0]), x.index(args[1])
-
     # build layered preview
     layers = []
-    for z, tile_xy in tile_xy.groupby("tile_z"):
+    for z, tile_xy in ds.groupby("tile_z"):
         print(z)
         layer = []
         for y, tile_x in tile_xy.groupby("tile_y"):
             row = []
             for x, tile in tile_x.groupby("tile_x"):
-                uuid = tile.values[0]
-                print(uuid)
-
-                data = ds[uuid].max(axis=0)
+                data = ds[tile].max(axis=0)
+                data = data[::-1, :]
 
                 row.append(data)
             layer.append(row)
@@ -70,12 +58,16 @@ if __name__ == "__main__":
     preview = da.block(layers)
     logger.debug(f"preview.shape={preview.shape}")
 
+    raise RuntimeError()
+
+    # execute on cluster
     preview = preview.persist()
     progress(preview)
+    # retrieve
     preview = preview.compute()
 
     logger.info("save preview")
-    imageio.volwrite("preview.tif", preview)
+    imageio.volwrite("preview_640.tif", preview)
 
     logger.info("launching napari")
     with napari.gui_qt():
