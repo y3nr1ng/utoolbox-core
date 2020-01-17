@@ -7,3 +7,7 @@ class MicroManagerDatasetError(DatasetError):
 
 class MissingMetadataError(MicroManagerDatasetError):
     """Unable to locate a metadata."""
+
+
+class MalformedMetadataError(MicroManagerDatasetError):
+    """Metadata file structure is corrupted."""

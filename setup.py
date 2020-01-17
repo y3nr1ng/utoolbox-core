@@ -65,8 +65,7 @@ setup(
     #   requirements.txt
     install_requires=[
         # numeric and processing
-        'dask',
-        'distributed',
+        "dask",
         "numpy>=1.17",
         "scipy",
         "pandas",
@@ -74,13 +73,9 @@ setup(
         "imageio",
         "imageio-ffmpeg",
         "tifffile",
-        "h5py",
-        # gui
-        "vispy",
-        "pyopengl",
+        "h5py>=2.9",
         # parallel
-        'cupy-cuda101 ; platform_system!="Darwin"',
-        'cupy ; platform_system=="Darwin"',
+        "distributed",
         # utils
         "pyparsing",
         "mako",
@@ -90,7 +85,13 @@ setup(
         "tqdm",
     ],
     # additional groups of dependencies here for the "extras" syntax
-    extras_require={},
+    extras_require={
+        "gpu": [
+            'cupy-cuda101 ; platform_system!="Darwin"',
+            'cupy ; platform_system=="Darwin"',
+        ],
+        "viewer": ["napari"],
+    },
     # data files included in packages
     package_data={"": ["*.cu"]},
     # include all package data found implicitly
