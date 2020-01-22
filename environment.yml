@@ -6,7 +6,7 @@ channels:
 
 dependencies:
     # core
-    - python=3
+    - python=3.7
 
     # build tools
     #- bumpversion # development stalled, use bump2version
