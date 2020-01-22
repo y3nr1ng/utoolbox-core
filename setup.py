@@ -56,7 +56,7 @@ setup(
     ],
     keywords="microscopy",
     packages=find_namespace_packages(include=["utoolbox.*"]),
-    python_requires=">=3.6",
+    python_requires="==3.7",
     # use pyproject.toml to define build system requirement
     # setup_requires=[
     # ],
@@ -65,7 +65,7 @@ setup(
     #   requirements.txt
     install_requires=[
         # numeric and processing
-        "dask",
+        "dask==2.9.1",
         "numpy>=1.17",
         "scipy",
         "pandas",
@@ -75,7 +75,7 @@ setup(
         "tifffile",
         "h5py>=2.9",
         # parallel
-        "distributed",
+        "distributed==2.9.1",
         # utils
         "pyparsing",
         "mako",
