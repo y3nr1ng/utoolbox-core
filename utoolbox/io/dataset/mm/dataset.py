@@ -1,3 +1,4 @@
+from collections import defaultdict
 import glob
 import json
 import logging
@@ -40,9 +41,7 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
             nz, shape = shape[0], shape[1:]
             array = da.stack(
                 [
-                    da.from_delayed(
-                        delayed(imageio.imread, pure=True)(file_path), shape, dtype
-                    )
+                    da.from_delayed(delayed(imageio.imread)(file_path), shape, dtype)
                     for file_path in uri
                 ]
             )
@@ -69,6 +68,23 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
     def _load_array_info(self):
         # shape
         shape = self.metadata["Height"], self.metadata["Width"]
+        if any(s <= 0 for s in shape):
+            logger.warning(f"metadata incidcates image size has 0 ({shape}), fixing...")
+            with open(self.metadata_path, "r") as fd:
+                metadata = json.load(fd)
+                for key, block in metadata.items():
+                    try:
+                        if block["Height"] > 0 and block["Width"] > 0:
+                            shape = block["Height"], block["Width"]
+                            logger.info(f'using image shape info from "{key}"')
+                            break
+                    except KeyError:
+                        pass
+                else:
+                    raise MalformedMetadataError(
+                        "unable to determine correct image shape"
+                    )
+
         nz = self.metadata["Slices"]
         if nz > 1:
             shape = (nz,) + shape
@@ -100,7 +116,7 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
     def _load_tiling_coordinates(self):
         positions = self.metadata["InitialPositionList"]
 
-        coords = {k: [] for k in ("tile_x", "tile_y")}
+        coords = defaultdict(list)
         labels = dict()
         for position in positions:
             # coordinate
@@ -179,7 +195,7 @@ class MicroManagerV2Dataset(MicroManagerV1Dataset):
     def _load_tiling_coordinates(self):
         positions = self.metadata["StagePositions"]
 
-        coords = {k: [] for k in ("tile_x", "tile_y")}
+        coords = defaultdict(list)
         labels = dict()
         for position in positions:
             devices = position["DevicePositions"]
