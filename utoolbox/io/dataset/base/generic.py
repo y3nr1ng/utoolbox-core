@@ -23,6 +23,7 @@ class BaseDataset(metaclass=ABCMeta):
             raise UnsupportedDatasetError()
 
         self._files = self._enumerate_files()
+        self._files.sort()
         logger.info(f"found {len(self.files)} file(s)")
 
     def __getattr__(self, key):
