@@ -148,7 +148,7 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
         index, coords = super()._load_tiling_info()
         try:
             # NOTE MicroManger does not have Z tiling, force them to be the same
-            index["tile_z"] = 0
+            index["tile_z"] = np.array([0], dtype=np.float32)
         except KeyError:
             pass
 
