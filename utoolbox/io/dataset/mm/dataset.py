@@ -229,7 +229,7 @@ class MicroManagerV2Dataset(MicroManagerV1Dataset):
             metadata = json.load(fd)
             for key in metadata.keys():
                 if key.startswith("Metadata"):
-                    sample_frame = self.metadata[key]
+                    sample_frame = metadata[key]
                     break
             else:
                 raise MalformedMetadataError()

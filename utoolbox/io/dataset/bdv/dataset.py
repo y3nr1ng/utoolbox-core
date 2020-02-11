@@ -357,20 +357,25 @@ class BigDataViewerDataset(
 
                 # generate queries
                 statements = [
-                    f"{k}=={coord_dict[k]}" for k in ("tile_x", "tile_y", "tile_z")
+                    f"{k}=={coord_dict[k]}"
+                    for k in ("tile_x", "tile_y", "tile_z")
+                    if k in coord_dict
                 ]
                 query_stmt = " & ".join(statements)
+
                 # find tile linear index
                 index = dataset.tile_coords.query(query_stmt).index.values
                 index = index[0]
 
+                # generate grouping parameters
+                kwlut = {"channel": "channel", "view": "illumination"}
+                kwargs = {
+                    kwlut[k]: coord_dict[k]
+                    for k in ("channel", "view")
+                    if k in coord_dict
+                }
                 ss = xml.add_view(
-                    shape,
-                    name=uuid,
-                    voxel_size=voxel_size,
-                    channel=coord_dict["channel"],
-                    illumination=coord_dict["view"],
-                    tile=index,
+                    shape, name=uuid, voxel_size=voxel_size, tile=index, **kwargs
                 )
                 logger.info(f" [{ss}] {uuid}")
 
@@ -378,13 +383,16 @@ class BigDataViewerDataset(
                 min_voxel_size = min(voxel_size)
                 factor = tuple(s / min_voxel_size for s in voxel_size)
 
+                # 3d transformation, pad info if missing
+                if "tile_z" not in coord_dict:
+                    coord_dict["tile_z"] = 0
                 # transformation
                 matrix = np.zeros((3, 4))
                 matrix[range(3), range(3)] = 1
                 matrix[range(3), -1] = [
                     coord_dict[k] / v * s * f
                     for k, v, s, f in zip(
-                        ("tile_y", "tile_z", "tile_x"),
+                        ("tile_x", "tile_y", "tile_z"),
                         reversed(voxel_size),
                         (-1, -1, -1),
                         reversed(factor),
