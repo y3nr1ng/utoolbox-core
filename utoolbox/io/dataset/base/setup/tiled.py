@@ -25,9 +25,10 @@ class TiledDataset(BaseDataset, metaclass=ABCMeta):
 
     @property
     def tile_shape(self):
-        return tuple(
-            len(self.tile_coords[f"tile_{ax}"].unique()) for ax in ("z", "y", "x")
-        )
+        axes = ("y", "x")
+        if "tile_z" in self.tile_coords.columns:
+            axes = ("z",) + axes
+        return tuple(len(self.tile_coords[f"tile_{ax}"].unique()) for ax in axes)
 
     ##
 
