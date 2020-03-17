@@ -228,11 +228,12 @@ class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
         query_stmt = " & ".join(statements)
         # find tile linear index
         index = self.tile_coords.query(query_stmt).index.values
-        # stacked data, only 1 file
-        index = index[0]
 
         try:
+            # stacked data, only 1 file
+            index = index[0]
             return file_list[index]
         except IndexError:
+            logger.debug(f'invalid statement "{query_stmt}"')
             # secondary filter failed
             return None

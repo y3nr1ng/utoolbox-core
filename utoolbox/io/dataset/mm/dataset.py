@@ -123,36 +123,28 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
             coord_dict = position["DeviceCoordinatesUm"]
             try:
                 coord_x, coord_y = tuple(coord_dict["XY Stage"])
+                coord_x, coord_y = np.float32(coord_x), np.float32(coord_y)
+
                 coords["tile_x"].append(coord_x)
                 coords["tile_y"].append(coord_y)
             except KeyError:
                 pass
             try:
                 coord_z = coord_dict["Z Stage"][0]
+                coord_z = np.float32(coord_z)
+
                 coords["tile_z"].append(coord_z)
             except KeyError:
                 pass
 
             # label
             # NOTE MicroManager only tiles in 2D, no need to include Z for indexing
-            labels[(np.float32(coord_x), np.float32(coord_y))] = position["Label"]
+            labels[(coord_x, coord_y)] = position["Label"]
 
         # internal bookkeeping
         self._tile_prefix = labels
 
-        return pd.DataFrame(
-            {k: np.array(v, dtype=np.float32) for k, v in coords.items()}
-        )
-
-    def _load_tiling_info(self):
-        index, coords = super()._load_tiling_info()
-        try:
-            # NOTE MicroManger does not have Z tiling, force them to be the same
-            index["tile_z"] = np.array([0], dtype=np.float32)
-        except KeyError:
-            pass
-
-        return index, coords
+        return pd.DataFrame({k: np.array(v) for k, v in coords.items()})
 
     def _load_voxel_size(self):
         dx, r = self.metadata["PixelSize_um"], self.metadata["PixelAspect"]
@@ -203,24 +195,26 @@ class MicroManagerV2Dataset(MicroManagerV1Dataset):
             for device in devices:
                 if device["Device"] == xy_stage:
                     coord_y, coord_x = tuple(device["Position_um"])
-                    coords["tile_x"].append(coord_x)
-                    coords["tile_y"].append(coord_y)
+                    coord_y, coord_x = np.float32(coord_y), np.float32(coord_x)
+
+                    coords["tile_x"].append((coord_x))
+                    coords["tile_y"].append((coord_y))
                 elif device["Device"] == z_stage:
                     coord_z = device["Position_um"][0]
+                    coord_z = np.float32(coord_z)
+
                     coords["tile_z"].append(coord_z)
                 else:
                     logger.warning(f"unknown device {device['Device']}")
 
             # label
             # NOTE MicroManager only tiles in 2D, no need to include Z for indexing
-            labels[(np.float32(coord_y), np.float32(coord_x))] = position["Label"]
+            labels[(coord_x, coord_y)] = position["Label"]
 
         # internal bookkeeping
         self._tile_prefix = labels
 
-        return pd.DataFrame(
-            {k: np.array(v, dtype=np.float32) for k, v in coords.items()}
-        )
+        return pd.DataFrame({k: np.array(v) for k, v in coords.items()})
 
     def _load_voxel_size(self):
         # extract sample frame from the metadata file
@@ -246,7 +240,7 @@ class MicroManagerV2Dataset(MicroManagerV1Dataset):
         return size
 
     def _retrieve_file_list(self, coord_dict):
-        prefix = self._tile_prefix[itemgetter("tile_y", "tile_x")(coord_dict)]
+        prefix = self._tile_prefix[itemgetter("tile_x", "tile_y")(coord_dict)]
         i_ch = self._channel_order.index(coord_dict["channel"])
         return glob.glob(
             os.path.join(self.root_dir, prefix, f"*_channel{i_ch:03d}_*.tif")
