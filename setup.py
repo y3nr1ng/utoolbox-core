@@ -65,7 +65,7 @@ setup(
     #   requirements.txt
     install_requires=[
         # numeric and processing
-        "dask==2.9.1",
+        "dask~=2.12.0",
         "numpy>=1.17",
         "scipy",
         "pandas",
@@ -75,7 +75,7 @@ setup(
         "tifffile",
         "h5py>=2.9",
         # parallel
-        "distributed==2.9.1",
+        "distributed~=2.12.0",
         # utils
         "pyparsing",
         "mako",
