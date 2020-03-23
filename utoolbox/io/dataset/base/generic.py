@@ -72,7 +72,12 @@ class BaseDataset(metaclass=ABCMeta):
     @property
     def read_func(self):
         """
-        callable(URI, SHAPE, DTYPE)
+        Returns:
+            callable(URI, SHAPE, DTYPE)
+
+        Note:
+            Dataset has to sort the file list itself, since different dataset may have 
+            different sorting requirement!
         """
         raise NotImplementedError("dataset is not readable")
 
