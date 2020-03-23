@@ -37,6 +37,9 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
     @property
     def read_func(self):
         def func(uri, shape, dtype):
+            # order by z
+            uri.sort()
+
             # layered volume
             nz, shape = shape[0], shape[1:]
             array = da.stack(
