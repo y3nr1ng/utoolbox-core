@@ -33,7 +33,7 @@ setup(
     #   bumpversion release
     # to next version
     #   bump patch/minor/major
-    version="0.6.2",
+    version="0.6.3",
     # one-line description for the summary field
     description="A Python image processing package for LLSM.",
     long_description=long_description,
@@ -65,7 +65,7 @@ setup(
     #   requirements.txt
     install_requires=[
         # numeric and processing
-        "dask==2.9.1",
+        "dask~=2.12.0",
         "numpy>=1.17",
         "scipy",
         "pandas",
@@ -75,7 +75,7 @@ setup(
         "tifffile",
         "h5py>=2.9",
         # parallel
-        "distributed==2.9.1",
+        "distributed~=2.12.0",
         # utils
         "pyparsing",
         "mako",
