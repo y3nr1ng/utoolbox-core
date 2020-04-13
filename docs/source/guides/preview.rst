@@ -1,4 +1,0 @@
-Preview
-=======
-.. toctree::
-    :caption: Preview
