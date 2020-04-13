@@ -63,13 +63,16 @@ setup(
     # other packages the project depends on to run
     #   install_requires -> necessity
     #   requirements.txt
-    install_requires=["dask~=2.12.0", "h5py>=2.9", "imageio", "numpy>=1.17", "pandas"],
+    install_requires=[
+        "dask~=2.12.0",
+        "h5py>=2.9",
+        "imageio[ffmpeg]",
+        "numpy>=1.17",
+        "pandas",
+    ],
     # additional groups of dependencies here for the "extras" syntax
     extras_require={
-        "gpu": [
-            'cupy-cuda101 ; platform_system!="Darwin"',
-            'cupy ; platform_system=="Darwin"',
-        ],
+        "gpu": ["cupy-cuda101"],
         "viewer": ["napari"],
         "original": [
             "scipy",
