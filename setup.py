@@ -39,7 +39,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     # project homepage
-    url="https://github.com/liuyenting/utoolbox",
+    url="https://github.com/liuyenting/utoolbox-core",
     # name or organization
     author="Liu, Yen-Ting",
     classifiers=[
@@ -63,27 +63,7 @@ setup(
     # other packages the project depends on to run
     #   install_requires -> necessity
     #   requirements.txt
-    install_requires=[
-        # numeric and processing
-        "dask~=2.12.0",
-        "numpy>=1.17",
-        "scipy",
-        "pandas",
-        # file io
-        "imageio",
-        "imageio-ffmpeg",
-        "tifffile",
-        "h5py>=2.9",
-        # parallel
-        "distributed~=2.12.0",
-        # utils
-        "pyparsing",
-        "mako",
-        "click",
-        "coloredlogs",
-        "prompt_toolkit>2.0.0",
-        "tqdm",
-    ],
+    install_requires=["dask~=2.12.0", "h5py>=2.9", "imageio", "numpy>=1.17", "pandas"],
     # additional groups of dependencies here for the "extras" syntax
     extras_require={
         "gpu": [
@@ -91,6 +71,20 @@ setup(
             'cupy ; platform_system=="Darwin"',
         ],
         "viewer": ["napari"],
+        "original": [
+            "scipy",
+            # file io
+            "imageio-ffmpeg",
+            "tifffile",
+            # parallel
+            "distributed~=2.12.0",
+            # utils
+            "mako",
+            "click",
+            "coloredlogs",
+            "prompt_toolkit>2.0.0",
+            "tqdm",
+        ],
     },
     # data files included in packages
     package_data={"": ["*.cu"]},

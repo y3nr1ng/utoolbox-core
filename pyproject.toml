@@ -14,3 +14,11 @@ exclude = '''
   | dist
 )/
 '''
+
+[tool.coverage.run]
+branch = true
+omit = '*/__init__.py'
+
+[tool.pytest]
+testpaths = 'tests/'
+addopts = '--cov=utoolbox/'

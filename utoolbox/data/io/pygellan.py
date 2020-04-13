@@ -1,11 +1,12 @@
 """
 Library for reading multiresolution micro-magellan.
 """
-import os
-import mmap
-import numpy as np
-import sys
 import json
+import mmap
+import os
+import sys
+
+import numpy as np
 
 
 class MagellanMultipageTiffReader():
