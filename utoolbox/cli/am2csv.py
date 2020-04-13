@@ -31,8 +31,9 @@ def main(src, dst=None):
             parent, dst = os.path.split(os.path.abspath(src))
             dst = os.path.join(parent, f"{dst}_csv")
             print(dst)
+
         def write_func(uri, df):
-            dst = f'{uri}.csv'
+            dst = f"{uri}.csv"
             df.to_csv(dst, index=False)
 
         ds_in = FolderDatastore(src, read_func=AmiraPointCloud)
@@ -44,11 +45,12 @@ def main(src, dst=None):
             print(f".. {name}")
             if i < 760 and i < 770:
                 i += 1
-                continue                
+                continue
             try:
                 ds_out[name] = ds_in[name]
             except ValueError as err:
-                logger.exception(f'ERROR! {str(err)}')
+                logger.exception(f"ERROR! {str(err)}")
+
 
 if __name__ == "__main__":
     coloredlogs.install(

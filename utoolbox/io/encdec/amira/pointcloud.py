@@ -41,7 +41,7 @@ class AmiraPointCloud(Amira):
                 shape = (entries, shape[-1])
                 # reduce overall elements
                 _count = entries * shape[-1]
-                logger.error(f'array size coerced from {count} to {_count} {shape}')
+                logger.error(f"array size coerced from {count} to {_count} {shape}")
                 # reshape again
                 array = (
                     np.fromfile(path, dtype=dtype, count=_count, offset=start)
@@ -50,10 +50,10 @@ class AmiraPointCloud(Amira):
                 )
                 damaged = True
             arrays[name] = array
-        
+
         if damaged:
-            arrays['Ids'] = arrays['Ids'][:-1]
-            
+            arrays["Ids"] = arrays["Ids"][:-1]
+
         df_source = {"Point ID": arrays["Ids"]}
         for i, ax in enumerate(["X", "Y", "Z"]):
             df_source[f"{ax} Coord"] = arrays["Coordinates"][:, i]
