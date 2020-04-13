@@ -7,7 +7,7 @@ cwd = os.path.dirname(os.path.abspath(__file__))
 tpl_dir = os.path.join(cwd, 'macro_template')
 templates = TemplateLookup(directories=[tpl_dir])
 
-template = Template(filename='macro.ijm', lookup=templates)
+template = Template(filename='macro_template/macro.ijm', lookup=templates)
 print(template.render(
     loop_files=False, batch_mode=True,
     file_list="SOURCE",

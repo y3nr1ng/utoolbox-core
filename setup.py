@@ -28,7 +28,7 @@ except ImportError:
 
 setup(
     # published project name
-    name="utoolbox",
+    name="utoolbox-core",
     # from dev to release
     #   bumpversion release
     # to next version
