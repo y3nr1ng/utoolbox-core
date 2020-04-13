@@ -16,7 +16,7 @@ setup(
     #   bump patch/minor/major
     version="0.0.1",
     # one-line description for the summary field
-    description="A Python image processing package for LLSM.",
+    description="Core functions for uToolbox.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     # project homepage
