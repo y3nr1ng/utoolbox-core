@@ -1,8 +1,6 @@
 from abc import ABCMeta, abstractmethod
 
-import numpy as np
-
-from ..generic import BaseDataset
+from ..generic import BaseDataset, PreloadPriorityOffset
 
 __all__ = ["TiledDataset"]
 
@@ -11,11 +9,16 @@ class TiledDataset(BaseDataset, metaclass=ABCMeta):
     def __init__(self):
         super().__init__()
 
-        index, self._tile_coords = self._load_tiling_info()
-        assert any(
-            key in index.keys() for key in ("tile_x", "tile_y", "tile_z")
-        ), "unable to find definition of tiling coordinates"
-        self.inventory.update(index)
+        def load_tiling_info():
+            index, self._tile_coords = self._load_tiling_info()
+            assert any(
+                key in index.keys() for key in ("tile_x", "tile_y", "tile_z")
+            ), "unable to find definition of tiling coordinates"
+            self.inventory.update(index)
+
+        self.register_preload_func(
+            load_tiling_info, priority=PreloadPriorityOffset.Metadata
+        )
 
     ##
 

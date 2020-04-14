@@ -288,11 +288,9 @@ class BigDataViewerDataset(
     DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset
 ):
     def __init__(self, root_dir):
-        self._root_dir = root_dir
-
         super().__init__()
 
-        self.preload()
+        self._root_dir = root_dir
 
     ##
 
@@ -313,7 +311,6 @@ class BigDataViewerDataset(
         pyramid=[(1, 1, 1), (2, 4, 4)],
         chunks=(64, 128, 128),
         compression="gzip",
-        client=None,
         dry_run=False,
     ):
         try:

@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 import logging
 
-from ..generic import BaseDataset
+from ..generic import BaseDataset, PreloadPriorityOffset
 
 __all__ = ["MultiChannelDataset"]
 
@@ -12,8 +12,13 @@ class MultiChannelDataset(BaseDataset, metaclass=ABCMeta):
     def __init__(self):
         super().__init__()
 
-        channels = self._load_channel_info()
-        self.inventory.update({"channel": channels})
+        def load_channel_info():
+            channels = self._load_channel_info()
+            self.inventory.update({"channel": channels})
+
+        self.register_preload_func(
+            load_channel_info, priority=PreloadPriorityOffset.Metadata
+        )
 
     ##
 

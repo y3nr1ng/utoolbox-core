@@ -4,7 +4,6 @@ import os
 import coloredlogs
 from dask.distributed import Client, LocalCluster
 import imageio
-import numpy as np
 
 from utoolbox.io.dataset import LatticeScopeTiledDataset
 
@@ -75,7 +74,7 @@ if __name__ == "__main__":
 
     logger = logging.getLogger(__name__)
 
-    use_local = False
+    use_local = True
 
     if use_local:
         logger.info("using local cluster")
@@ -86,7 +85,7 @@ if __name__ == "__main__":
         client = Client("10.109.20.6:8786")
     logger.info(client)
 
-    src_ds = LatticeScopeTiledDataset("Y:/ARod/4F/20200114_flybrain_No2/405")
+    src_ds = LatticeScopeTiledDataset.load("Y:/ARod/4F/20200317_No5_CamA")
     print(src_ds.inventory)
 
     logger.info(f"tile by {src_ds.tile_shape}")
@@ -99,7 +98,7 @@ if __name__ == "__main__":
 
     # import ipdb; ipdb.set_trace()
 
-    dst_dir = "U:/ARod/4F/20200114_flybrain_No2/405_preview"
+    dst_dir = "Y:/ARod/4F/20200317_No5_CamA"
     preview_mip(src_ds, dst_dir)
 
     client.close()

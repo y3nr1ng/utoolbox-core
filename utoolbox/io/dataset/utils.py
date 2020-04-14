@@ -27,7 +27,7 @@ def open_dataset(path):
     ]
     for _klass in klass:
         try:
-            ds = _klass(path)
+            ds = _klass.load(path)
             logger.debug(f'"{path}" is a "{_klass}"')
             break
         except UnsupportedDatasetError:

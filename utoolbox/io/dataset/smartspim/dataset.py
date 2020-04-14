@@ -22,11 +22,9 @@ class SmartSpimDataset(
     DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset
 ):
     def __init__(self, root_dir):
-        self._root_dir = root_dir
-
         super().__init__()
 
-        self.preload()
+        self._root_dir = root_dir
 
     ##
 

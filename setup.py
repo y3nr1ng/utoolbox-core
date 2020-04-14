@@ -47,6 +47,7 @@ setup(
     install_requires=[
         "dask~=2.12.0",
         "h5py>=2.9",
+        "humanfriendly",
         "imageio[ffmpeg]",
         "numpy>=1.17",
         "pandas",

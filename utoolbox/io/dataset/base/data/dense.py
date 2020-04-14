@@ -14,32 +14,33 @@ class DenseDataset(BaseDataset, metaclass=ABCMeta):
     def __init__(self):
         super().__init__()
 
-    ##
+        def assign_data_uuid():
+            assert isinstance(
+                self.inventory, pd.MultiIndex
+            ), "inventory not consolidated"
 
-    def preload(self):
-        self._consolidate_inventory()
-        assert isinstance(self.inventory, pd.MultiIndex), "inventory not consolidated"
+            shape, dtype = self._load_array_info()
 
-        shape, dtype = self._load_array_info()
+            logger.debug("preloading...")
+            data_uuid = []
+            for coord in self.inventory:
+                coord_dict = {k: v for k, v in zip(self.inventory.names, coord)}
+                file_list = self._retrieve_file_list(coord_dict)
 
-        logger.debug("preloading...")
-        data_uuid = []
-        for coord in self.inventory:
-            coord_dict = {k: v for k, v in zip(self.inventory.names, coord)}
-            file_list = self._retrieve_file_list(coord_dict)
+                if file_list:
+                    array = self.read_func(file_list, shape, dtype)
+                    uuid = self._register_data(array)
+                else:
+                    uuid = ""
+                    coord_str = [f"{k}:{v}" for k, v in coord_dict.items()]
+                    coord_str = "(" + ", ".join(coord_str) + ")"
+                    logger.warning(f"missing data, {coord_str}")
+                data_uuid.append(uuid)
 
-            if file_list:
-                array = self.read_func(file_list, shape, dtype)
-                uuid = self._register_data(array)
-            else:
-                uuid = ""
-                coord_str = [f"{k}:{v}" for k, v in coord_dict.items()]
-                coord_str = "(" + ", ".join(coord_str) + ")"
-                logger.warning(f"missing data, {coord_str}")
-            data_uuid.append(uuid)
+            # complete the preload process
+            self._inventory = pd.Series(data_uuid, index=self.inventory)
 
-        # complete the preload process
-        self._inventory = pd.Series(data_uuid, index=self.inventory)
+        self.register_preload_func(assign_data_uuid, priority=60)
 
     ##
 

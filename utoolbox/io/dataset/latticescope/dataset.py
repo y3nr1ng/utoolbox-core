@@ -22,11 +22,9 @@ logger = logging.getLogger(__name__)
 
 class LatticeScopeDataset(DenseDataset, MultiChannelDataset, MultiViewDataset):
     def __init__(self, root_dir):
-        self._root_dir = root_dir
-
         super().__init__()
 
-        self.preload()
+        self._root_dir = root_dir
 
     ##
 
