@@ -9,26 +9,28 @@ from utoolbox.io.dataset import (
 )
 from .base import UnsupportedDatasetError
 
-__all__ = ["open_dataset"]
+__all__ = ["open_dataset", "SUPPORTED_DATASET_CLASS"]
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("utoolbox.io.dataset")
+
+
+SUPPORTED_DATASET_CLASS = [
+    # uManager
+    MicroManagerV2Dataset,
+    MicroManagerV1Dataset,
+    # LatticeScope
+    LatticeScopeTiledDataset,
+    LatticeScopeDataset,
+    # SmartSPIM
+    SmartSpimDataset,
+]
 
 
 def open_dataset(path):
-    klass = [
-        # uManager
-        MicroManagerV2Dataset,
-        MicroManagerV1Dataset,
-        # LatticeScope
-        LatticeScopeTiledDataset,
-        LatticeScopeDataset,
-        # SmartSPIM
-        SmartSpimDataset,
-    ]
-    for _klass in klass:
+    for _klass in SUPPORTED_DATASET_CLASS:
         try:
             ds = _klass.load(path)
-            logger.debug(f'"{path}" is a "{_klass}"')
+            logger.info(f'"{path}" is a "{_klass}"')
             break
         except UnsupportedDatasetError:
             logger.debug(f'not a "{_klass}"')

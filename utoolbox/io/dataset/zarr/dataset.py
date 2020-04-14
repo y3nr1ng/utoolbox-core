@@ -4,7 +4,7 @@ from ..base import DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDat
 
 __all__ = ["ZarrDataset"]
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("utoolbox.io.dataset")
 
 
 class ZarrDataset(DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset):

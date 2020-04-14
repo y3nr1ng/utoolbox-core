@@ -17,7 +17,7 @@ from .error import MalformedMetadataError, MissingMetadataError
 
 __all__ = ["MicroManagerV1Dataset", "MicroManagerV2Dataset"]
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("utoolbox.io.dataset")
 
 
 class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):

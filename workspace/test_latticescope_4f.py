@@ -5,7 +5,7 @@ import coloredlogs
 from dask.distributed import Client, LocalCluster
 import imageio
 
-from utoolbox.io.dataset import LatticeScopeTiledDataset
+from utoolbox.io import open_dataset
 
 
 def preview_mip(src_ds, dst_dir):
@@ -85,7 +85,7 @@ if __name__ == "__main__":
         client = Client("10.109.20.6:8786")
     logger.info(client)
 
-    src_ds = LatticeScopeTiledDataset.load("Y:/ARod/4F/20200317_No5_CamA")
+    src_ds = open_dataset("Y:/ARod/4F/20200317_No5_CamA")
     print(src_ds.inventory)
 
     logger.info(f"tile by {src_ds.tile_shape}")

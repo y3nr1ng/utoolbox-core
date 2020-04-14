@@ -1,7 +1,6 @@
 import glob
 from io import StringIO
 import logging
-from operator import itemgetter
 import os
 
 from dask import delayed
@@ -15,7 +14,7 @@ from .error import MissingMetadataError
 
 __all__ = ["SmartSpimDataset"]
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("utoolbox.io.dataset")
 
 
 class SmartSpimDataset(

@@ -11,7 +11,7 @@ from ..base import DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDat
 
 __all__ = ["BigDataViewerDataset"]
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("utoolbox.io.dataset")
 
 
 class BigDataViewerXML(object):

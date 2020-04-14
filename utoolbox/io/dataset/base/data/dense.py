@@ -7,7 +7,7 @@ from ..generic import BaseDataset
 
 __all__ = ["DenseDataset"]
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("utoolbox.io.dataset")
 
 
 class DenseDataset(BaseDataset, metaclass=ABCMeta):

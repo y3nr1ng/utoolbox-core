@@ -12,7 +12,7 @@ from .error import PreloadError, UnsupportedDatasetError
 
 __all__ = ["BaseDataset", "PreloadPriorityOffset"]
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("utoolbox.io.dataset")
 
 
 class PreloadPriorityOffset(IntEnum):
@@ -107,9 +107,7 @@ class BaseDataset(metaclass=ABCMeta):
     @classmethod
     def load(cls, *args, **kwargs):
         """
-        Load dataset.
-
-        This will kickstart dataset preload functions.
+        Load dataset and kickstart preload functions.
         """
         # 1) construct dataset
         ds = cls(*args, **kwargs)
@@ -169,23 +167,27 @@ class BaseDataset(metaclass=ABCMeta):
         self._preload_funcs.sort(key=lambda f: f[0])
         logger.debug(f"{len(self._preload_funcs)} preload functions registered")
 
-        # dump all the preload functions
-        prev_priority = -1
-        table = []
-        for priority, func in self.preload_funcs:
-            if priority != prev_priority:
-                prev_priority = priority
-                prefix_str = int(priority)
-            else:
-                prefix_str = " "
-            func_name = func.__name__.strip("_")
-            table.append([prefix_str, func_name])
-        print(format_pretty_table(table, ["Priority", "Function"]))
+        if logger.getEffectiveLevel() >= logging.DEBUG:
+            # dump all the preload functions
+            prev_priority = -1
+            table = []
+            for priority, func in self.preload_funcs:
+                if priority != prev_priority:
+                    prev_priority = priority
+                    prefix_str = int(priority)
+                else:
+                    prefix_str = " "
+                func_name = func.__name__.strip("_")
+                table.append([prefix_str, func_name])
+            print(format_pretty_table(table, ["Priority", "Function"]))
 
         logger.info("start preloading")
         for _, func in self.preload_funcs:
             try:
                 func()
+            except UnsupportedDatasetError:
+                # shunt
+                raise
             except Exception as e:
                 func_name = func.__name__.strip("_")
                 raise PreloadError(f'failed at "{func_name}": {str(e)}')

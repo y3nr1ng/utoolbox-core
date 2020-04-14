@@ -1,11 +1,8 @@
 from abc import ABCMeta, abstractmethod
-import logging
 
 from ..generic import BaseDataset, PreloadPriorityOffset
 
 __all__ = ["MultiViewDataset"]
-
-logger = logging.getLogger(__name__)
 
 
 class MultiViewDataset(BaseDataset, metaclass=ABCMeta):

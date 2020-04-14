@@ -17,7 +17,7 @@ from .settings import AcquisitionMode, ScanType, Settings
 
 __all__ = ["LatticeScopeDataset", "LatticeScopeTiledDataset"]
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("utoolbox.io.dataset")
 
 
 class LatticeScopeDataset(DenseDataset, MultiChannelDataset, MultiViewDataset):
