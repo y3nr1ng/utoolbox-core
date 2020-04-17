@@ -36,7 +36,7 @@ setup(
         "Intended Audience :: Science/Research",
     ],
     keywords="microscopy",
-    packages=find_namespace_packages(include=["utoolbox.*"]),
+    packages=find_namespace_packages(where="src"),
     python_requires="~=3.7",
     # use pyproject.toml to define build system requirement
     # setup_requires=[
