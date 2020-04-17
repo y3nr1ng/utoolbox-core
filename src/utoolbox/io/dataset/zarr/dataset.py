@@ -1,43 +1,32 @@
 import logging
 
-from ..base import DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset
+from ..base import (
+    DenseDataset,
+    MultiChannelDataset,
+    MultiViewDataset,
+    TiledDataset,
+    SessionDataset,
+)
 
 __all__ = ["ZarrDataset"]
 
 logger = logging.getLogger("utoolbox.io.dataset")
 
 
-class ZarrDataset(DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset):
-    def __init__(self, root_dir):
-        super().__init__()
-
-        self._root_dir = root_dir
-
-        # init internal attribute
-        self._handle = None
-
-        def open_zarr_store():
-            self._handle = None
-
-        self.register_preload_func(open_zarr_store, priority=60)
-
-    ##
-
-    @property
-    def handle(self):
-        if self._handle is None:
-            raise RuntimeError("dataset is not properly opened")
-        return self._handle
-
+class ZarrDataset(
+    SessionDataset, DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset
+):
     @property
     def read_func(self):
         pass
 
-    @property
-    def root_dir(self):
-        return self._root_dir
-
     ##
+
+    def _open_session(self):
+        pass
+
+    def _close_session(self):
+        pass
 
     def _can_read(self):
         pass

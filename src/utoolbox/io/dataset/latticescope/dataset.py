@@ -11,7 +11,13 @@ import pandas as pd
 
 from utoolbox.cli.prompt import prompt_float
 
-from ..base import DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset
+from ..base import (
+    DenseDataset,
+    MultiChannelDataset,
+    MultiViewDataset,
+    TiledDataset,
+    DirectoryDataset,
+)
 from .error import MalformedSettingsFileError, MissingSettingsFileError
 from .settings import AcquisitionMode, ScanType, Settings
 
@@ -20,14 +26,9 @@ __all__ = ["LatticeScopeDataset", "LatticeScopeTiledDataset"]
 logger = logging.getLogger("utoolbox.io.dataset")
 
 
-class LatticeScopeDataset(DenseDataset, MultiChannelDataset, MultiViewDataset):
-    def __init__(self, root_dir):
-        super().__init__()
-
-        self._root_dir = root_dir
-
-    ##
-
+class LatticeScopeDataset(
+    DirectoryDataset, DenseDataset, MultiChannelDataset, MultiViewDataset
+):
     @property
     def read_func(self):
         def func(uri, shape, dtype):

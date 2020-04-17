@@ -5,7 +5,9 @@ import logging
 from abc import ABCMeta, abstractmethod
 from typing import Optional
 
-__all__ = ["SessionDataset"]
+from .generic import BaseDataset
+
+__all__ = ["DirectoryDataset", "SessionDataset"]
 
 logger = logging.getLogger("utoolbox.io.dataset")
 
@@ -32,14 +34,37 @@ class SessionDataset(DirectoryDataset):
         def open_session():
             self._open_session()
 
-        # TODO provide a contextlib wrapped interface for session objects (re-wrap store -> handle)
         self.register_preload_func(open_session, priority=10)
 
     def __enter__(self):
-        pass
+        self._open_session()
+        return self
 
-    def __exit__(self):
-        pass
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    ##
+
+    @property
+    def handle(self):
+        assert (
+            self._handle is not None
+        ), "dataset session is not opened, programmer error"
+        return self._handle
+
+    ##
+
+    def close(self):
+        """
+        Explicitly close the dataset session.
+        
+        If the dataset is not accessed within a with block, please remember to 
+        call this method to close the dataset.
+        """
+        if self._handle is None:
+            return
+        self._close_session()
+        self._handle = None
 
     ##
 
