@@ -16,7 +16,7 @@ logger = logging.getLogger("utoolbox.io.dataset")
 
 
 class PreloadPriorityOffset(IntEnum):
-    Metadata = 20
+    Metadata = 40
     Data = 50
     User = 100
 
@@ -39,8 +39,8 @@ class BaseDataset(metaclass=ABCMeta):
             self._files.sort()
             logger.info(f"found {len(self.files)} file(s)")
 
-        self.register_preload_func(test_readability, priority=0)
-        self.register_preload_func(list_files, priority=10)
+        self.register_preload_func(test_readability, priority=20)
+        self.register_preload_func(list_files, priority=30)
         self.register_preload_func(self._consolidate_inventory, priority=50)
 
     def __getattr__(self, key):
@@ -138,12 +138,12 @@ class BaseDataset(metaclass=ABCMeta):
         By default,
             - 0-99, internal functions
                 - 0-49: metadata
-                    - 0, readability test
-                    - 10, list files
-                    - 20, load dataset metadata
+                    - 10, open session to access the dataset
+                    - 20, readability test
+                    - 30, list files
+                    - 40, load dataset metadata
                 - 50-99: data
                     - 50, consolidate dataset dimension
-                    - 60, open session to access data
                     - 80, assign uuid to data
             - 100-, user functions
 

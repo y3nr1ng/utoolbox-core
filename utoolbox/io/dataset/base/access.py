@@ -33,7 +33,7 @@ class SessionDataset(DirectoryDataset):
             self._open_session()
 
         # TODO provide a contextlib wrapped interface for session objects (re-wrap store -> handle)
-        self.register_preload_func(open_session, priority=60)
+        self.register_preload_func(open_session, priority=10)
 
     def __enter__(self):
         pass
