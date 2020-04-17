@@ -9,9 +9,25 @@ logger = logging.getLogger("utoolbox.io.dataset")
 
 class ZarrDataset(DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset):
     def __init__(self, root_dir):
-        pass
+        super().__init__()
+
+        self._root_dir = root_dir
+
+        # init internal attribute
+        self._handle = None
+
+        def open_zarr_store():
+            self._handle = None
+
+        self.register_preload_func(open_zarr_store, priority=60)
 
     ##
+
+    @property
+    def handle(self):
+        if self._handle is None:
+            raise RuntimeError("dataset is not properly opened")
+        return self._handle
 
     @property
     def read_func(self):

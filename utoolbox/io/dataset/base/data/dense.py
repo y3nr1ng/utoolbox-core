@@ -40,7 +40,7 @@ class DenseDataset(BaseDataset, metaclass=ABCMeta):
             # complete the preload process
             self._inventory = pd.Series(data_uuid, index=self.inventory)
 
-        self.register_preload_func(assign_data_uuid, priority=60)
+        self.register_preload_func(assign_data_uuid, priority=80)
 
     ##
 

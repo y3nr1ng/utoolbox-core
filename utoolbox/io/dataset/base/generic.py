@@ -143,7 +143,8 @@ class BaseDataset(metaclass=ABCMeta):
                     - 20, load dataset metadata
                 - 50-99: data
                     - 50, consolidate dataset dimension
-                    - 60, inventor data (assign uuid)
+                    - 60, open session to access data
+                    - 80, assign uuid to data
             - 100-, user functions
 
         Args:
