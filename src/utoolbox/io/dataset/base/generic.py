@@ -108,6 +108,13 @@ class BaseDataset(metaclass=ABCMeta):
     def load(cls, *args, **kwargs):
         """
         Load dataset and kickstart preload functions.
+        
+        Args:
+            *args : arguments for __init__
+            **kwargs: keyword arguments for __init__
+
+        Note:
+            Function signature should closely match __init__.
         """
         # 1) construct dataset
         ds = cls(*args, **kwargs)
@@ -118,15 +125,9 @@ class BaseDataset(metaclass=ABCMeta):
         return ds
 
     @classmethod
-    def dump(cls, path, dataset=None):
-        """
-        Dump dataset.
-
-        Args:
-            path (str): data destination
-            dataset (optional): if provided, serialize the provided dataset instead of
-                current object
-        """
+    @abstractmethod
+    def dump(cls):
+        """Dump dataset."""
         raise NotImplementedError("serialization is not supported")
 
     ##

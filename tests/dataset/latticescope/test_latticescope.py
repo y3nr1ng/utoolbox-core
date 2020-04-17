@@ -12,7 +12,14 @@ def path():
     return os.path.join(cwd, "data", "demo_3x3x1_CMTKG-V3")
 
 
-def test_open_dataset(path):
+@pytest.fixture
+def dataset(path):
+    """Manually create the dataset object, not loaded yet."""
+    dataset = LatticeScopeTiledDataset(path)
+    return dataset
+
+
+def test_load(path):
     try:
         LatticeScopeTiledDataset.load(path)
     except UnsupportedDatasetError:

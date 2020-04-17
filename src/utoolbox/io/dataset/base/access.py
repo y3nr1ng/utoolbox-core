@@ -24,10 +24,34 @@ class DirectoryDataset(BaseDataset, metaclass=ABCMeta):
     def root_dir(self) -> str:
         return self._root_dir
 
+    ##
+
+    @classmethod
+    def dump(cls, root_dir: str, dataset):
+        """
+        Dump dataset.
+
+        Args:
+            root_dir (str): data destination
+            dataset : serialize the provided dataset
+        """
+        raise NotImplementedError("serialization is not supported")
+
 
 class SessionDataset(DirectoryDataset):
-    def __init__(self, store: str, path: Optional[str] = None):
+    """
+    Dataset that requires a session to access its contents. Since session has a 
+    life-cycle, one should use a `with` block to ensure its closure or 
+    explicitly call the `close` method after finishing it.
+
+    Args:   
+        store (str): path to the data store
+        path (str): internal path
+    """
+
+    def __init__(self, store: str, path: str):
         super().__init__(root_dir=store)
+        self._path = path
 
         self._handle = None
 
@@ -52,6 +76,25 @@ class SessionDataset(DirectoryDataset):
         ), "dataset session is not opened, programmer error"
         return self._handle
 
+    @property
+    def path(self) -> str:
+        """Internal path of the session object."""
+        return self._path
+
+    ##
+
+    @classmethod
+    def dump(cls, store: str, path: str, dataset):
+        """
+        Dump dataset.
+
+        Args:
+            store (str): path to the data store
+            path (str): internal path
+            dataset : serialize the provided dataset
+        """
+        raise NotImplementedError("serialization is not supported")
+
     ##
 
     def close(self):
@@ -62,7 +105,7 @@ class SessionDataset(DirectoryDataset):
         call this method to close the dataset.
         """
         if self._handle is None:
-            return
+            logger.warning(f"dataset is prematurely closed")
         self._close_session()
         self._handle = None
 
@@ -75,5 +118,11 @@ class SessionDataset(DirectoryDataset):
 
     @abstractmethod
     def _close_session(self):
-        """Close opened session and cleanup."""
+        """
+        Close opened session and cleanup.
+        
+        Note:
+            Implementation should set handle to None to signal the closure is 
+            completed.
+        """
         pass
