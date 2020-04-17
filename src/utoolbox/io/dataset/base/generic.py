@@ -168,7 +168,7 @@ class BaseDataset(metaclass=ABCMeta):
         self._preload_funcs.sort(key=lambda f: f[0])
         logger.debug(f"{len(self._preload_funcs)} preload functions registered")
 
-        if logger.getEffectiveLevel() >= logging.DEBUG:
+        if logger.getEffectiveLevel() <= logging.DEBUG:
             # dump all the preload functions
             prev_priority = -1
             table = []
