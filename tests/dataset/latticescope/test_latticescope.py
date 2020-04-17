@@ -1,14 +1,19 @@
+import os
+
 import pytest
 
-from utoolbox.io import dataset
-
-# TODO switch between tiled and non-tiled
-@pytest.fixture(
-    cls=[dataset.LatticeScopeTiledDataset], path=["../data/demo_3x3x1_CMTKG-V3"]
-)
-def dataset(cls, path):
-    return cls.load(path)
+from utoolbox.io.dataset import LatticeScopeTiledDataset
+from utoolbox.io.dataset.base import UnsupportedDatasetError
 
 
-def test_open_dataset(dataset):
-    assert dataset._can_read() == True
+@pytest.fixture
+def path():
+    cwd = os.path.dirname(__file__)
+    return os.path.join(cwd, "data", "demo_3x3x1_CMTKG-V3")
+
+
+def test_open_dataset(path):
+    try:
+        LatticeScopeTiledDataset.load(path)
+    except UnsupportedDatasetError:
+        pytest.fail("unexpected UnsupportedDatasetError")
