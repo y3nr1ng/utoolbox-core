@@ -52,6 +52,7 @@ setup(
         "imageio[ffmpeg]",
         "numpy>=1.17",
         "pandas",
+        "zarr",
     ],
     # additional groups of dependencies here for the "extras" syntax
     extras_require={
