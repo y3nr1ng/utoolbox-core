@@ -42,7 +42,7 @@ class ZarrDataset(
     ##
 
     @classmethod
-    def dump(cls, store: str, dataset, path: Optional[str] = "/"):
+    def dump(cls, store: str, dataset, path: Optional[str] = "/", **kwargs):
         """
         Dump dataset.
 
@@ -50,12 +50,14 @@ class ZarrDataset(
             store (str): path to the data store
             dataset : serialize the provided dataset
             path (str, optional): internal path
+            **kwargs : additional argument for `zarr.open` function
         """
+        ds_zarr = zarr.open(store, **kwargs)
 
     ##
 
     def _open_session(self):
-        z = zarr.open(self.root_dir)
+        z = zarr.open(self.root_dir, mode="r")  # don't create it
         self._handle = z[self.path]
 
         # preview the internal structure
