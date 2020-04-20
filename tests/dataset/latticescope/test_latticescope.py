@@ -8,8 +8,10 @@ from utoolbox.io.dataset.base import UnsupportedDatasetError
 
 @pytest.fixture
 def path():
-    cwd = os.path.dirname(__file__)
-    return os.path.join(cwd, "data", "demo_3x3x1_CMTKG-V3")
+    pwd = os.path.abspath(__file__)
+    cwd = os.path.dirname(pwd)
+    parent = os.path.dirname(cwd)
+    return os.path.join(parent, "data", "demo_3x3x1_CMTKG-V3")
 
 
 @pytest.fixture
