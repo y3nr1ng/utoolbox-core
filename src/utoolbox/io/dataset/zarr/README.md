@@ -16,6 +16,10 @@ each level corresponds to
 - `s` spatial setup, includes different views and tiles
 - last level defines the pyramid scale level, starts from `0`, the original resolution
 
+### Attributes
+TODO
+- define time info, channel info, spatial setup info (coordinate, resolution, downsample setup)
+
 ### Dataset root
 For the original dataset, it is stored under `/`, where generated dataset has an underscore prefix, `/_{:s}`, as its root.
 
