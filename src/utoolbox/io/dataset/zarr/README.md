@@ -1,6 +1,6 @@
 # Zarr Dataset
 
-Zarr provides an implementation of chunked, compressed, N-dimensional arrays. In order to accomodate our common acquisition requirements, it utilize meta-data and a hierarchy group similar to the container structure used in BDV, N5, and IMS.
+Zarr provides an implementation of chunked, compressed, N-dimensional arrays. In order to accomodate our common acquisition requirements, it utilize meta-data and a hierarchy group similar to the container structure used in [BDV](https://arxiv.org/pdf/1412.0488.pdf), [N5](https://github.com/saalfeldlab/n5-viewer), and [IMS](http://open.bitplane.com/Default.aspx?tabid=268).
 
 ## Container Structure
 A dataset stores not only the original image data, but also other lower resolution and post-process generated data.
