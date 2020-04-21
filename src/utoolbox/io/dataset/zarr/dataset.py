@@ -42,7 +42,7 @@ class ZarrDataset(
     ##
 
     @classmethod
-    def dump(cls, store: str, dataset, path: Optional[str] = "/", **kwargs):
+    def dump(cls, store: str, dataset, path: Optional[str] = None, **kwargs):
         """
         Dump dataset.
 
@@ -52,8 +52,13 @@ class ZarrDataset(
             path (str, optional): internal path
             **kwargs : additional argument for `zarr.open` function
         """
-        ds_zarr = zarr.open(store, **kwargs)
+        root = zarr.open(store, **kwargs)
+        if path:
+            # nested group
+            root = root.open_group(path)
 
+        # TODO start populating the container structure
+        
     ##
 
     def _open_session(self):
