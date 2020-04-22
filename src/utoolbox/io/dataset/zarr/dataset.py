@@ -19,6 +19,8 @@ logger = logging.getLogger("utoolbox.io.dataset")
 class ZarrDataset(
     SessionDataset, DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset
 ):
+    version = 1
+
     """
     Using Zarr directory as backend. 
 
@@ -42,7 +44,9 @@ class ZarrDataset(
     ##
 
     @classmethod
-    def dump(cls, store: str, dataset, path: Optional[str] = None, **kwargs):
+    def dump(
+        cls, store: str, dataset, path: Optional[str] = None, overwrite=False, **kwargs
+    ):
         """
         Dump dataset.
 
@@ -50,15 +54,23 @@ class ZarrDataset(
             store (str): path to the data store
             dataset : serialize the provided dataset
             path (str, optional): internal path
+            overwrite (bool, optional): overwrite the dataset if exists
             **kwargs : additional argument for `zarr.open` function
         """
+        kwargs["mode"] = "a"
         root = zarr.open(store, **kwargs)
+
+        # test attributes
+        root.attrs["zarr_dataset"] = "ZarrDataset"
+        root.attrs["format_version"] = cls.version
+
         if path:
             # nested group
-            root = root.open_group(path)
+            mode = "w" if overwrite else "w-"
+            root = root.open_group(path, mode=mode)
 
         # TODO start populating the container structure
-        
+
     ##
 
     def _open_session(self):
