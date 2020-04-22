@@ -17,6 +17,12 @@ each level corresponds to
 - last level defines the pyramid scale level, starts from `0`, the original resolution
 
 ### Attributes
+#### Signature
+Root level of the Zarr file should contain
+- `zarr_dataset` magic attribute with value `ZarrDataset`
+- `format_version` implies the version that implements the container format
+
+#### TODO
 TODO
 - define time info, channel info, spatial setup info (coordinate, resolution, downsample setup)
 
