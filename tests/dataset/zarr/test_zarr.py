@@ -2,6 +2,7 @@ import logging
 import os
 
 from utoolbox.io.dataset import LatticeScopeTiledDataset, ZarrDataset
+from utoolbox.io.dataset.iterators import DatasetIterator
 
 logger = logging.getLogger("test_zarr")
 
@@ -14,6 +15,12 @@ def main():
     logger.info("loading source dataset")
     ds_src_dir = os.path.join(parent, "data", "demo_3D_2x2x2_CMTKG-V3")
     ds_src = LatticeScopeTiledDataset.load(ds_src_dir)
+
+    iterator = DatasetIterator(ds_src, "tile_x", return_key=True)
+    for key, value in iterator:
+        print(f"[{key}]")
+        print(value)
+        print()
 
     logger.info("dumping destination dataset")
     ds_dst_dir = os.path.join(parent, "data", "demo_3D_2x2x2_CMTKG-V3.zarr")

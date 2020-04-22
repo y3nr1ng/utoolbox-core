@@ -1,20 +1,20 @@
 from abc import ABCMeta, abstractmethod
 
 from ..generic import BaseDataset, PreloadPriorityOffset
-from .template import DimensionalDataset
+from ..iterators import DatasetIterator
 
-__all__ = ["MultiViewDataset"]
+__all__ = ["MultiViewDataset", "MultiViewDatasetIterator"]
+
+MULTI_VIEW_INDEX = "view"
 
 
-class MultiViewDataset(BaseDataset, DimensionalDataset, metaclass=ABCMeta):
-    index = ("view",)
-
+class MultiViewDataset(BaseDataset, metaclass=ABCMeta):
     def __init__(self):
         super().__init__()
 
         def load_view_info():
             views = self._load_view_info()
-            self.inventory.update({self.index[0]: views})
+            self.inventory.update({MULTI_VIEW_INDEX: views})
 
         self.register_preload_func(
             load_view_info, priority=PreloadPriorityOffset.Metadata
@@ -27,3 +27,8 @@ class MultiViewDataset(BaseDataset, DimensionalDataset, metaclass=ABCMeta):
     @abstractmethod
     def _load_view_info(self):
         pass
+
+
+class MultiViewDatasetIterator(DatasetIterator):
+    def __init__(self, dataset: MultiViewDataset, **kwargs):
+        super().__init__(dataset, index=MULTI_VIEW_INDEX, **kwargs)

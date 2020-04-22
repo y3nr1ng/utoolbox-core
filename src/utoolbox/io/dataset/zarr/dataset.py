@@ -9,6 +9,7 @@ from ..base import (
     MultiViewDataset,
     SessionDataset,
     TiledDataset,
+    TimeSeriesDataset,
 )
 
 __all__ = ["ZarrDataset"]
@@ -70,6 +71,12 @@ class ZarrDataset(
             root = root.open_group(path, mode=mode)
 
         # TODO start populating the container structure
+        if issubclass(dataset, TimeSeriesDataset):
+            pass
+        if issubclass(dataset, MultiChannelDataset):
+            pass
+        if issubclass(dataset, (MultiViewDataset, TiledDataset)):
+            pass
 
     ##
 
