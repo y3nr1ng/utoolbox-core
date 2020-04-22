@@ -16,16 +16,6 @@ each level corresponds to
 - `s` spatial setup, includes different views and tiles
 - last level defines the pyramid scale level, starts from `0`, the original resolution
 
-### Attributes
-#### Signature
-Root level of the Zarr file should contain
-- `zarr_dataset` magic attribute with value `ZarrDataset`
-- `format_version` implies the version that implements the container format
-
-#### TODO
-TODO
-- define time info, channel info, spatial setup info (coordinate, resolution, downsample setup)
-
 ### Dataset root
 For the original dataset, it is stored under `/`, where generated dataset has an underscore prefix, `/_{:s}`, as its root.
 
@@ -33,3 +23,13 @@ For the original dataset, it is stored under `/`, where generated dataset has an
 To archive a dataset, it is recommended to remove root groups start with an underscore, and all the non-zero resolution level.
 
 If desired, one may keep the `/_preview` root group to provide quick preview access.
+
+## Attributes
+### Signature
+Root level of the Zarr file should contain
+- `zarr_dataset` magic attribute with value `ZarrDataset`
+- `format_version` implies the version that implements the container format
+
+### TODO
+TODO
+- define time info, channel info, spatial setup info (coordinate, resolution, downsample setup)
