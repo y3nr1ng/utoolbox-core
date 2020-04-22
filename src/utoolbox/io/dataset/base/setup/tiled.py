@@ -1,18 +1,21 @@
 from abc import ABCMeta, abstractmethod
 
 from ..generic import BaseDataset, PreloadPriorityOffset
+from .template import DimensionalDataset
 
 __all__ = ["TiledDataset"]
 
 
-class TiledDataset(BaseDataset, metaclass=ABCMeta):
+class TiledDataset(BaseDataset, DimensionalDataset, metaclass=ABCMeta):
+    index = ("tile_x", "tile_y", "tile_z")
+
     def __init__(self):
         super().__init__()
 
         def load_tiling_info():
             index, self._tile_coords = self._load_tiling_info()
             assert any(
-                key in index.keys() for key in ("tile_x", "tile_y", "tile_z")
+                key in index.keys() for key in self.index
             ), "unable to find definition of tiling coordinates"
             self.inventory.update(index)
 
