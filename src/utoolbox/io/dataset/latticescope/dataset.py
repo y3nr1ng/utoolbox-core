@@ -112,7 +112,7 @@ class LatticeScopeDataset(
                     if flag == "TRUE":
                         return ("CamA", "CamB")
                     else:
-                        return ("SINGLE",)
+                        return None
             else:
                 raise MalformedSettingsFileError("cannot find twin camera flag")
 
@@ -139,10 +139,10 @@ class LatticeScopeDataset(
 
     def _retrieve_file_list(self, coord_dict):
         # filter by view...
-        if coord_dict["view"] == "SINGLE":
-            filtered = self.files
-        else:
+        if "view" in coord_dict:
             filtered = [f for f in self.files if coord_dict["view"] in f]
+        else:
+            filtered = self.files
         # .. and channel
         ich = self._lookup_channel_id(coord_dict["channel"])
         filtered = [f for f in filtered if f"ch{ich}" in f]

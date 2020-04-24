@@ -1,15 +1,21 @@
 import logging
+from collections import OrderedDict
 from typing import Optional
+from itertools import product
 
 import zarr
 
 from ..base import (
     DenseDataset,
     MultiChannelDataset,
+    MultiChannelDatasetIterator,
     MultiViewDataset,
+    MultiViewDatasetIterator,
     SessionDataset,
     TiledDataset,
+    TiledDatasetIterator,
     TimeSeriesDataset,
+    TimeSeriesDatasetIterator,
 )
 
 __all__ = ["ZarrDataset"]
@@ -70,13 +76,35 @@ class ZarrDataset(
             mode = "w" if overwrite else "w-"
             root = root.open_group(path, mode=mode)
 
-        # TODO start populating the container structure
-        if issubclass(dataset, TimeSeriesDataset):
-            pass
-        if issubclass(dataset, MultiChannelDataset):
-            pass
-        if issubclass(dataset, (MultiViewDataset, TiledDataset)):
-            pass
+        # start populating the container structure
+        #   /time/channel/setup/level
+        for i_t, (t, t_dataset) in enumerate(TimeSeriesDatasetIterator(dataset)):
+            t_root = root[f"t{i_t}"]
+            t_root.attrs["timestamp"] = t
+
+            for i_c, (c, c_dataset) in enumerate(
+                MultiChannelDatasetIterator(t_dataset)
+            ):
+                c_root = t_root[f"c{i_c}"]
+                c_root.attrs["channel"] = c
+
+                i_s = 0
+                for sv, sv_dataset in MultiViewDatasetIterator(c_dataset):
+                    s_root = c_root[f"s{i_s}"]
+                    if sv is not None:
+                        # write multi-view info
+                        s_root.attrs["view"] = sv
+                    for st, st_dataset in TiledDatasetIterator(sv_dataset):
+                        st_root = sv_root["s"]
+                        # TODO fuck
+        t = populate_dimension(TimeSeriesDataset, TimeSeriesDatasetIterator)
+        c = populate_dimension(MultiChannelDataset, MultiChannelDatasetIterator)
+        sv = populate_dimension(MultiViewDataset, MultiViewDatasetIterator)
+        st = populate_dimension(TiledDataset, TiledDatasetIterator)
+        if sv and st:
+            s = product(sv, st)
+        for tt, cc, ss in product(t, c, s):
+            print(f"t={tt}, c={cc}, s={ss}")
 
     ##
 

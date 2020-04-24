@@ -19,7 +19,10 @@ def main():
     iterator = TiledDatasetIterator(ds_src, axis="zyx", return_key=True)
     for key, value in iterator:
         print(f"[{key}]")
-        print(value)
+        if not isinstance(value, list):
+            value = [value]
+        for v in value:
+            print(f".. {ds_src[v]}")
         print()
 
     logger.info("dumping destination dataset")
