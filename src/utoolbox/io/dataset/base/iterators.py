@@ -29,7 +29,8 @@ class DatasetIterator:
             self._index = index
             self._iter_func = self._single_iter
         else:
-            self._index = list(self._index)
+            self._index = list(index)
+            self._iter_func = self._nested_iter
         self._ascending = ascending
         self._return_key = return_key
 
@@ -37,7 +38,7 @@ class DatasetIterator:
         yield self._iter_func()
 
     def _nested_iter(self):
-        raise NotImplementedError
+        raise NotImplementedError  # TODO
 
     def _single_iter(self):
         dataset = self.dataset.sort_index(

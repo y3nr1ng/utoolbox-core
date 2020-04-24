@@ -3,7 +3,7 @@ from abc import ABCMeta, abstractmethod
 from ..generic import BaseDataset, PreloadPriorityOffset
 from ..iterators import DatasetIterator
 
-__all__ = ["TimeSeriesDataset"]
+__all__ = ["TimeSeriesDataset", "TimeSeriesDatasetIterator"]
 
 TIME_SERIES_INDEX = "time"
 

@@ -1,9 +1,12 @@
+import logging
 from abc import ABCMeta, abstractmethod
 
 from ..generic import BaseDataset, PreloadPriorityOffset
 from ..iterators import DatasetIterator
 
-__all__ = ["TiledDataset"]
+__all__ = ["TiledDataset", "TiledDatasetIterator"]
+
+logger = logging.getLogger("utoolbox.io.dataset")
 
 TILED_INDEX = ("tile_x", "tile_y", "tile_z")
 
@@ -15,7 +18,7 @@ class TiledDataset(BaseDataset, metaclass=ABCMeta):
         def load_tiling_info():
             index, self._tile_coords = self._load_tiling_info()
             assert any(
-                key in index.keys() for key in self.TILED_INDEX
+                key in index.keys() for key in TILED_INDEX
             ), "unable to find definition of tiling coordinates"
             self.inventory.update(index)
 
@@ -79,7 +82,27 @@ class TiledDataset(BaseDataset, metaclass=ABCMeta):
 
 
 class TiledDatasetIterator(DatasetIterator):
-    def __init__(self, dataset: TiledDataset, axis="zyx", **kwargs):
-        # rearrange axis
-        # TODO
-        super().__init__(dataset, index=TILED_INDEX, **kwargs)
+    """
+    Iterator for tiled dataset.
+
+    Args:
+        dataset (TiledDataset): source dataset
+        axis (str, optional): order of tiling axis to tile over with
+        **kwargs: additional keyword arguments
+    """
+
+    def __init__(self, dataset: TiledDataset, *, axis="zyx", **kwargs):
+        # restore axis name
+        axis = [f"tile_{a}" for a in axis]
+        if any(a not in TILED_INDEX for a in axis):
+            desc = ", ".join(f'"{a}"' for a in TILED_INDEX)
+            raise ValueError(f"axis can only contain {desc}")
+
+        # drop unsupported axis
+        index = [a for a in axis if a in dataset.index.names]
+        delta = set(index) ^ set(axis)
+        if len(delta) > 0:
+            desc = ", ".join(f'"{a}"' for a in delta)
+            logger.warning(f"found unused index, dropping {desc}")
+
+        super().__init__(dataset, index=index, **kwargs)
