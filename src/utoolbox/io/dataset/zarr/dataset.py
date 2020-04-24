@@ -78,6 +78,7 @@ class ZarrDataset(
 
         # start populating the container structure
         #   /time/channel/setup/level
+        # welp, i have no idea how to do this cleanly without nested structure
         for i_t, (t, t_dataset) in enumerate(TimeSeriesDatasetIterator(dataset)):
             t_root = root[f"t{i_t}"]
             t_root.attrs["timestamp"] = t
@@ -97,14 +98,6 @@ class ZarrDataset(
                     for st, st_dataset in TiledDatasetIterator(sv_dataset):
                         st_root = sv_root["s"]
                         # TODO fuck
-        t = populate_dimension(TimeSeriesDataset, TimeSeriesDatasetIterator)
-        c = populate_dimension(MultiChannelDataset, MultiChannelDatasetIterator)
-        sv = populate_dimension(MultiViewDataset, MultiViewDatasetIterator)
-        st = populate_dimension(TiledDataset, TiledDatasetIterator)
-        if sv and st:
-            s = product(sv, st)
-        for tt, cc, ss in product(t, c, s):
-            print(f"t={tt}, c={cc}, s={ss}")
 
     ##
 
