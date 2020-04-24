@@ -26,7 +26,8 @@ def main():
         print()
 
     logger.info("dumping destination dataset")
-    ds_dst_dir = os.path.join(parent, "data", "demo_3D_2x2x2_CMTKG-V3.zarr")
+    parent, dname = os.path.split(ds_src_dir)
+    ds_dst_dir = os.path.join(parent, f"{dname}.zarr")
     ZarrDataset.dump(ds_dst_dir, ds_src)
 
 
