@@ -110,18 +110,23 @@ class ZarrDataset(
                         l0_group = s_root.require_group("0")
                         print(l0_group)  # DEBUG
                         data = dataset[selected]
-                        # NOTE using default chunk shape after rechunk will cause
-                        # problem, since chunk size is composite of chunks as tuples
-                        # instead of int
+                        # NOTE compression benchmark reference http://alimanfoo.github.
+                        # io/2016/09/21/genotype-compression-benchmark.html
                         data_dst = l0_group.empty_like(
                             "data",
                             data,
                             chunks=True,
-                            compression="lz4",
-                            compression_opts=dict(acceleration=1),
+                            compression="blosc",
+                            compression_opts=dict(
+                                cname="lz4", clevel=5, shuffle=zarr.blosc.SHUFFLE
+                            ),
                         )
+                        # NOTE using default chunk shape after rechunk will cause
+                        # problem, since chunk size is composite of chunks as tuples
+                        # instead of int
                         data_src = data.rechunk(data_dst.chunks)
-                        data_dst[...] = data_src[...]
+                        data_src.to_zarr(data_dst)
+                        # FIXME move to distributed, use submit (parallel)
 
     ##
 
