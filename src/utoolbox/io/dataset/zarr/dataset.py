@@ -1,7 +1,5 @@
 import logging
-from collections import OrderedDict
 from typing import Optional
-from itertools import product
 
 import zarr
 
@@ -79,25 +77,51 @@ class ZarrDataset(
         # start populating the container structure
         #   /time/channel/setup/level
         # welp, i have no idea how to do this cleanly without nested structure
-        for i_t, (t, t_dataset) in enumerate(TimeSeriesDatasetIterator(dataset)):
-            t_root = root[f"t{i_t}"]
+        # 1) time
+        for i_t, (t, t_selected) in enumerate(TimeSeriesDatasetIterator(dataset)):
+            t_root = root.require_group(f"t{i_t}")
             t_root.attrs["timestamp"] = t
 
-            for i_c, (c, c_dataset) in enumerate(
-                MultiChannelDatasetIterator(t_dataset)
+            # 2) channel
+            for i_c, (c, c_selected) in enumerate(
+                MultiChannelDatasetIterator(t_selected)
             ):
-                c_root = t_root[f"c{i_c}"]
+                c_root = t_root.require_group(f"c{i_c}")
                 c_root.attrs["channel"] = c
 
+                # 3) setup
                 i_s = 0
-                for sv, sv_dataset in MultiViewDatasetIterator(c_dataset):
-                    s_root = c_root[f"s{i_s}"]
+                for sv, v_selected in MultiViewDatasetIterator(c_selected):
+                    attrs = {}
                     if sv is not None:
-                        # write multi-view info
-                        s_root.attrs["view"] = sv
-                    for st, st_dataset in TiledDatasetIterator(sv_dataset):
-                        st_root = sv_root["s"]
-                        # TODO fuck
+                        attrs["view"] = sv
+                    tiles_iterator = TiledDatasetIterator(v_selected, axis="zyx")
+                    for st, selected in tiles_iterator:
+                        if st is not None:
+                            names = tiles_iterator.index
+                            names = [name.split("_")[-1] for name in names]
+                            attrs["tile_coord"] = {k: v for k, v in zip(names, st)}
+
+                        s_root = c_root.require_group(f"s{i_s}")
+                        i_s += 1
+                        s_root.attrs.update(attrs)
+
+                        # 4) level
+                        l0_group = s_root.require_group("0")
+                        print(l0_group)  # DEBUG
+                        data = dataset[selected]
+                        # NOTE using default chunk shape after rechunk will cause
+                        # problem, since chunk size is composite of chunks as tuples
+                        # instead of int
+                        data_dst = l0_group.empty_like(
+                            "data",
+                            data,
+                            chunks=True,
+                            compression="lz4",
+                            compression_opts=dict(acceleration=1),
+                        )
+                        data_src = data.rechunk(data_dst.chunks)
+                        data_dst[...] = data_src[...]
 
     ##
 
