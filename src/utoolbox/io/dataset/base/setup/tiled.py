@@ -106,3 +106,13 @@ class TiledDatasetIterator(DatasetIterator):
             logger.warning(f"found unused index, dropping {desc}")
 
         super().__init__(dataset, index=index, **kwargs)
+
+
+class TiledSlabDatasetIterator(TiledDatasetIterator):
+    """
+    Treat Z slices as slabs. 
+
+    This iterator batches tiles within the same layers or multiple layers (a slab).
+    """
+
+    # TODO
