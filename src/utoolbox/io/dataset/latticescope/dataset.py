@@ -224,6 +224,8 @@ class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
         )
         # keep only these columns
         coords = coords[["tile_x", "tile_y", "tile_z"]]
+        # ensure we have np.float32
+        coords = coords.astype(np.float32)
         # keep the scanning order, LatticeScope use this as saving order
         return coords
 
