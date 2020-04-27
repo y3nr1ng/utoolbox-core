@@ -2,6 +2,8 @@ import logging
 from typing import Optional
 
 import zarr
+from dask.distributed import as_completed
+from tqdm import tqdm
 
 from ..base import (
     DenseDataset,
@@ -37,10 +39,17 @@ class ZarrDataset(
         path (str, optional): group path
     """
 
-    def __init__(self, store: str, path: str = "/"):
+    def __init__(self, store: str, path: str = "/", level=0):
+        self._level = 0
+
         super().__init__(store, path)
 
     ##
+
+    @property
+    def level(self) -> int:
+        """Pyramid level to load."""
+        return self._level
 
     @property
     def read_func(self):
@@ -50,7 +59,13 @@ class ZarrDataset(
 
     @classmethod
     def dump(
-        cls, store: str, dataset, path: Optional[str] = None, overwrite=False, **kwargs
+        cls,
+        store: str,
+        dataset,
+        path: Optional[str] = None,
+        overwrite=False,
+        client=None,
+        **kwargs,
     ):
         """
         Dump dataset.
@@ -60,6 +75,7 @@ class ZarrDataset(
             dataset : serialize the provided dataset
             path (str, optional): internal path
             overwrite (bool, optional): overwrite the dataset if exists
+            client (Client, optional): remote cluster client
             **kwargs : additional argument for `zarr.open` function
         """
         kwargs["mode"] = "a"
@@ -73,6 +89,8 @@ class ZarrDataset(
             # nested group
             mode = "w" if overwrite else "w-"
             root = root.open_group(path, mode=mode)
+
+        tasks = []  # conversion tasks, batch submit after populated all of them
 
         # start populating the container structure
         #   /time/channel/setup/level
@@ -125,8 +143,37 @@ class ZarrDataset(
                         # problem, since chunk size is composite of chunks as tuples
                         # instead of int
                         data_src = data.rechunk(data_dst.chunks)
-                        data_src.to_zarr(data_dst)
-                        # FIXME move to distributed, use submit (parallel)
+                        task = data_src.to_zarr(
+                            data_dst, overwrite=overwrite, compute=False
+                        )
+                        tasks.append(task)
+
+        def wait_future(futures):
+            n_failed = 0
+            for future in tqdm(as_completed(futures), total=len(futures)):
+                try:
+                    future.result()
+                except Exception as error:
+                    logger.exception(error)
+                    n_failed += 1
+            if n_failed > 0:
+                logger.error(f"{n_failed} task(s) failed")
+
+        # submit the task to cluster
+        if client:
+            futures = client.compute(tasks)
+            wait_future(futures)
+        else:
+            from dask.distributed import Client
+
+            logger.info("launch a temporary local cluster")
+            with Client(
+                memory_target_fraction=False,
+                memory_spill_fraction=False,
+                memory_pause_fraction=0.6,
+            ) as client:
+                futures = client.compute(tasks)
+                wait_future(futures)
 
     ##
 
@@ -144,8 +191,8 @@ class ZarrDataset(
 
     def _can_read(self):
         try:
-            magic = self.handle["zarr_dataset"]
-            version = self.handle["format_version"]
+            magic = self.handle.attrs["zarr_dataset"]
+            version = self.handle.attrs["format_version"]
         except KeyError:
             return False
         else:
