@@ -165,12 +165,20 @@ class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
         script_path = glob.glob(os.path.join(self.root_dir, "*.csv"))
         if len(script_path) == 0:
             return False
-        self._script_path = script_path[0]
-
-        if len(script_path) > 1:
-            logger.warning(
-                f'found multiple script file candidates, using "{self._script_path}"'
-            )
+        elif len(script_path) > 1:
+            logger.warning(f"found {len(script_path)} script file candidates")
+            for path in script_path:
+                with open(path, "r") as fd:
+                    first_line = fd.readline()
+                    if first_line.startswith("# Subvolume X"):
+                        logger.info(f'using "{os.path.basename(path)}" as script file')
+                        self._script_path = path
+                        break
+            else:
+                logger.error("none of the candidates are valid")
+                return False
+        else:
+            self._script_path = script_path[0]
 
         return True
 
