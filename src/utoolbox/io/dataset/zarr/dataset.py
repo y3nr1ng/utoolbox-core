@@ -217,6 +217,9 @@ class ZarrDataset(
         s = list(root.group_keys())
         n_s = len(s)  # TODO enumerate attributes across different setups
         print(f"t={n_t}, c={n_c}, s={n_s}")
+
+        # TODO generalize the data list to a table
+        
         raise RuntimeError("DEBUG, _enumerate_files")
 
     def _load_array_info(self):
