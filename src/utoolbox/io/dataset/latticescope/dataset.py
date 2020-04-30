@@ -1,23 +1,23 @@
 import glob
-from io import StringIO
 import logging
 import os
 import re
 from collections import defaultdict
-from dask import delayed
+from io import StringIO
+
 import dask.array as da
 import imageio
 import numpy as np
 import pandas as pd
-
-from utoolbox.cli.prompt import prompt_float
+from dask import delayed
+from prompt_toolkit.shortcuts import input_dialog
 
 from ..base import (
     DenseDataset,
+    DirectoryDataset,
     MultiChannelDataset,
     MultiViewDataset,
     TiledDataset,
-    DirectoryDataset,
     TimeSeriesDataset,
 )
 from .error import MalformedSettingsFileError, MissingSettingsFileError
@@ -148,7 +148,10 @@ class LatticeScopeDataset(
                 raise MalformedSettingsFileError("cannot find twin camera flag")
 
     def _load_voxel_size(self):
-        self._pixel_size = prompt_float("What is the size of a single pixel? ")
+        value = input_dialog(
+            title="Missing Info", text="What is the size of a single pixel? "
+        ).run()
+        self._pixel_size = float(value)
         size = (self._pixel_size,) * 2
 
         if self.metadata["general"]["mode"] == AcquisitionMode.Z_STACK:

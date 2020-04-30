@@ -33,11 +33,13 @@ class TimeSeriesDataset(BaseDataset, metaclass=ABCMeta):
     @property
     def interval(self):
         """Difference in time in seconds between each acquired data array."""
+        raise NotImplementedError
         return self._t_interval
 
     @property
     def idle(self):
         """Amount of idle time in seconds between each acquired data array."""
+        raise NotImplementedError
         return self._t_idle
 
     ##
@@ -60,7 +62,7 @@ class TimeSeriesDataset(BaseDataset, metaclass=ABCMeta):
         if any(t1 <= t0 for t1, t0 in zip(timestamps[1:], timestamps[:-1])):
             raise RuntimeError("timestamps are not monotonically increasing")
 
-        # parse interval/idel info
+        # parse interval/idle info
         # TODO
 
         return timestamps

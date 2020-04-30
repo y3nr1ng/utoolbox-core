@@ -237,4 +237,34 @@ class HardwareSettings(AttrDict):
 
         self.raw_config = config
 
-        # TODO parse only required info
+        for section in config.sections():
+            try:
+                # iterate over ini sections
+                section, parse_func = {
+                    "Twin Cam Saving": ("twin_cam", self.parse_twin_cam_saving),
+                }[section]
+
+                # get resave section dict
+                try:
+                    parsed_section = self[section]
+                except KeyError:
+                    parsed_section = AttrDict()
+                    self[section] = parsed_section
+
+                # save parsed result
+                key, parsed = parse_func()
+                parsed_section[key] = parsed
+            except KeyError:
+                logger.debug('unknown section "{}", ignored'.format(section))
+
+    ##
+
+    def parse_twin_cam_saving(self):
+        parsed = {}
+        for key, save in self.raw_config["Twin Cam Saving"].items():
+            camera, channel = re.search(
+                r"saving camera ([a-zA-Z]{1}) (.*)", key
+            ).groups()
+            camera = f"Cam{camera.upper()}"
+            parsed[(camera, channel)] = save == "TRUE"
+        return "partial_save", parsed
