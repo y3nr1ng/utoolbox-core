@@ -1,4 +1,7 @@
 from abc import ABCMeta, abstractmethod
+from typing import List
+
+import numpy as np
 
 from ..generic import BaseDataset, PreloadPriorityOffset
 from ..iterators import DatasetIterator
@@ -14,7 +17,7 @@ class TimeSeriesDataset(BaseDataset, metaclass=ABCMeta):
 
         # use assign_coords to add time coords
         def load_timeseries_info():
-            raise NotImplementedError
+            pass  # raise NotImplementedError
 
         self.register_preload_func(
             load_timeseries_info, priority=PreloadPriorityOffset.Metadata
@@ -22,9 +25,30 @@ class TimeSeriesDataset(BaseDataset, metaclass=ABCMeta):
 
     ##
 
+    @property
+    def interval(self):
+        """Difference in time in seconds between each acquired data array."""
+        return self._t_interval
+
+    @property
+    def idle(self):
+        """Amount of idle time in seconds between each acquired data array."""
+        return self._t_idle
+
+    ##
+
     @abstractmethod
-    def _load_timeseries_info(self):
+    def _load_timestamps(self) -> List[np.datetime64]:
         pass
+
+    def _load_timeseries_info(self):
+        timestamps = self._load_timestamps()
+        # ensure the timestamp has millisecond resolution
+        timestamps = [np.datetime64(timestamp, "ms") for timestamp in timestamps]
+
+        dt = timestamps[1:] - timestamps[:-1]
+        print(dt)
+        raise RuntimeError("DEBUG")
 
 
 class TimeSeriesDatasetIterator(DatasetIterator):

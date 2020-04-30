@@ -19,7 +19,7 @@ SUPPORTED_DATASET_CLASS = [
     MicroManagerV2Dataset,
     MicroManagerV1Dataset,
     # LatticeScope
-    LatticeScopeTiledDataset,
+    LatticeScopeTiledDataset, # we must test the tiled-form first
     LatticeScopeDataset,
     # SmartSPIM
     SmartSpimDataset,

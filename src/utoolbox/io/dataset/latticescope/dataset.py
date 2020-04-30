@@ -17,6 +17,7 @@ from ..base import (
     MultiViewDataset,
     TiledDataset,
     DirectoryDataset,
+    TimeSeriesDataset,
 )
 from .error import MalformedSettingsFileError, MissingSettingsFileError
 from .settings import AcquisitionMode, ScanType, Settings
@@ -27,7 +28,11 @@ logger = logging.getLogger("utoolbox.io.dataset")
 
 
 class LatticeScopeDataset(
-    DirectoryDataset, DenseDataset, MultiChannelDataset, MultiViewDataset
+    DirectoryDataset,
+    DenseDataset,
+    MultiChannelDataset,
+    MultiViewDataset,
+    TimeSeriesDataset,
 ):
     @property
     def read_func(self):
@@ -101,6 +106,9 @@ class LatticeScopeDataset(
             metadata = Settings(fd.read())
         self._settings_path = settings_path
         return metadata
+
+    def _load_timestamps(self):
+        pass
 
     def _load_view_info(self):
         # TODO dirty patch, fix this
