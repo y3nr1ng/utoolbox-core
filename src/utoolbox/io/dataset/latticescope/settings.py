@@ -3,10 +3,11 @@ from datetime import datetime
 from enum import Enum
 import logging
 import re
+import configparser
 
 from utoolbox.utils import AttrDict
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("utoolbox.io.dataset")
 
 
 class AcquisitionMode(Enum):
@@ -52,7 +53,7 @@ class Settings(AttrDict):
                     "Waveform": Settings.parse_waveform,
                     "Camera": Settings.parse_camera,
                     "Advanced Timing": Settings.parse_timing,
-                    # ".ini File": None, # TODO analyze setup file
+                    ".ini File": Settings.parse_hardware_settings,
                 }[title](lines[start:end])
                 self[section] = parsed
             except KeyError:
@@ -211,7 +212,29 @@ class Settings(AttrDict):
 
         return "timing", parsed
 
+    @staticmethod
+    def parse_hardware_settings(lines):
+        # drop the header line
+        lines = lines.split("\n", 1)[1]
 
-class HardwareSettings(object):
+        return "hardware", HardwareSettings(lines)
+
+
+class HardwareSettings(AttrDict):
+    """
+    Args:
+        lines (str): lines read from the .ini file
+
+    Attributes:
+        raw_config (ConfigParser): the main configuration parser from lines
+    """
+
     def __init__(self, lines):
-        pass
+        super().__init__()
+
+        config = configparser.ConfigParser()
+        config.read_string(lines)
+
+        self.raw_config = config
+
+        # TODO parse only required info

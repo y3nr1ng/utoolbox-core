@@ -1,10 +1,10 @@
 import logging
 import os
-
-from tqdm import tqdm
+from pprint import pprint
 
 from utoolbox.io.dataset import (
     LatticeScopeTiledDataset,
+    LatticeScopeDataset,
     TiledDatasetIterator,
     ZarrDataset,
 )
@@ -14,7 +14,8 @@ logger = logging.getLogger("test_zarr")
 
 def main(ds_src_dir, ds_dst_dir, client=None):
     logger.info("loading source dataset")
-    ds_src = LatticeScopeTiledDataset.load(ds_src_dir)
+    # ds_src = LatticeScopeTiledDataset.load(ds_src_dir)
+    ds_src = LatticeScopeDataset.load(ds_src_dir)
 
     # iterator = TiledDatasetIterator(ds_src, axis="zyx", return_key=True)
     # for key, value in iterator:
@@ -25,6 +26,10 @@ def main(ds_src_dir, ds_dst_dir, client=None):
     #        print(v)
     #        print(f".. {ds_src[v]}")
     #    print()
+
+    pprint(ds_src.metadata)
+
+    raise RuntimeError("DEBUG")
 
     if not os.path.exists(ds_dst_dir):
         logger.info("dumping destination dataset")
@@ -48,7 +53,7 @@ if __name__ == "__main__":
 
     # Case 2)
     cwd = os.path.dirname(os.path.abspath(__file__))
-    ds_src_dir = os.path.join(cwd, "../data/demo_3D_2x2x2_CMTKG-V3")
+    ds_src_dir = os.path.join(cwd, "../data/cell1_zp3um_20ms_interval_12s")
     parent, dname = os.path.split(ds_src_dir)
     ds_dst_dir = os.path.join(parent, f"{dname}.zarr")
 
