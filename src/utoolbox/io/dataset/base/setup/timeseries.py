@@ -1,3 +1,4 @@
+import logging
 from abc import ABCMeta, abstractmethod
 from typing import List
 
@@ -8,6 +9,8 @@ from ..iterators import DatasetIterator
 
 __all__ = ["TimeSeriesDataset", "TimeSeriesDatasetIterator"]
 
+logger = logging.getLogger("utoolbox.io.dataset")
+
 TIME_SERIES_INDEX = "time"
 
 
@@ -17,7 +20,9 @@ class TimeSeriesDataset(BaseDataset, metaclass=ABCMeta):
 
         # use assign_coords to add time coords
         def load_timeseries_info():
-            pass  # raise NotImplementedError
+            timestamps = self._load_timeseries_info()
+            if timestamps is not None:
+                self.inventory.update({TIME_SERIES_INDEX: timestamps})
 
         self.register_preload_func(
             load_timeseries_info, priority=PreloadPriorityOffset.Metadata
@@ -43,12 +48,22 @@ class TimeSeriesDataset(BaseDataset, metaclass=ABCMeta):
 
     def _load_timeseries_info(self):
         timestamps = self._load_timestamps()
-        # ensure the timestamp has millisecond resolution
-        timestamps = [np.datetime64(timestamp, "ms") for timestamp in timestamps]
+        try:
+            if len(timestamps) <= 1:
+                logger.warning("single timepoint is simplified as a fixed dataset")
+                return None
+        except TypeError:
+            # timestamps is None
+            return None
 
-        dt = timestamps[1:] - timestamps[:-1]
-        print(dt)
-        raise RuntimeError("DEBUG")
+        # timestamps should be monotonically increaing
+        if any(t1 <= t0 for t1, t0 in zip(timestamps[1:], timestamps[:-1])):
+            raise RuntimeError("timestamps are not monotonically increasing")
+
+        # parse interval/idel info
+        # TODO
+
+        return timestamps
 
 
 class TimeSeriesDatasetIterator(DatasetIterator):

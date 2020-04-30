@@ -2,7 +2,8 @@ import glob
 from io import StringIO
 import logging
 import os
-
+import re
+from collections import defaultdict
 from dask import delayed
 import dask.array as da
 import imageio
@@ -108,7 +109,29 @@ class LatticeScopeDataset(
         return metadata
 
     def _load_timestamps(self):
-        pass
+        pattern = r"_stack(\d+)_.*_(\d+)msec_"
+        pairs = defaultdict(list)
+        for filename in self.files:
+            try:
+                stackno, rel_ts = re.search(pattern, filename).groups()
+                stackno, rel_ts = int(stackno), np.timedelta64(rel_ts, "ms")
+            except (AttributeError, ValueError):
+                # no match!
+                logger.error(f'malformed filename "{os.path.basename(filename)}"')
+            pairs[stackno].append(rel_ts)
+
+        # deduplicate
+        dedup_pairs = []
+        for stackno, ts in pairs.items():
+            if not all(t == ts[0] for t in ts):
+                logger.warning(
+                    f"a channel/view combination yields inconsistent timestamp"
+                )
+            dedup_pairs.append((stackno, ts[0]))
+
+        # sort timestamps by stackno
+        dedup_pairs.sort(key=lambda x: x[0])
+        return [rel_ts for _, rel_ts in dedup_pairs]
 
     def _load_view_info(self):
         # TODO dirty patch, fix this
