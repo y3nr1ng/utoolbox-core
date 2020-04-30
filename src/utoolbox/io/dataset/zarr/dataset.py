@@ -200,7 +200,24 @@ class ZarrDataset(
             return True
 
     def _enumerate_files(self):
-        pass
+        #   /time/channel/setup/level
+
+        # 1) time
+        root = self.handle
+        t0 = list(root.group_keys())
+        n_t = len(t0)
+
+        # 2) channel
+        root = root[t0[0]]
+        c0 = list(root.group_keys())
+        n_c = len(c0)
+
+        # 3) setup
+        root = root[c0[0]]
+        s = list(root.group_keys())
+        n_s = len(s)  # TODO enumerate attributes across different setups
+        print(f"t={n_t}, c={n_c}, s={n_s}")
+        raise RuntimeError("DEBUG, _enumerate_files")
 
     def _load_array_info(self):
         pass
