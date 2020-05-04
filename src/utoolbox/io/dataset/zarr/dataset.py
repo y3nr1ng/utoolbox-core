@@ -98,6 +98,9 @@ class ZarrDataset(
         # 1) time
         for i_t, (t, t_selected) in enumerate(TimeSeriesDatasetIterator(dataset)):
             t_root = root.require_group(f"t{i_t}")
+
+            t = t.to_timedelta64()  # ns
+            t = int(t) // 1000000  # ms
             t_root.attrs["timestamp"] = t
 
             # 2) channel
@@ -213,13 +216,14 @@ class ZarrDataset(
         n_c = len(c0)
 
         # 3) setup
+        print(root)
         root = root[c0[0]]
         s = list(root.group_keys())
         n_s = len(s)  # TODO enumerate attributes across different setups
         print(f"t={n_t}, c={n_c}, s={n_s}")
 
         # TODO generalize the data list to a table
-        
+
         raise RuntimeError("DEBUG, _enumerate_files")
 
     def _load_array_info(self):
