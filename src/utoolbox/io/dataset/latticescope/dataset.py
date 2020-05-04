@@ -38,6 +38,7 @@ class LatticeScopeDataset(
     @property
     def read_func(self):
         def func(uri, shape, dtype):
+            print(f'read_func "{uri}"')
             array = da.from_delayed(
                 delayed(imageio.volread, pure=True)(uri), shape, dtype
             )
@@ -171,17 +172,23 @@ class LatticeScopeDataset(
         else:
             raise ValueError(f'channel "{channel}" is not enlisted in the settings')
 
-    def _retrieve_file_list(self, coord_dict):
-        # filter by view...
+    def _retrieve_file_list(self, coord_dict, single=True):
+        # filter by view, might only has single view
         if "view" in coord_dict:
             filtered = [f for f in self.files if coord_dict["view"] in f]
         else:
             filtered = self.files
-        # .. and channel
+        # filter by channel and timestamp
         ich = self._lookup_channel_id(coord_dict["channel"])
-        filtered = [f for f in filtered if f"ch{ich}" in f]
+        its = coord_dict["time"].to_timedelta64()  # ns
+        its = int(its) // 1000000  # ms
+        filtered = [f for f in filtered if f"ch{ich}" in f and f"_{its:07d}msec_" in f]
 
-        return filtered
+        if single:
+            assert len(filtered) == 1, "found more than 1 file matches, stmt error"
+            return filtered[0]
+        else:
+            return filtered
 
 
 class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
