@@ -103,7 +103,11 @@ class TiledDatasetIterator(DatasetIterator):
         delta = set(index) ^ set(axis)
         if len(delta) > 0:
             desc = ", ".join(f'"{a}"' for a in delta)
-            logger.warning(f"found unused index, dropping {desc}")
+            logger.debug(f"found unused index, dropping {desc}")
+
+        if not index:
+            # use dummy axis header to trigger KeyError
+            index = "tile_"
 
         super().__init__(dataset, index=index, **kwargs)
 
