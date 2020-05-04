@@ -1,6 +1,8 @@
 import logging
+from collections import defaultdict
 from typing import Optional
 
+import dask.array as da
 import zarr
 from dask.distributed import as_completed
 from tqdm import tqdm
@@ -22,6 +24,8 @@ __all__ = ["ZarrDataset"]
 
 logger = logging.getLogger("utoolbox.io.dataset")
 
+RAW_DATA_LABEL = "raw"
+
 
 class ZarrDataset(
     SessionDataset, DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset
@@ -36,24 +40,41 @@ class ZarrDataset(
 
     Args:
         store (str): path to the data store
-        path (str, optional): group path
+        label (str, optional): label of the data array
+        path (str, optional): internal group path
+        level (int, optional): resolution level
     """
 
-    def __init__(self, store: str, path: str = "/", level=0):
-        self._level = 0
+    def __init__(
+        self, store: str, label: str = RAW_DATA_LABEL, path: str = "/", level: int = 0
+    ):
+        self._label, self._level = label, 0
 
         super().__init__(store, path)
 
     ##
 
     @property
+    def label(self) -> str:
+        return self._label
+
+    @property
     def level(self) -> int:
         """Pyramid level to load."""
         return self._level
 
+    @level.setter
+    def level(self, level: int):
+        # TODO how to reload dataset from filesystem
+        raise NotImplementedError
+
     @property
     def read_func(self):
-        pass
+        def func(uri, shape, dtype):
+            # zarr array contains shape, dtype and decompression info
+            return da.from_zarr(self.root_dir, uri)
+
+        return func
 
     ##
 
@@ -62,6 +83,7 @@ class ZarrDataset(
         cls,
         store: str,
         dataset,
+        label: str = RAW_DATA_LABEL,
         path: Optional[str] = None,
         overwrite=False,
         client=None,
@@ -73,6 +95,7 @@ class ZarrDataset(
         Args:
             store (str): path to the data store
             dataset : serialize the provided dataset
+            label (str, optional): label of the data array
             path (str, optional): internal path
             overwrite (bool, optional): overwrite the dataset if exists
             client (Client, optional): remote cluster client
@@ -134,7 +157,7 @@ class ZarrDataset(
                         # NOTE compression benchmark reference http://alimanfoo.github.
                         # io/2016/09/21/genotype-compression-benchmark.html
                         data_dst = l0_group.empty_like(
-                            "data",
+                            label,
                             data,
                             chunks=True,
                             compression="blosc",
@@ -205,26 +228,24 @@ class ZarrDataset(
     def _enumerate_files(self):
         #   /time/channel/setup/level
 
-        # 1) time
-        root = self.handle
-        t0 = list(root.group_keys())
-        n_t = len(t0)
+        l_str = str(self.level)
+        files = []
+        for t, t_root in self.handle.groups():
+            for c, c_root in t_root.groups():
+                for s, s_root in c_root.groups():
+                    if l_str not in s_root:
+                        # no data for this resolution level
+                        continue
+                    s_root = s_root[l_str]
+                    if self.label in s_root:
+                        # build path
+                        path = f"/{t}/{c}/{s}/{l_str}/{self.label}"
+                        files.append(path)
+        logger.info(
+            f'found {len(files)} file(s) for label "{self.label}", level {self.level}'
+        )
 
-        # 2) channel
-        root = root[t0[0]]
-        c0 = list(root.group_keys())
-        n_c = len(c0)
-
-        # 3) setup
-        print(root)
-        root = root[c0[0]]
-        s = list(root.group_keys())
-        n_s = len(s)  # TODO enumerate attributes across different setups
-        print(f"t={n_t}, c={n_c}, s={n_s}")
-
-        # TODO generalize the data list to a table
-
-        raise RuntimeError("DEBUG, _enumerate_files")
+        return files
 
     def _load_array_info(self):
         pass
@@ -233,7 +254,35 @@ class ZarrDataset(
         pass
 
     def _load_metadata(self):
-        pass
+        dim_info = defaultdict(lambda: defaultdict(list))
+
+        # /time[G]/channel[G]/setup[G]/level[G]/label[A]
+        indices = ["time", "channel", "setup", "level", "label"]
+
+        def nested_iters(root, indices):
+            """
+            Loop over each group and extract their raw attributes.
+            
+            Args:
+                root (Group): the root to start with
+                indices (list of str): the index list to use as key in `dim_info`
+            """
+            index = indices.pop(0)
+            if len(indices) == 1:
+                # last dimension is the array itself
+                iterator = root.arrays()
+            else:
+                iterator = root.groups()
+            for name, child in iterator:
+                dim_info[index][name].append(child.attrs)  # lazy load
+                if indices:
+                    nested_iters(child, indices[1:])
+
+        # TODO lowest level is still incorrect
+        
+        nested_iters(self.handle, indices)
+
+        return dim_info
 
     def _load_tiling_coordinates(self):
         pass

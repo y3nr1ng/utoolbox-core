@@ -38,7 +38,6 @@ class LatticeScopeDataset(
     @property
     def read_func(self):
         def func(uri, shape, dtype):
-            print(f'read_func "{uri}"')
             array = da.from_delayed(
                 delayed(imageio.volread, pure=True)(uri), shape, dtype
             )
