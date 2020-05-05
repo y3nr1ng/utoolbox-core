@@ -172,7 +172,7 @@ class SmartSpimDataset(
 
         return metadata
 
-    def _load_tiling_coordinates(self):
+    def _load_coordinates(self):
         # SmartSpim bookkeeps all 3 axis, but only stored in 2-level hierarchy
         coords = self.metadata["coords"][["X", "Y"]].copy()
         coords.rename({"X": "tile_x", "Y": "tile_y"}, axis="columns", inplace=True)

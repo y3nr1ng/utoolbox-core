@@ -19,6 +19,7 @@ from ..base import (
     MultiViewDataset,
     TiledDataset,
     TimeSeriesDataset,
+    TILED_INDEX,
 )
 from .error import MalformedSettingsFileError, MissingSettingsFileError
 from .settings import AcquisitionMode, ScanType, Settings
@@ -227,7 +228,12 @@ class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
 
         return True
 
-    def _load_tiling_coordinates(self):
+    def _load_coordinates(self):
+        """
+        NOTE Do NOT use the Stack X/Y/Z in script.csv! They are might be inconsistent
+        with coordinates when manually modified. This is also why I implement
+        `_load_coordinates` instead of `_load_mapped_coordinates`.
+        """
         # cleanup the file
         with open(self.script_path, "r", encoding="unicode_escape") as fd:
             ignore_start, ignore_end = -1, -1
@@ -278,10 +284,15 @@ class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
         file_list = super()._retrieve_file_list(coord_dict, cascade=True)
 
         # generate queries
-        statements = [f"{k}=={coord_dict[k]}" for k in ("tile_x", "tile_y", "tile_z")]
+        statements = [f"{k}=={coord_dict[k]}" for k in TILED_INDEX]
         query_stmt = " & ".join(statements)
         # find tile linear index
-        index = self.tile_coords.query(query_stmt).index.values
+        index = self.tile_coords.query(query_stmt).index
+
+        print(index)
+        print(index.to_flat_index())
+         # TODO convert multiindex to flat index
+        raise RuntimeError
 
         try:
             # stacked data, only 1 file

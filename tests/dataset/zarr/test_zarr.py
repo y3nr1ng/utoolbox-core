@@ -13,6 +13,9 @@ def main(ds_src_dir, ds_dst_dir, client=None):
     logger.info("loading source dataset")
     ds_src = open_dataset(ds_src_dir)
 
+    ds_src.remap_tiling_axes({"x": "z", "y": "x", "z": "y"})
+    ds_src.flip_tiling_axes(["x", "y"])
+
     # iterator = TiledDatasetIterator(ds_src, axis="zyx", return_key=True)
     # for key, value in iterator:
     #    print(f"[{key}]")
@@ -26,6 +29,15 @@ def main(ds_src_dir, ds_dst_dir, client=None):
     pprint(ds_src.metadata)
     with pd.option_context("display.max_rows", None):
         print(ds_src.inventory)
+
+    for key, value in TiledDatasetIterator(
+        ds_src, return_key=True, return_real_coord=True
+    ):
+        print(key)
+        print(value)
+        print()
+
+    raise RuntimeError("DEBUG")
 
     if not os.path.exists(ds_dst_dir):
         logger.info("dumping destination dataset")

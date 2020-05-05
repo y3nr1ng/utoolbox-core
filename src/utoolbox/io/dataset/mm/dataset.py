@@ -114,7 +114,7 @@ class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
         else:
             raise MissingMetadataError()
 
-    def _load_tiling_coordinates(self):
+    def _load_coordinates(self):
         positions = self.metadata["InitialPositionList"]
 
         coords = defaultdict(list)
@@ -185,7 +185,7 @@ class MicroManagerV2Dataset(MicroManagerV1Dataset):
 
         return channels
 
-    def _load_tiling_coordinates(self):
+    def _load_coordinates(self):
         positions = self.metadata["StagePositions"]
 
         coords = defaultdict(list)

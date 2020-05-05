@@ -296,7 +296,7 @@ class ZarrDataset(
 
         return dim_info
 
-    def _load_tiling_coordinates(self):
+    def _load_coordinates(self):
         pass
 
     def _load_timestamps(self) -> List[np.datetime64]:
