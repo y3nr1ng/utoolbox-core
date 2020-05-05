@@ -125,7 +125,6 @@ class BaseDataset(metaclass=ABCMeta):
         return ds
 
     @classmethod
-    @abstractmethod
     def dump(cls):
         """Dump dataset."""
         raise NotImplementedError("serialization is not supported")

@@ -4,20 +4,14 @@ from pprint import pprint
 
 import pandas as pd
 
-from utoolbox.io.dataset import (
-    LatticeScopeDataset,
-    LatticeScopeTiledDataset,
-    TiledDatasetIterator,
-    ZarrDataset,
-)
+from utoolbox.io.dataset import TiledDatasetIterator, ZarrDataset, open_dataset
 
 logger = logging.getLogger("test_zarr")
 
 
 def main(ds_src_dir, ds_dst_dir, client=None):
     logger.info("loading source dataset")
-    # ds_src = LatticeScopeTiledDataset.load(ds_src_dir)
-    ds_src = LatticeScopeDataset.load(ds_src_dir)
+    ds_src = open_dataset(ds_src_dir)
 
     # iterator = TiledDatasetIterator(ds_src, axis="zyx", return_key=True)
     # for key, value in iterator:
@@ -50,8 +44,8 @@ if __name__ == "__main__":
     )
 
     # Case 1)
-    # ds_src_dir = "Y:/ARod/4F/20200420_flybrain_CamA"
-    # ds_dst_dir = "X:/ARod/4F/20200420_flybrain_CamA.zarr"
+    # ds_src_dir = "X:/charm/20200430_ExM_7d_kb-2_nkcc2_488_5um_p11x16_2x2bin_1"
+    # ds_dst_dir = "U:/charm/20200430_ExM_7d_kb-2_nkcc2_488_5um_p11x16_2x2bin_1.zarr"
 
     # Case 2)
     cwd = os.path.dirname(os.path.abspath(__file__))
@@ -61,4 +55,4 @@ if __name__ == "__main__":
     parent, dname = os.path.split(ds_src_dir)
     ds_dst_dir = os.path.join(parent, f"{dname}.zarr")
 
-    main(ds_src_dir, ds_dst_dir, client=None)
+    main(ds_src_dir, ds_dst_dir)

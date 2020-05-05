@@ -122,8 +122,12 @@ class ZarrDataset(
         for i_t, (t, t_selected) in enumerate(TimeSeriesDatasetIterator(dataset)):
             t_root = root.require_group(f"t{i_t}")
 
-            t = t.to_timedelta64()  # ns
-            t = int(t) // 1000000  # ms
+            try:
+                t = t.to_timedelta64()  # ns
+                t = int(t) // 1000000  # ms
+            except AttributeError:
+                # not a time series
+                pass
             t_root.attrs["timestamp"] = t
 
             # 2) channel
@@ -279,7 +283,7 @@ class ZarrDataset(
                     nested_iters(child, indices[1:])
 
         # TODO lowest level is still incorrect
-        
+
         nested_iters(self.handle, indices)
 
         return dim_info
