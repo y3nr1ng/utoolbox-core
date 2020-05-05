@@ -171,23 +171,28 @@ class LatticeScopeDataset(
         else:
             raise ValueError(f'channel "{channel}" is not enlisted in the settings')
 
-    def _retrieve_file_list(self, coord_dict, single=True):
-        # filter by view, might only has single view
-        if "view" in coord_dict:
-            filtered = [f for f in self.files if coord_dict["view"] in f]
-        else:
-            filtered = self.files
-        # filter by channel and timestamp
-        ich = self._lookup_channel_id(coord_dict["channel"])
-        its = coord_dict["time"].to_timedelta64()  # ns
-        its = int(its) // 1000000  # ms
-        filtered = [f for f in filtered if f"ch{ich}" in f and f"_{its:07d}msec_" in f]
+    def _retrieve_file_list(self, coord_dict, cascade=False):
+        file_list = self.files
 
-        if single:
-            assert len(filtered) == 1, "found more than 1 file matches, stmt error"
-            return filtered[0]
+        # view
+        if "view" in coord_dict:
+            file_list = [f for f in file_list if coord_dict["view"] in f]
+
+        # channel
+        ich = self._lookup_channel_id(coord_dict["channel"])
+        file_list = [f for f in file_list if f"ch{ich}" in f]
+
+        # timepoint
+        if "time" in coord_dict:
+            its = coord_dict["time"].to_timedelta64()  # ns
+            its = int(its) // 1000000  # ms
+            file_list = [f for f in file_list if f"_{its:07d}msec_" in f]
+
+        if not cascade:
+            assert len(file_list) == 1, "multiple files match the search condition"
+            return file_list[0]
         else:
-            return filtered
+            return file_list
 
 
 class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
@@ -270,7 +275,7 @@ class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
         return coords
 
     def _retrieve_file_list(self, coord_dict):
-        file_list = super()._retrieve_file_list(coord_dict)
+        file_list = super()._retrieve_file_list(coord_dict, cascade=True)
 
         # generate queries
         statements = [f"{k}=={coord_dict[k]}" for k in ("tile_x", "tile_y", "tile_z")]

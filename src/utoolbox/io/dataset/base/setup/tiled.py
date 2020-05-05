@@ -1,5 +1,8 @@
 import logging
 from abc import ABCMeta, abstractmethod
+from typing import Mapping, Tuple
+
+import numpy as np
 
 from ..generic import BaseDataset, PreloadPriorityOffset
 from ..iterators import DatasetIterator
@@ -19,7 +22,7 @@ class TiledDataset(BaseDataset, metaclass=ABCMeta):
             index, self._tile_coords = self._load_tiling_info()
             assert any(
                 key in index.keys() for key in TILED_INDEX
-            ), "unable to find definition of tiling coordinates"
+            ), "unknown tiling definition"
             self._update_inventory_index(index)
 
         self.register_preload_func(
@@ -71,13 +74,53 @@ class TiledDataset(BaseDataset, metaclass=ABCMeta):
 
     ##
 
+    def _load_coordinates(self):
+        raise NotImplementedError
+
+    def _load_index(self):
+        raise NotImplementedError
+
+    def _load_mapped_coordinates(self) -> Mapping[Tuple[int], Tuple[np.float32]]:
+        try:
+            index, coords = self._load_index(), self._load_coordinates()
+        except NotImplementedError:
+            raise NotImplementedError(
+                "either `_load_coordinates` or `_load_mapped_coordinates` has to be implemented"
+            )
+        else:
+            if len(index) != len(coords):
+                raise ValueError(
+                    "index definitions does not match coordinates definitions"
+                )
+            mapping = {k: v for k, v in zip(index, coords)}
+
+        # TODO use `mapping` keys() to generate inventory index
+        
+        # TODO any way to simplify this section?
+        
+        return mapping
+
+    ##
+
     @abstractmethod
     def _load_tiling_coordinates(self):
         pass
 
+    def _load_tiling_index(self):
+        logger.warning("infer index by raw coordinates may lead to unwanted error")
+        return None
+
     def _load_tiling_info(self):
         coords = self._load_tiling_coordinates()
         unique_coords = {ax: coords[ax].unique() for ax in coords}
+
+        from pprint import pprint
+
+        pprint(coords)
+        pprint(unique_coords)
+
+        raise RuntimeError("DEBUG, load_tiling_info")
+
         return unique_coords, coords
 
 
