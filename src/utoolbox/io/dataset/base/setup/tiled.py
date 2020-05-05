@@ -20,7 +20,7 @@ class TiledDataset(BaseDataset, metaclass=ABCMeta):
             assert any(
                 key in index.keys() for key in TILED_INDEX
             ), "unable to find definition of tiling coordinates"
-            self.inventory.update(index)
+            self._update_inventory_index(index)
 
         self.register_preload_func(
             load_tiling_info, priority=PreloadPriorityOffset.Metadata

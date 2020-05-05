@@ -2,7 +2,7 @@ import logging
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from enum import IntEnum
-from typing import Callable, Optional, Tuple
+from typing import Callable, Optional, Tuple, Mapping, Iterable, Any
 from uuid import uuid4
 
 import pandas as pd
@@ -226,3 +226,14 @@ class BaseDataset(metaclass=ABCMeta):
         uuid = str(uuid4())
         self.data[uuid] = data
         return uuid
+
+    def _update_inventory_index(self, mapping: Mapping[str, Iterable[Any]]):
+        """
+        Update inventory structure _before_ consolidation happened.
+        
+        Args:
+            mapping (Mapping[str, Iterable[Any]]): index and their ticks
+        """
+        mapping = {k: v for k, v in mapping.items() if v is not None}
+        if mapping:
+            self.inventory.update(mapping)

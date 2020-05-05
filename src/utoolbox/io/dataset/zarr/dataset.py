@@ -1,8 +1,9 @@
 import logging
 from collections import defaultdict
-from typing import Optional
+from typing import List, Optional
 
 import dask.array as da
+import numpy as np
 import zarr
 from dask.distributed import as_completed
 from tqdm import tqdm
@@ -108,6 +109,8 @@ class ZarrDataset(
         root.attrs["zarr_dataset"] = "ZarrDataset"
         root.attrs["format_version"] = cls.version
 
+        # TODO save original metadata, msgpack?
+
         if path:
             # nested group
             mode = "w" if overwrite else "w-"
@@ -123,6 +126,7 @@ class ZarrDataset(
             t_root = root.require_group(f"t{i_t}")
 
             try:
+                # convert from np.datetime64 to int (JSON serializable)
                 t = t.to_timedelta64()  # ns
                 t = int(t) // 1000000  # ms
             except AttributeError:
@@ -226,6 +230,10 @@ class ZarrDataset(
         except KeyError:
             return False
         else:
+            # verify version
+            if version != type(self).version:
+                return False
+
             logger.debug(f"a uToolbox written dataset, {magic} {version}")
             return True
 
@@ -289,6 +297,9 @@ class ZarrDataset(
         return dim_info
 
     def _load_tiling_coordinates(self):
+        pass
+
+    def _load_timestamps(self) -> List[np.datetime64]:
         pass
 
     def _load_view_info(self):

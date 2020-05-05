@@ -21,8 +21,7 @@ class TimeSeriesDataset(BaseDataset, metaclass=ABCMeta):
         # use assign_coords to add time coords
         def load_timeseries_info():
             timestamps = self._load_timeseries_info()
-            if timestamps is not None:
-                self.inventory.update({TIME_SERIES_INDEX: timestamps})
+            self._update_inventory_index({TIME_SERIES_INDEX: timestamps})
 
         self.register_preload_func(
             load_timeseries_info, priority=PreloadPriorityOffset.Metadata

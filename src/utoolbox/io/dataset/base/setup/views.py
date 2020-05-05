@@ -14,8 +14,7 @@ class MultiViewDataset(BaseDataset, metaclass=ABCMeta):
 
         def load_view_info():
             views = self._load_view_info()
-            if views is not None:
-                self.inventory.update({MULTI_VIEW_INDEX: views})
+            self._update_inventory_index({MULTI_VIEW_INDEX: views})
 
         self.register_preload_func(
             load_view_info, priority=PreloadPriorityOffset.Metadata
