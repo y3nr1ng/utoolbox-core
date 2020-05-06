@@ -54,50 +54,55 @@ class TiledDataset(BaseDataset, metaclass=ABCMeta):
         return self._tile_coords
 
     @property
-    def tile_index(self):
-        return self._tile_index
-
-    @property
     def tile_shape(self):
         return self._tile_shape
 
     ##
 
     def flip_tiling_axes(self, axes):
-        # TODO
         axes = [f"tile_{ax}" for ax in axes]
 
-        # flip inventory, multi-index
+        # flip inventory
         for axis in axes:
             # lookup multiindex numerical index
             i = self.inventory.index.names.index(axis)
             # original values
             values = self.inventory.index.levels[i]
             # flip
-            values -= max(values)
-            values *= -1
+            values = values.max() - values
             self.inventory.index.set_levels(values, level=axis, inplace=True)
         self.inventory.sort_index(inplace=True)
 
-        # flip internal list, dataframe
+        # flip coordinate list (index)
         for axis in axes:
-            # index
-            self.tile_index[axis] -= self.tile_index[axis].max()
-            self.tile_index[axis] *= -1
-            # coords
+            print(self.tile_coords)
+            # lookup multiindex numerical index
+            i = self.inventory.index.names.index(axis)
+            # original values
+            values = self.inventory.index.levels[i]
+            # flip
+            values = values.max() - values
+            self.tile_coords.index.set_levels(values, level=axis, inplace=True)
+        # flip coordinate list (coords)
+        for axis in axes:
+            axis = axis.split("_")[1]
+            axis = f"{axis}_coord"
             self.tile_coords[axis] *= -1
 
     def remap_tiling_axes(self, mapping):
-        # generate complete name
         mapping = {f"tile_{src}": f"tile_{dst}" for src, dst in mapping.items()}
 
-        # rename inventory, multi-index
+        # rename inventory
         self.inventory.index.rename(
             mapping.values(), level=mapping.keys(), inplace=True
         )
 
-        # rename internal list, dataframe
-        self.tile_index.rename(mapping, axis="columns", inplace=True)
+        # rename coordinate list (index)
+        self.tile_coords.index.rename(
+            mapping.values(), level=mapping.keys(), inplace=True
+        )
+        # rename coordinate list (value)
+        mapping = {f"{src}_coord": f"{dst}_coord" for src, dst in mapping.items()}
         self.tile_coords.rename(mapping, axis="columns", inplace=True)
 
     ##
@@ -162,6 +167,8 @@ class TiledDataset(BaseDataset, metaclass=ABCMeta):
         # build multi-index
         df = pd.concat([index, coords], axis="columns")
         df.set_index(index.columns.to_list(), inplace=True)
+        # remap back
+        coord_names_mapping = {v: k for k, v in coord_names_mapping.items()}
 
         return df
 
@@ -208,7 +215,6 @@ class TiledDatasetIterator(DatasetIterator):
 
                 print(">>>")
                 print(self.dataset.tile_coords)
-                print(self.dataset.tile_index)
                 print(selected)
                 print("<<<")
 

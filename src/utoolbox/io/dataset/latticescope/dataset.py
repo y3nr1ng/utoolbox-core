@@ -282,23 +282,18 @@ class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
 
     def _retrieve_file_list(self, coord_dict):
         file_list = super()._retrieve_file_list(coord_dict, cascade=True)
-
         # generate queries
         statements = [f"{k}=={coord_dict[k]}" for k in TILED_INDEX]
         query_stmt = " & ".join(statements)
         # find tile linear index
-        index = self.tile_coords.query(query_stmt).index
-
-        print(index)
-        print(index.to_flat_index())
-         # TODO convert multiindex to flat index
-        raise RuntimeError
+        result = self.tile_coords.query(query_stmt)
 
         try:
             # stacked data, only 1 file
-            index = index[0]
-            return file_list[index]
+            index = self.tile_coords.index.get_loc(result.iloc[0].name)
         except IndexError:
             logger.debug(f'invalid statement "{query_stmt}"')
             # secondary filter failed
             return None
+        else:
+            return file_list[index]
