@@ -75,7 +75,6 @@ class TiledDataset(BaseDataset, metaclass=ABCMeta):
 
         # flip coordinate list (index)
         for axis in axes:
-            print(self.tile_coords)
             # lookup multiindex numerical index
             i = self.inventory.index.names.index(axis)
             # original values
@@ -179,51 +178,67 @@ class TiledDatasetIterator(DatasetIterator):
 
     Args:
         dataset (TiledDataset): source dataset
-        axis (str, optional): order of tiling axis to tile over with
-        return_real_coord (bool, optional): return actual coordinate instad of index
+        axes (str, optional): order of axes to loop over
+        return_format (str, optional): return as 'index', 'coord' or 'both'
         **kwargs: additional keyword arguments
     """
 
     def __init__(
-        self, dataset: TiledDataset, *, axis="zyx", return_real_coord=False, **kwargs
+        self, dataset: TiledDataset, *, axes="zyx", return_format="index", **kwargs
     ):
-        self._return_real_coord = return_real_coord
+        self._return_format = return_format
 
         # restore axis name
-        axis = [f"tile_{a}" for a in axis]
-        if any(a not in TILED_INDEX for a in axis):
-            desc = ", ".join(f'"{a}"' for a in TILED_INDEX)
+        axes = [f"tile_{axis}" for axis in axes]
+        if any(axis not in TILED_INDEX for axis in axes):
+            desc = ", ".join(f'"{axis}"' for axis in TILED_INDEX)
             raise ValueError(f"axis can only contain {desc}")
 
         # drop unsupported axis
-        index = [a for a in axis if a in dataset.index.names]
-        delta = set(index) ^ set(axis)
-        if len(delta) > 0:
-            desc = ", ".join(f'"{a}"' for a in delta)
+        index = [axis for axis in axes if axis in dataset.index.names]
+        index_diff = set(index) ^ set(axes)
+        if index_diff:
+            desc = ", ".join(f'"{axis}"' for axis in index_diff)
             logger.debug(f"found unused index, dropping {desc}")
-
-        if not index:
-            # use dummy axis header to trigger KeyError
-            index = "tile_0"
 
         super().__init__(dataset, index=index, **kwargs)
 
     def __iter__(self):
+        requires_lookup = self.return_key and (self.return_format != "index")
+
+        if requires_lookup:
+            # build lookup table for *_coord columns
+            key_header = []
+            for axis in self.index:
+                axis = axis.split("_")[1]
+                axis = f"{axis}_coord"
+                key_header.append(axis)
+
         for result in super().__iter__():
-            if self.return_key and self.return_real_coord:
-                key, selected = result
+            if requires_lookup:
+                key_index, selected = result
 
-                print(">>>")
-                print(self.dataset.tile_coords)
-                print(selected)
-                print("<<<")
+                if key_index:
+                    # select the row by matching the multi-index using inner join
+                    key_coord = pd.merge(
+                        self.dataset.tile_coords,
+                        selected.rename("uuid"),
+                        how="inner",
+                        left_index=True,
+                        right_index=True,
+                    )
+                    # build key order from previous selection order
+                    key_coord = tuple(
+                        key_coord[header].iloc[0] for header in key_header
+                    )
 
-                df_sel = selected.index.to_frame(index=False)
-                df_sel = df_sel[self.dataset.tile_coords.columns.to_list()]
-                print(df_sel)
-                # isolate the labels
-                print(pd.merge(self.dataset.tile_index, df_sel, how="inner"))
-                raise RuntimeError
+                if self.return_format == "both":
+                    key = key_index, key_coord
+                else:
+                    # we are already translating the keys, we either have to return
+                    # both keys or only the translated one
+                    key = key_coord
+
                 yield key, selected
             else:
                 yield result
@@ -231,8 +246,8 @@ class TiledDatasetIterator(DatasetIterator):
     ##
 
     @property
-    def return_real_coord(self):
-        return self._return_real_coord
+    def return_format(self) -> str:
+        return self._return_format
 
 
 class TiledSlabDatasetIterator(TiledDatasetIterator):

@@ -147,12 +147,21 @@ class ZarrDataset(
                     attrs = {}
                     if sv is not None:
                         attrs["view"] = sv
-                    tiles_iterator = TiledDatasetIterator(v_selected, axis="zyx")
+                    tiles_iterator = TiledDatasetIterator(
+                        v_selected, axes="zyx", return_format="both"
+                    )
                     for st, selected in tiles_iterator:
                         if st is not None:
+                            index, coord = st
                             names = tiles_iterator.index
                             names = [name.split("_")[-1] for name in names]
-                            attrs["tile_coord"] = {k: v for k, v in zip(names, st)}
+                            # NOTE numpy dtypes are not serializable, use native
+                            attrs["tile_index"] = {
+                                k: int(v) for k, v in zip(names, index)
+                            }
+                            attrs["tile_coord"] = {
+                                k: float(v) for k, v in zip(names, coord)
+                            }
 
                         s_root = c_root.require_group(f"s{i_s}")
                         i_s += 1
@@ -161,6 +170,7 @@ class ZarrDataset(
                         # 4) level
                         l0_group = s_root.require_group("0")
                         print(l0_group)  # DEBUG
+                        print(selected.inventory)
                         data = dataset[selected]
                         # NOTE compression benchmark reference http://alimanfoo.github.
                         # io/2016/09/21/genotype-compression-benchmark.html

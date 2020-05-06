@@ -38,25 +38,45 @@ class DatasetIterator:
         self._strict = strict
 
     def __iter__(self):
+        print(
+            f">> {self.__class__.__name__}.__iter__, type(dataset)={type(self.dataset).__name__}"
+        )
+
+        original_inventory = self.dataset.inventory.copy()
+
         try:
-            dataset = self.dataset.sort_index(
+            dataset = self.dataset.inventory.sort_index(
                 axis="index",
                 level=self.index,
                 ascending=self.ascending,
                 sort_remaining=False,
             )
             iterator = dataset.groupby(self.index)
-        except KeyError:
+        except (KeyError, IndexError):
             # not a supported dataset
+            #   - KeyError: inventory does not has this column
+            #   - IndexError: unusable index, such as empty list
             if self.strict:
                 raise ValueError("iterator does not support this dataset")
             else:
                 iterator = [(None, self.dataset)]
+
+        # use original dataset as skeleton, iterate over stuff
+        modified = False
         for key, selected in iterator:
+            # TODO refactor here
+            # TODO if selected only has 1 row, return dataset[selected] instead of wrapped dataset
             if self.return_key:
-                yield key, selected
+                if key:
+                    self.dataset.inventory = selected
+                    modified = True
+                yield key, self.dataset
             else:
-                yield selected
+                yield self.dataset
+
+        # restore
+        if modified:
+            self.dataset.inventory = original_inventory
 
     ##
 

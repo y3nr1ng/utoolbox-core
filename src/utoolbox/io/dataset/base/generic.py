@@ -81,6 +81,11 @@ class BaseDataset(metaclass=ABCMeta):
     def inventory(self):
         return self._inventory
 
+    @inventory.setter
+    def inventory(self, new_inventory):
+        # TODO do column/index-level check, ensure compatibility
+        self._inventory = new_inventory
+
     @property
     def metadata(self):
         return self._metadata

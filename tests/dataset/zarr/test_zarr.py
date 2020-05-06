@@ -4,7 +4,12 @@ from pprint import pprint
 
 import pandas as pd
 
-from utoolbox.io.dataset import TiledDatasetIterator, ZarrDataset, open_dataset
+from utoolbox.io.dataset import (
+    LatticeScopeTiledDataset,
+    TiledDatasetIterator,
+    ZarrDataset,
+    open_dataset,
+)
 
 logger = logging.getLogger("test_zarr")
 
@@ -13,8 +18,9 @@ def main(ds_src_dir, ds_dst_dir, client=None):
     logger.info("loading source dataset")
     ds_src = open_dataset(ds_src_dir)
 
-    ds_src.remap_tiling_axes({"x": "z", "y": "x", "z": "y"})
-    ds_src.flip_tiling_axes(["x", "y"])
+    if isinstance(ds_src, LatticeScopeTiledDataset):
+        ds_src.remap_tiling_axes({"x": "z", "y": "x", "z": "y"})
+        ds_src.flip_tiling_axes(["x", "y"])
 
     # iterator = TiledDatasetIterator(ds_src, axis="zyx", return_key=True)
     # for key, value in iterator:
@@ -26,25 +32,30 @@ def main(ds_src_dir, ds_dst_dir, client=None):
     #        print(f".. {ds_src[v]}")
     #    print()
 
-    pprint(ds_src.metadata)
-    with pd.option_context("display.max_rows", None):
-        print(ds_src.inventory)
+    # pprint(ds_src.metadata)
 
+    logger.info("dump dataset info")
     for key, value in TiledDatasetIterator(
-        ds_src, return_key=True, return_real_coord=True
+        ds_src, return_key=True, return_format="both"
     ):
         print(key)
         print(value)
         print()
 
-    raise RuntimeError("DEBUG")
+    with pd.option_context("display.max_rows", None):
+        print(">> tile_coords")
+        print(ds_src.tile_coords)
+        print()
+        print(">> inventory")
+        print(ds_src.inventory)
+        print()
 
     if not os.path.exists(ds_dst_dir):
-        logger.info("dumping destination dataset")
+        logger.info("convert to zarr dataset")
         ZarrDataset.dump(ds_dst_dir, ds_src, overwrite=True, client=client)
 
-    logger.info("reload destination dataset")
-    ds_dst = ZarrDataset.load(ds_dst_dir)
+    # logger.info("reload destination dataset")
+    # ds_dst = ZarrDataset.load(ds_dst_dir)
 
 
 if __name__ == "__main__":
