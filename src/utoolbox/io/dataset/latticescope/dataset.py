@@ -74,7 +74,22 @@ class LatticeScopeDataset(
 
     def _enumerate_files(self):
         search_path = os.path.join(self.root_dir, "*.tif")
-        return glob.glob(search_path)
+        file_list, partial_suffix = [], set()
+        for fname in glob.glob(search_path):
+            result = re.search(r"_part(\d+).t", fname)
+            if result:
+                # this is a partial file
+                partial_suffix.add(result.group(1))
+            else:
+                file_list.append(fname)
+
+        if partial_suffix:
+            self._fragmented = True
+            logger.info(
+                f"fragmented TIFF, each data contains {len(partial_suffix)+1} pieces"
+            )
+
+        return file_list
 
     def _find_settings_path(self):
         # find common prefix
