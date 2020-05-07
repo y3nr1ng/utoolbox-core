@@ -50,7 +50,7 @@ def main(ds_src_dir, ds_dst_dir, client=None):
         print(ds_src.inventory)
         print()
 
-    raise RuntimeError("DEBUG")
+    #raise RuntimeError("DEBUG")
 
     if not os.path.exists(ds_dst_dir):
         logger.info("convert to zarr dataset")
@@ -68,7 +68,7 @@ if __name__ == "__main__":
         level="DEBUG", fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
     )
 
-    if True:
+    if False:
         # Case 1)
         ds_src_dir = "Y:/ARod/4F_/20200506_flybrain_no2_mz19_GFP"
         ds_dst_dir = "Y:/ARod/4F_/20200506_flybrain_no2_mz19_GFP.zarr"

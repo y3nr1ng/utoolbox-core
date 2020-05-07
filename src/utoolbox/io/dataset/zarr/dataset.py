@@ -171,6 +171,7 @@ class ZarrDataset(
                         l0_group = s_root.require_group("0")
                         print(l0_group)  # DEBUG
                         print(selected.inventory)
+                        print(selected)
                         data = dataset[selected]
                         # NOTE compression benchmark reference http://alimanfoo.github.
                         # io/2016/09/21/genotype-compression-benchmark.html

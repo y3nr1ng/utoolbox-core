@@ -38,24 +38,59 @@ class LatticeScopeDataset(
 ):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._fragmented = False
+        self._n_fragments = 1
 
     ##
 
     @property
-    def fragmented(self) -> bool:
-        """Are files fragmented due to 4GiB size constraint?"""
-        return self._fragmented
+    def is_fragmented(self) -> bool:
+        return self._n_fragments > 1
+
+    @property
+    def n_fragments(self) -> int:
+        """How many pieces are the file fragmented into?"""
+        return self._n_fragments
 
     @property
     def read_func(self):
         def func(uri, shape, dtype):
-            print(uri)  # FIXME
-            raise RuntimeError("DEBUG, read_func")
-            array = da.from_delayed(
-                delayed(imageio.volread, pure=True)(uri), shape, dtype
-            )
-            return array
+            if self.is_fragmented:
+                # build parts list
+                fbase, fext = os.path.splitext(uri)
+                uri = [uri]
+                for i in range(1, self.n_fragments):
+                    part_uri = f"{fbase}_part{i:04d}{fext}"
+                    uri.append(part_uri)
+
+                # probe the shape
+                if not self._fragmented_shapes:
+                    shapes = []
+                    for part_uri in uri:
+                        reader = imageio.get_reader(part_uri)
+                        nz = reader.get_length()
+                        nxy = next(reader.iter_data()).shape
+                        shapes.append((nz,) + nxy)
+                    self._fragmented_shapes = tuple(shapes)
+
+                # load and concat file parts
+                arrays = []
+                for part_uri, part_shape in zip(uri, self._fragmented_shapes):
+                    part_array = da.from_delayed(
+                        delayed(imageio.volread, pure=True)(part_uri), part_shape, dtype
+                    )
+                    arrays.append(part_array)
+                # fragments are 3D-only, we concat them at the slowest axis
+                array = da.concatenate(arrays, axis=0)
+
+                if array.shape != shape:
+                    logger.warning(f'"{os.path.basename(uri[0])}" is incomplete')
+
+                return array
+            else:
+                # simple array
+                return da.from_delayed(
+                    delayed(imageio.volread, pure=True)(uri), shape, dtype
+                )
 
         return func
 
@@ -83,10 +118,12 @@ class LatticeScopeDataset(
             else:
                 file_list.append(fname)
 
-        if partial_suffix:
-            self._fragmented = True
+        # update fragments count
+        self._n_fragments = 1 + len(partial_suffix)
+
+        if self.is_fragmented:
             logger.info(
-                f"fragmented TIFF, each data contains {len(partial_suffix)+1} pieces"
+                f"fragmented TIFF, each data contains {self.n_fragments} pieces"
             )
 
         return file_list
@@ -122,6 +159,10 @@ class LatticeScopeDataset(
             nz = self.metadata["waveform"][key]
             if nz > 1:
                 shape = (nz,) + shape
+
+        if self.is_fragmented:
+            # we will need this to store the precise shape later
+            self._fragmented_shapes = None
 
         # NOTE assuming fixed at 16-bit
         return shape, np.uint16
@@ -219,7 +260,7 @@ class LatticeScopeDataset(
 
         if not cascade:
             assert len(file_list) == 1, "multiple files match the search condition"
-            return file_list[0]  # FIXME
+            return file_list[0]
         else:
             return file_list
 
@@ -324,4 +365,4 @@ class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
             # secondary filter failed
             return None
         else:
-            return file_list[index]  # FIXME
+            return file_list[index]
