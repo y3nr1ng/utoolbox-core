@@ -46,16 +46,21 @@ setup(
     #   install_requires -> necessity
     #   requirements.txt
     install_requires=[
-        "dask~=2.12.0",
+        "dask[array]~=2.12.0",
         "h5py>=2.9",
         "humanfriendly",
         "imageio[ffmpeg]",
         "numpy>=1.17",
         "pandas",
+        "prompt_toolkit",
+        "tqdm",  # TODO should i add this?
         "zarr",
     ],
     # additional groups of dependencies here for the "extras" syntax
     extras_require={
+        # TODO add distributed as an optional package
+        # TODO how to add test dependencies? [coloredlogs]
+        # TODO remove rest of the sections
         "gpu": ["cupy-cuda101"],
         "viewer": ["napari"],
         "original": [
