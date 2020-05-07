@@ -50,7 +50,7 @@ def main(ds_src_dir, ds_dst_dir, client=None):
         print(ds_src.inventory)
         print()
 
-    #raise RuntimeError("DEBUG")
+    # raise RuntimeError("DEBUG")
 
     if not os.path.exists(ds_dst_dir):
         logger.info("convert to zarr dataset")

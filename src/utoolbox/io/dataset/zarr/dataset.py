@@ -169,9 +169,7 @@ class ZarrDataset(
 
                         # 4) level
                         l0_group = s_root.require_group("0")
-                        print(l0_group)  # DEBUG
-                        print(selected.inventory)
-                        print(selected)
+                        print(l0_group)  # FIXME remove debug
                         data = dataset[selected]
                         # NOTE compression benchmark reference http://alimanfoo.github.
                         # io/2016/09/21/genotype-compression-benchmark.html
@@ -195,6 +193,7 @@ class ZarrDataset(
 
         def wait_future(futures):
             n_failed = 0
+            # TODO should tqdm become built in? dummy class when import error?
             for future in tqdm(as_completed(futures), total=len(futures)):
                 try:
                     future.result()

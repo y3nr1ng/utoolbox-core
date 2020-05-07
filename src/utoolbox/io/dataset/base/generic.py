@@ -47,7 +47,12 @@ class BaseDataset(metaclass=ABCMeta):
         return self.inventory.__getattr__(key)
 
     def __getitem__(self, key):
+        if isinstance(key, BaseDataset):
+            # extract inventory
+            key = key.inventory
+
         if isinstance(key, pd.Series):
+            # extract uuid directly by row number
             if len(key) > 1:
                 raise KeyError("multiple keys provided")
             uuid = key.values[0]
@@ -56,9 +61,12 @@ class BaseDataset(metaclass=ABCMeta):
             coord_list = tuple(key[k] for k in self.inventory.index.names)
             uuid = self.inventory.__getitem__(coord_list)
         elif isinstance(key, str):
+            # direct uuid
             uuid = key
         else:
             raise KeyError("unknown key format")
+            
+        # look up the uuid
         try:
             return self.data[uuid]
         except KeyError:

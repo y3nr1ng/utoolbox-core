@@ -44,6 +44,7 @@ class DatasetIterator:
 
         original_inventory = self.dataset.inventory.copy()
 
+        # filter dataframe and iterate over them
         try:
             dataset = self.dataset.inventory.sort_index(
                 axis="index",
@@ -59,24 +60,18 @@ class DatasetIterator:
             if self.strict:
                 raise ValueError("iterator does not support this dataset")
             else:
-                iterator = [(None, self.dataset)]
+                iterator = [(None, self.dataset.inventory)]
 
         # use original dataset as skeleton, iterate over stuff
-        modified = False
         for key, selected in iterator:
-            # TODO refactor here
-            # TODO if selected only has 1 row, return dataset[selected] instead of wrapped dataset
+            self.dataset.inventory = selected
             if self.return_key:
-                if key:
-                    self.dataset.inventory = selected
-                    modified = True
                 yield key, self.dataset
             else:
                 yield self.dataset
 
         # restore
-        if modified:
-            self.dataset.inventory = original_inventory
+        self.dataset.inventory = original_inventory
 
     ##
 
