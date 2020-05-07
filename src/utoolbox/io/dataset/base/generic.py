@@ -65,7 +65,7 @@ class BaseDataset(metaclass=ABCMeta):
             uuid = key
         else:
             raise KeyError("unknown key format")
-            
+
         # look up the uuid
         try:
             return self.data[uuid]
