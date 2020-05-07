@@ -36,9 +36,22 @@ class LatticeScopeDataset(
     MultiViewDataset,
     TimeSeriesDataset,
 ):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._fragmented = False
+
+    ##
+
+    @property
+    def fragmented(self) -> bool:
+        """Are files fragmented due to 4GiB size constraint?"""
+        return self._fragmented
+
     @property
     def read_func(self):
         def func(uri, shape, dtype):
+            print(uri)  # FIXME
+            raise RuntimeError("DEBUG, read_func")
             array = da.from_delayed(
                 delayed(imageio.volread, pure=True)(uri), shape, dtype
             )
@@ -191,7 +204,7 @@ class LatticeScopeDataset(
 
         if not cascade:
             assert len(file_list) == 1, "multiple files match the search condition"
-            return file_list[0]
+            return file_list[0]  # FIXME
         else:
             return file_list
 
@@ -296,4 +309,4 @@ class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
             # secondary filter failed
             return None
         else:
-            return file_list[index]
+            return file_list[index]  # FIXME

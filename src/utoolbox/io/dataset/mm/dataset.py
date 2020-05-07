@@ -11,7 +11,7 @@ import imageio
 import numpy as np
 import pandas as pd
 
-from ..base import DenseDataset, MultiChannelDataset, TiledDataset
+from ..base import DenseDataset, MultiChannelDataset, TiledDataset, DirectoryDataset
 
 from .error import MalformedMetadataError, MissingMetadataError
 
@@ -20,14 +20,9 @@ __all__ = ["MicroManagerV1Dataset", "MicroManagerV2Dataset"]
 logger = logging.getLogger("utoolbox.io.dataset")
 
 
-class MicroManagerV1Dataset(DenseDataset, MultiChannelDataset, TiledDataset):
-    def __init__(self, root_dir):
-        super().__init__()
-
-        self._root_dir = root_dir
-
-    ##
-
+class MicroManagerV1Dataset(
+    DirectoryDataset, DenseDataset, MultiChannelDataset, TiledDataset
+):
     @property
     def metadata_path(self):
         return self._metadata_path

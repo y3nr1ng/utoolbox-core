@@ -50,6 +50,8 @@ def main(ds_src_dir, ds_dst_dir, client=None):
         print(ds_src.inventory)
         print()
 
+    raise RuntimeError("DEBUG")
+
     if not os.path.exists(ds_dst_dir):
         logger.info("convert to zarr dataset")
         ZarrDataset.dump(ds_dst_dir, ds_src, overwrite=True, client=client)
@@ -66,16 +68,17 @@ if __name__ == "__main__":
         level="DEBUG", fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
     )
 
-    # Case 1)
-    # ds_src_dir = "X:/charm/20200430_ExM_7d_kb-2_nkcc2_488_5um_p11x16_2x2bin_1"
-    # ds_dst_dir = "U:/charm/20200430_ExM_7d_kb-2_nkcc2_488_5um_p11x16_2x2bin_1.zarr"
-
-    # Case 2)
-    cwd = os.path.dirname(os.path.abspath(__file__))
-    # ds_src_dir = os.path.join(cwd, "../data/demo_3D_2x2x2_CMTKG-V3")
-    path = os.path.join(cwd, "../data/demo_3D_2x2x2_CMTKG-V3")
-    ds_src_dir = os.path.abspath(path)
-    parent, dname = os.path.split(ds_src_dir)
-    ds_dst_dir = os.path.join(parent, f"{dname}.zarr")
+    if True:
+        # Case 1)
+        ds_src_dir = "Y:/ARod/4F_/20200506_flybrain_no2_mz19_GFP"
+        ds_dst_dir = "Y:/ARod/4F_/20200506_flybrain_no2_mz19_GFP.zarr"
+    else:
+        # Case 2)
+        cwd = os.path.dirname(os.path.abspath(__file__))
+        # ds_src_dir = os.path.join(cwd, "../data/demo_3D_2x2x2_CMTKG-V3")
+        path = os.path.join(cwd, "../data/demo_3D_2x2x2_CMTKG-V3")
+        ds_src_dir = os.path.abspath(path)
+        parent, dname = os.path.split(ds_src_dir)
+        ds_dst_dir = os.path.join(parent, f"{dname}.zarr")
 
     main(ds_src_dir, ds_dst_dir)
