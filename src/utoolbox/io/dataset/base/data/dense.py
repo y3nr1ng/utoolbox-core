@@ -1,5 +1,6 @@
-from abc import ABCMeta, abstractmethod
 import logging
+from abc import ABCMeta, abstractmethod
+from typing import Tuple
 
 import pandas as pd
 
@@ -13,6 +14,9 @@ logger = logging.getLogger("utoolbox.io.dataset")
 class DenseDataset(BaseDataset, metaclass=ABCMeta):
     def __init__(self):
         super().__init__()
+
+        def load_voxel_size():
+            self._voxel_size = self._load_voxel_size()
 
         def assign_data_uuid():
             assert isinstance(
@@ -40,7 +44,14 @@ class DenseDataset(BaseDataset, metaclass=ABCMeta):
             # complete the preload process
             self._inventory = pd.Series(data_uuid, index=self.inventory)
 
+        self.register_preload_func(load_voxel_size, priority=60)
         self.register_preload_func(assign_data_uuid, priority=80)
+
+    ##
+
+    @property
+    def voxel_size(self) -> Tuple[int, int, int]:
+        return self._voxel_size
 
     ##
 

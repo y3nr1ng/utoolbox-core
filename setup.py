@@ -57,7 +57,6 @@ setup(
     ],
     # additional groups of dependencies here for the "extras" syntax
     extras_require={
-        # TODO add distributed as an optional package
         # TODO how to add test dependencies? [coloredlogs]
         # TODO remove rest of the sections
         "gpu": ["cupy-cuda101"],
@@ -67,8 +66,6 @@ setup(
             # file io
             "imageio-ffmpeg",
             "tifffile",
-            # parallel
-            "distributed~=2.12.0",
             # utils
             "mako",
             "click",

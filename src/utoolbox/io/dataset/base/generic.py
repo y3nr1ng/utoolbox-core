@@ -157,6 +157,7 @@ class BaseDataset(metaclass=ABCMeta):
                     - 40, load dataset metadata
                 - 50-99: data
                     - 50, consolidate dataset dimension
+                    - 60, data book-keeping, e.g. voxel size
                     - 80, assign uuid to data
             - 100-, user functions
 

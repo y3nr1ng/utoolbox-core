@@ -56,8 +56,8 @@ def main(ds_src_dir, ds_dst_dir, client=None):
         logger.info("convert to zarr dataset")
         ZarrDataset.dump(ds_dst_dir, ds_src, overwrite=True, client=client)
 
-    # logger.info("reload destination dataset")
-    # ds_dst = ZarrDataset.load(ds_dst_dir)
+    logger.info("reload destination dataset")
+    ds_dst = ZarrDataset.load(ds_dst_dir)
 
 
 if __name__ == "__main__":

@@ -4,9 +4,9 @@ from typing import List, Optional
 
 import dask.array as da
 import numpy as np
+import pandas as pd
 import zarr
 from dask.distributed import as_completed
-from tqdm import tqdm
 
 from utoolbox.utils.dask import get_client, wait_futures
 
@@ -258,7 +258,7 @@ class ZarrDataset(
         pass
 
     def _load_channel_info(self):
-        pass
+        return self._load_injective_attributes("channel", required=True)
 
     def _load_metadata(self):
         dim_info = defaultdict(lambda: defaultdict(list))
@@ -274,31 +274,87 @@ class ZarrDataset(
                 root (Group): the root to start with
                 indices (list of str): the index list to use as key in `dim_info`
             """
-            index = indices.pop(0)
-            if len(indices) == 1:
+            index = indices[0]
+            if len(indices) > 1:
+                iterator = root.groups()
+            else:
                 # last dimension is the array itself
                 iterator = root.arrays()
-            else:
-                iterator = root.groups()
             for name, child in iterator:
                 dim_info[index][name].append(child.attrs)  # lazy load
-                if indices:
+                if len(indices) > 1:
                     nested_iters(child, indices[1:])
-
-        # TODO lowest level is still incorrect
 
         nested_iters(self.handle, indices)
 
         return dim_info
 
-    def _load_coordinates(self):
-        pass
+    def _load_mapped_coordinates(self):
+        # NOTE we store index/coord under the same setup attrs, therefore, we construct
+        # the mapped coordinate table directly
+        coords, index = [], []
+        for key, attrs in self.metadata["setup"].items():
+            for attr in attrs:
+                if "tile_coord" in attr:
+                    coords.append(attr["tile_coord"])
+                if "tile_index" in attr:
+                    index.append(attr["tile_index"])
+
+        coords, index = pd.DataFrame(coords), pd.DataFrame(index)
+
+        # rename index (which is a bit annoy to rename as multi-index)
+        index_names_mapping = {ax: f"tile_{ax}" for ax in index.columns}
+        index.rename(index_names_mapping, axis="columns", inplace=True)
+
+        # sanity check
+        if len(coords) != len(index):
+            logger.error("coordinates and index info mismatch")
+            index = self._infer_index_from_coords(coords)
+
+        # build multi-index
+        df = pd.concat([index, coords], axis="columns")
+        df.set_index(index.columns.to_list(), inplace=True)
+
+        # rename coords
+        coord_names_mapping = {ax: f"{ax}_coord" for ax in coords.columns}
+        df.rename(coord_names_mapping, axis="columns", inplace=True)
+
+        return df
 
     def _load_timestamps(self) -> List[np.datetime64]:
-        pass
+        raise RuntimeError("DEBUG")
 
     def _load_view_info(self):
-        pass
+        return self._load_injective_attributes("view")
+
+    def _load_injective_attributes(self, dim_name, required=False):
+        """
+        Load group dimensional attributes that are 1-1 mapping across different group 
+        names.
+
+        Args:
+            dim_name (str): dimension name to extract
+            required (bool, optional): the attribute must exist
+        """
+        mapping = defaultdict(set)
+        for key, attrs in self.metadata[dim_name].items():
+            for attr in attrs:
+                try:
+                    mapping[key].add(attr[dim_name])
+                except KeyError:
+                    if required:
+                        raise KeyError(f'"{key}" does not have attribute "{dim_name}"')
+
+        for key, value in mapping.items():
+            inconsist = len(value) > 1
+            value = next(iter(value))
+            if inconsist:
+                logger.error(
+                    f'"{key}" has inconsistent attribute definitions, using "{value}"'
+                )
+            mapping[key] = value
+
+        return list(mapping.values())
 
     def _load_voxel_size(self):
         pass

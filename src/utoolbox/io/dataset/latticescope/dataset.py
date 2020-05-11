@@ -221,6 +221,8 @@ class LatticeScopeDataset(
                 raise MalformedSettingsFileError("cannot find twin camera flag")
 
     def _load_voxel_size(self):
+        raise RuntimeError("DEBUG")
+
         value = input_dialog(
             title="Missing Info", text="What is the size of a single pixel? "
         ).run()
