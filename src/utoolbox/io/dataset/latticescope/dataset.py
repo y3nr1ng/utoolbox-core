@@ -2,6 +2,7 @@ import glob
 import logging
 import os
 import re
+import warnings
 from collections import defaultdict
 from io import StringIO
 
@@ -13,13 +14,13 @@ from dask import delayed
 from prompt_toolkit.shortcuts import input_dialog
 
 from ..base import (
+    TILED_INDEX,
     DenseDataset,
     DirectoryDataset,
     MultiChannelDataset,
     MultiViewDataset,
     TiledDataset,
     TimeSeriesDataset,
-    TILED_INDEX,
 )
 from .error import MalformedSettingsFileError, MissingSettingsFileError
 from .settings import AcquisitionMode, ScanType, Settings
@@ -76,7 +77,9 @@ class LatticeScopeDataset(
                 arrays = []
                 for part_uri, part_shape in zip(uri, self._fragmented_shapes):
                     part_array = da.from_delayed(
-                        delayed(imageio.volread, pure=True)(part_uri), part_shape, dtype
+                        delayed(imageio.volread, pure=True)(part_uri),
+                        part_shape,
+                        dtype,
                     )
                     arrays.append(part_array)
                 # fragments are 3D-only, we concat them at the slowest axis
