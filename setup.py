@@ -46,14 +46,13 @@ setup(
     #   install_requires -> necessity
     #   requirements.txt
     install_requires=[
-        "dask[array]~=2.12.0",
+        "dask[complete]~=2.12.0",
         "h5py>=2.9",
         "humanfriendly",
         "imageio[ffmpeg]",
         "numpy>=1.17",
         "pandas",
         "prompt_toolkit",
-        "tqdm",  # TODO should i add this?
         "zarr",
     ],
     # additional groups of dependencies here for the "extras" syntax
