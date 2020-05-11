@@ -2,7 +2,6 @@ import glob
 import logging
 import os
 import re
-import warnings
 from collections import defaultdict
 from io import StringIO
 
@@ -207,27 +206,37 @@ class LatticeScopeDataset(
         return [rel_ts for _, rel_ts in dedup_pairs]
 
     def _load_view_info(self):
-        # TODO dirty patch, fix this
-        with open(self.settings_path, "r", errors="ignore") as fd:
-            for line in fd:
-                if line.startswith("Twin cam mode?"):
-                    _, flag = line.split("=")
-                    flag = flag.strip()
-                    if flag == "TRUE":
-                        return ("CamA", "CamB")
-                    else:
-                        return None
-            else:
-                raise MalformedSettingsFileError("cannot find twin camera flag")
+        if self.metadata["hardware"]["detection"]["twin_cam"]["enabled"]:
+            return ("CamA", "CamB")
+        else:
+            return None
 
     def _load_voxel_size(self):
-        raise RuntimeError("DEBUG")
+        camera_type = set()
+        for attrs in self.metadata["hardware"]["detection"]["cameras"].values():
+            camera_type.add(attrs["type"])
+        if len(camera_type) > 1:
+            raise MalformedSettingsFileError(
+                "when I parse this stuff, it does not support twin-cam with different brand"
+            )
+        camera_type = next(iter(camera_type))
 
-        value = input_dialog(
-            title="Missing Info", text="What is the size of a single pixel? "
-        ).run()
-        self._pixel_size = float(value)
-        size = (self._pixel_size,) * 2
+        try:
+            value = {"Orca4.0": 6.5}[camera_type]
+            logger.debug(f'camera identified as "{camera_type}", pixel size {value} um')
+            mag = self.metadata["hardware"]["detection"]["magnification"]
+            value /= mag
+            logger.info(
+                f"detection magnification {mag}, effective pixel size {value:.4f} um"
+            )
+        except KeyError:
+            value = input_dialog(
+                title="Unknown camera model",
+                text=f'What is the size of a single pixel for "{camera_type}"? ',
+            ).run()
+            value = float(value)
+        self._pixel_size = value
+        size = (self._pixel_size,) * 2  # assuming pixel size is isotropic
 
         if self.metadata["general"]["mode"] == AcquisitionMode.Z_STACK:
             scan_type = self.metadata["waveform"]["type"]

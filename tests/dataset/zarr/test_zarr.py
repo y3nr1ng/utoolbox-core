@@ -32,7 +32,7 @@ def main(ds_src_dir, ds_dst_dir, client=None):
     #        print(f".. {ds_src[v]}")
     #    print()
 
-    # pprint(ds_src.metadata)
+    pprint(ds_src.metadata)
 
     logger.info("dump dataset info")
     for key, value in TiledDatasetIterator(

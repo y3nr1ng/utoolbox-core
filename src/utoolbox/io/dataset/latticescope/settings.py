@@ -1,11 +1,13 @@
-from collections import namedtuple
-from datetime import datetime
-from enum import Enum
+import configparser
 import logging
 import re
-import configparser
+from collections import abc, namedtuple
+from datetime import datetime
+from enum import Enum
 
 from utoolbox.utils import AttrDict
+
+from .error import MalformedSettingsFileError
 
 logger = logging.getLogger("utoolbox.io.dataset")
 
@@ -220,7 +222,31 @@ class Settings(AttrDict):
         return "hardware", HardwareSettings(lines)
 
 
-class HardwareSettings(AttrDict):
+def update_nested_dict(d, u):
+    for k, v in u.items():
+        if isinstance(v, abc.Mapping):
+            # update new value in dict
+            d[k] = update_nested_dict(d.get(k, {}), v)
+        elif isinstance(v, list):
+            # append new value
+            try:
+                d[k].append(v)
+            except AttributeError:
+                d[k] = v
+        # NOTE do we really need set in hardware dict?
+        # elif isinstance(v, set):
+        #    # add new value to set
+        #    try:
+        #        d[k].add(v)
+        #    except AttributeError:
+        #        d[k] = v
+        else:
+            # override pure value
+            d[k] = v
+    return d
+
+
+class HardwareSettings(dict):
     """
     Args:
         lines (str): lines read from the .ini file
@@ -235,36 +261,94 @@ class HardwareSettings(AttrDict):
         config = configparser.ConfigParser()
         config.read_string(lines)
 
-        self.raw_config = config
-
-        for section in config.sections():
+        def parse_section(section, func_table):
             try:
-                # iterate over ini sections
-                section, parse_func = {
-                    "Twin Cam Saving": ("twin_cam", self.parse_twin_cam_saving),
-                }[section]
+                parse_funcs = func_table[section]
 
-                # get resave section dict
-                try:
-                    parsed_section = self[section]
-                except KeyError:
-                    parsed_section = AttrDict()
-                    self[section] = parsed_section
+                if not isinstance(parse_funcs, list):
+                    parse_funcs = [parse_funcs]
 
-                # save parsed result
-                key, parsed = parse_func()
-                parsed_section[key] = parsed
+                # call the parsers
+                for parse_func in parse_funcs:
+                    if not isinstance(parse_func, tuple):
+                        parse_func = (parse_func,)
+
+                    func, *args = parse_func
+                    parsed = func(config[section], *args)
+                    if parsed:
+                        update_nested_dict(self, parsed)
             except KeyError:
-                logger.debug('unknown section "{}", ignored'.format(section))
+                logger.debug('ignore section "{}"'.format(section))
+            except Exception as error:
+                logger.exception(error)
+
+        # 1st pass
+        for section in config.sections():
+            parse_section(
+                section,
+                {
+                    "Cam 1": (self.parse_camera_type, "Cam 1"),
+                    "Cam 2": (self.parse_camera_type, "Cam 2"),
+                    "Cam 3": (self.parse_camera_type, "Cam 3"),
+                    "Cam 4": (self.parse_camera_type, "Cam 4"),
+                    "Detection optics": self.parse_magnification,
+                    "General": [self.parse_trigger_mode, self.parse_twin_cam_mode],
+                    "Twin Cam Saving": self.parse_twin_cam_saving,
+                },
+            )
+
+        # 2nd pass
+        # NOTE these sections are optional, dependes on results from 1st pass
+        for section in config.sections():
+            parse_section(
+                section,
+                {"Hamamatsu Camera Settings": self.parse_hamamatsu_camera_settings},
+            )
 
     ##
 
-    def parse_twin_cam_saving(self):
-        parsed = {}
-        for key, save in self.raw_config["Twin Cam Saving"].items():
+    def parse_camera_type(self, section, camera):
+        if section["Enabled?"] == "TRUE":
+            return {
+                "detection": {"cameras": {camera: {"type": section["Type"].strip('"')}}}
+            }
+        else:
+            return None
+
+    def parse_hamamatsu_camera_settings(self, section):
+        serials = {}
+        mapping = {
+            ("Cam 1", "Orca4.0"): "Orca 4.0 SN",
+            ("Cam 2", "Orca4.0"): "Orca 4.0 SN (Twin Camera)",
+            ("Cam 1", "Orca2.8"): "Orca 2.8 SN",
+        }
+        for camera, values in self["detection"]["cameras"].items():
+            camera_type = values["type"]
+            try:
+                key = mapping[(camera, camera_type)]
+                serials[camera] = {"serial": section[key].strip('"')}
+            except KeyError:
+                raise MalformedSettingsFileError(
+                    f'unknown Hamamatsu combination "{camera}" ({camera_type})'
+                )
+        return {"detection": {"cameras": serials}}
+
+    def parse_trigger_mode(self, section):
+        return {"detection": {"trigger_mode": section["Cam Trigger Mode"].strip('"')}}
+
+    def parse_twin_cam_mode(self, section):
+        enabled = section["Twin cam mode?"] == "TRUE"
+        return {"detection": {"twin_cam": {"enabled": enabled}}}
+
+    def parse_magnification(self, section):
+        return {"detection": {"magnification": float(section["magnification"])}}
+
+    def parse_twin_cam_saving(self, section):
+        partial_save = {}
+        for key, save in section.items():
             camera, channel = re.search(
                 r"saving camera ([a-zA-Z]{1}) (.*)", key
             ).groups()
             camera = f"Cam{camera.upper()}"
-            parsed[(camera, channel)] = save == "TRUE"
-        return "partial_save", parsed
+            partial_save[(camera, channel)] = save == "TRUE"
+        return {"detection": {"twin_cam": {"partial_save": partial_save}}}
