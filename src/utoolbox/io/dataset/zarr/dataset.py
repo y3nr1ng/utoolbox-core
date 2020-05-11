@@ -8,6 +8,8 @@ import zarr
 from dask.distributed import as_completed
 from tqdm import tqdm
 
+from utoolbox.utils.dask import get_client, wait_futures
+
 from ..base import (
     DenseDataset,
     MultiChannelDataset,
@@ -101,6 +103,9 @@ class ZarrDataset(
             overwrite (bool, optional): overwrite the dataset if exists
             client (Client, optional): remote cluster client
             **kwargs : additional argument for `zarr.open` function
+
+        Returns:
+            (list of Futures)
         """
         kwargs["mode"] = "a"
         root = zarr.open(store, **kwargs)
@@ -169,7 +174,7 @@ class ZarrDataset(
 
                         # 4) level
                         l0_group = s_root.require_group("0")
-                        print(l0_group)  # FIXME remove debug
+                        logger.debug(l0_group)  # FIXME remove debug
                         data = dataset[selected]
                         # NOTE compression benchmark reference http://alimanfoo.github.
                         # io/2016/09/21/genotype-compression-benchmark.html
@@ -191,33 +196,13 @@ class ZarrDataset(
                         )
                         tasks.append(task)
 
-        def wait_future(futures):
-            n_failed = 0
-            # TODO should tqdm become built in? dummy class when import error?
-            for future in tqdm(as_completed(futures), total=len(futures)):
-                try:
-                    future.result()
-                except Exception as error:
-                    logger.exception(error)
-                    n_failed += 1
-            if n_failed > 0:
-                logger.error(f"{n_failed} task(s) failed")
-
         # submit the task to cluster
-        if client:
+        try:
             futures = client.compute(tasks)
-            wait_future(futures)
-        else:
-            from dask.distributed import Client
-
-            logger.info("launch a temporary local cluster")
-            with Client(
-                memory_target_fraction=False,
-                memory_spill_fraction=False,
-                memory_pause_fraction=0.6,
-            ) as client:
-                futures = client.compute(tasks)
-                wait_future(futures)
+        except AttributeError:
+            client = get_client()
+            futures = client.compute(tasks)
+        wait_futures(futures)
 
     ##
 
