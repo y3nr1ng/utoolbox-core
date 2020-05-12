@@ -1,18 +1,17 @@
-from collections import defaultdict
 import glob
 import json
 import logging
-from operator import itemgetter
 import os
+from collections import defaultdict
+from operator import itemgetter
 
-from dask import delayed
 import dask.array as da
 import imageio
 import numpy as np
 import pandas as pd
+from dask import delayed
 
-from ..base import DenseDataset, MultiChannelDataset, TiledDataset, DirectoryDataset
-
+from ..base import DenseDataset, DirectoryDataset, MultiChannelDataset, TiledDataset
 from .error import MalformedMetadataError, MissingMetadataError
 
 __all__ = ["MicroManagerV1Dataset", "MicroManagerV2Dataset"]
@@ -46,10 +45,6 @@ class MicroManagerV1Dataset(
             return array
 
         return func
-
-    @property
-    def root_dir(self):
-        return self._root_dir
 
     ##
 
@@ -109,7 +104,7 @@ class MicroManagerV1Dataset(
         else:
             raise MissingMetadataError()
 
-    def _load_coordinates(self):
+    def _load_mapped_coordinates(self):  # TODO update to new format
         positions = self.metadata["InitialPositionList"]
 
         coords = defaultdict(list)
@@ -180,37 +175,50 @@ class MicroManagerV2Dataset(MicroManagerV1Dataset):
 
         return channels
 
-    def _load_coordinates(self):
-        positions = self.metadata["StagePositions"]
+    def _load_mapped_coordinates(self):
+        coords, index = [], []
+        labels = []
+        for position in self.metadata["StagePositions"]:
+            # NOTE MicroManager only tiles in 2D
+            index.append({"x": position["GridCol"], "y": position["GridRow"]})
 
-        coords = defaultdict(list)
-        labels = dict()
-        for position in positions:
-            devices = position["DevicePositions"]
             xy_stage, z_stage = position["DefaultXYStage"], position["DefaultZStage"]
-            for device in devices:
-                if device["Device"] == xy_stage:
-                    coord_y, coord_x = tuple(device["Position_um"])
-                    coord_y, coord_x = np.float32(coord_y), np.float32(coord_x)
-
-                    coords["tile_x"].append((coord_x))
-                    coords["tile_y"].append((coord_y))
-                elif device["Device"] == z_stage:
+            coord = {}
+            for device in position["DevicePositions"]:
+                device_name = device["Device"]
+                if device_name == xy_stage:
+                    coord_x, coord_y = tuple(device["Position_um"])
+                    coord["x"] = float(coord_x)
+                    coord["y"] = float(coord_y)
+                elif device_name == z_stage:
                     coord_z = device["Position_um"][0]
-                    coord_z = np.float32(coord_z)
-
-                    coords["tile_z"].append(coord_z)
+                    coords["z"] = float(coord_z)
                 else:
-                    logger.warning(f"unknown device {device['Device']}")
+                    logger.warning(f"unknown device {device_name}")
+            coords.append(coord)
 
-            # label
-            # NOTE MicroManager only tiles in 2D, no need to include Z for indexing
-            labels[(coord_x, coord_y)] = position["Label"]
+            labels.append(position["Label"])
 
-        # internal bookkeeping
-        self._tile_prefix = labels
+        coords, index = pd.DataFrame(coords), pd.DataFrame(index)
+        labels = pd.DataFrame({"label": labels})
 
-        return pd.DataFrame({k: np.array(v) for k, v in coords.items()})
+        # rename index
+        index_names_mapping = {ax: f"tile_{ax}" for ax in index.columns}
+        index.rename(index_names_mapping, axis="columns", inplace=True)
+
+        # sanity check
+        if len(coords) != len(index) or len(coords) != len(labels):
+            raise MalformedMetadataError("coordinate info incomplete")
+
+        # build multi-index
+        df = pd.concat([index, coords, labels], axis="columns")
+        df.set_index(index.columns.to_list(), inplace=True)
+
+        # rename coords
+        coord_names_mapping = {ax: f"{ax}_coord" for ax in coords.columns}
+        df.rename(coord_names_mapping, axis="columns", inplace=True)
+
+        return df
 
     def _load_voxel_size(self):
         # extract sample frame from the metadata file
@@ -236,8 +244,17 @@ class MicroManagerV2Dataset(MicroManagerV1Dataset):
         return size
 
     def _retrieve_file_list(self, coord_dict):
-        prefix = self._tile_prefix[itemgetter("tile_x", "tile_y")(coord_dict)]
+        # find folder that contains the stack
+        tile_index = ["tile_x", "tile_y"]
+        label = self.tile_coords.xs(
+            itemgetter(*tile_index)(coord_dict), axis="index", level=tile_index,
+        )["label"].iloc[0]
+        tile_folder = os.path.join(self.root_dir, label)
+        file_list = [f for f in self.files if f.startswith(tile_folder)]
+
+        # find images
         i_ch = self._channel_order.index(coord_dict["channel"])
-        return glob.glob(
-            os.path.join(self.root_dir, prefix, f"*_channel{i_ch:03d}_*.tif")
-        )
+        i_ch = f"_channel{i_ch:03d}_"
+        file_list = [f for f in file_list if i_ch in f]
+
+        return file_list

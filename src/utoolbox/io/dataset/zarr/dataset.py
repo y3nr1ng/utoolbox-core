@@ -100,12 +100,15 @@ class ZarrDataset(
             dataset : serialize the provided dataset
             label (str, optional): label of the data array
             path (str, optional): internal path
-            overwrite (bool, optional): overwrite the dataset if exists
+            overwrite (bool, optional): overwrite _data_ if it already exists
             client (Client, optional): remote cluster client
             **kwargs : additional argument for `zarr.open` function
 
         Returns:
             (list of Futures)
+
+        Note:
+            Even if overwrite is False, existing attributes _WILL BE_ overwrite.
         """
         kwargs["mode"] = "a"
         root = zarr.open(store, **kwargs)
@@ -117,9 +120,7 @@ class ZarrDataset(
         # TODO save original metadata, msgpack?
 
         if path:
-            # nested group
-            mode = "w" if overwrite else "w-"
-            root = root.open_group(path, mode=mode)
+            root = root.open_group(path, mode="w")
 
         tasks = []  # conversion tasks, batch submit after populated all of them
 
@@ -137,7 +138,8 @@ class ZarrDataset(
             except AttributeError:
                 # not a time series
                 pass
-            t_root.attrs["timestamp"] = t
+            else:
+                t_root.attrs["timestamp"] = t
 
             # 2) channel
             for i_c, (c, c_selected) in enumerate(
@@ -174,6 +176,12 @@ class ZarrDataset(
 
                         # 4) level
                         l0_group = s_root.require_group("0")
+                        if label in l0_group:
+                            if not overwrite:
+                                logger.info(f'"{l0_group.path}" already has "{label}"')
+                                continue
+                        # TODO review from here
+                        # 5) data
                         logger.debug(l0_group)  # FIXME remove debug
                         data = dataset[selected]
                         # NOTE compression benchmark reference http://alimanfoo.github.
@@ -255,7 +263,20 @@ class ZarrDataset(
         return files
 
     def _load_array_info(self):
-        pass
+        shape, dtype = set(), set()
+        for array in self.files:
+            array = self.handle[array]
+            shape.add(array.shape)
+            dtype.add(array.dtype)
+
+        inconsist = len(shape) != 1 or len(dtype) != 1
+        shape, dtype = next(iter(shape)), next(iter(dtype))
+        if inconsist:
+            logger.error(
+                f"array definition is inconsistent somewhere, using {shape}, {dtype}"
+            )
+
+        return shape, dtype
 
     def _load_channel_info(self):
         return self._load_injective_attributes("channel", required=True)
@@ -322,7 +343,9 @@ class ZarrDataset(
         return df
 
     def _load_timestamps(self) -> List[np.datetime64]:
-        raise RuntimeError("DEBUG")
+        return self._load_injective_attributes(
+            "time"
+        )  # TODO should i ignore attr when not a timeseries dataset?
 
     def _load_view_info(self):
         return self._load_injective_attributes("view")
@@ -357,7 +380,7 @@ class ZarrDataset(
         return list(mapping.values())
 
     def _load_voxel_size(self):
-        pass
+        raise RuntimeError("DEBUG, _load_voxel_size")
 
     def _retrieve_file_list(self, coord_dict):
-        pass
+        raise RuntimeError("DEBUG, _retrieve_file_list")

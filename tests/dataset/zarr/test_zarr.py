@@ -1,6 +1,7 @@
 import logging
 import os
 from pprint import pprint
+from prompt_toolkit.shortcuts import button_dialog
 
 import pandas as pd
 
@@ -22,16 +23,6 @@ def main(ds_src_dir, ds_dst_dir, client=None):
         ds_src.remap_tiling_axes({"x": "z", "y": "x", "z": "y"})
         ds_src.flip_tiling_axes(["x", "y"])
 
-    # iterator = TiledDatasetIterator(ds_src, axis="zyx", return_key=True)
-    # for key, value in iterator:
-    #    print(f"[{key}]")
-    #    if not isinstance(value, list):
-    #        value = [value]
-    #    for v in value:
-    #        print(v)
-    #        print(f".. {ds_src[v]}")
-    #    print()
-
     pprint(ds_src.metadata)
 
     logger.info("dump dataset info")
@@ -50,14 +41,32 @@ def main(ds_src_dir, ds_dst_dir, client=None):
         print(ds_src.inventory)
         print()
 
-    # raise RuntimeError("DEBUG")
+    dump, overwrite = True, False
+    if os.path.exists(ds_dst_dir):
+        dump, overwrite = button_dialog(
+            title="Zarr dataset exists",
+            text="What should we do?",
+            buttons=[
+                ("Skip", (False, None)),
+                ("Update", (True, False)),
+                ("Overwrite", (True, True)),
+            ],
+        ).run()
+    else:
+        dump, overwrite = True, False
 
-    if not os.path.exists(ds_dst_dir):
+    if dump:
         logger.info("convert to zarr dataset")
-        ZarrDataset.dump(ds_dst_dir, ds_src, overwrite=True, client=client)
+        ZarrDataset.dump(ds_dst_dir, ds_src, overwrite=overwrite, client=client)
 
     logger.info("reload destination dataset")
     ds_dst = ZarrDataset.load(ds_dst_dir)
+
+    iterator = TiledDatasetIterator(ds_dst, axes="zyx", return_key=True)
+    for key, value in iterator:
+        print(f"[{key}]")
+        print(value)
+        print()
 
 
 if __name__ == "__main__":
@@ -68,10 +77,10 @@ if __name__ == "__main__":
         level="DEBUG", fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
     )
 
-    if False:
+    if True:
         # Case 1)
-        ds_src_dir = "Y:/ARod/4F_/20200506_flybrain_no2_mz19_GFP"
-        ds_dst_dir = "Y:/ARod/4F_/20200506_flybrain_no2_mz19_GFP.zarr"
+        ds_src_dir = "X:/charm/20200424_ExM_Thy1_testis_dapi_z2um_1"
+        ds_dst_dir = "~/Desktop/20200424_ExM_Thy1_testis_dapi_z2um_1.zarr"
     else:
         # Case 2)
         cwd = os.path.dirname(os.path.abspath(__file__))
@@ -80,5 +89,9 @@ if __name__ == "__main__":
         ds_src_dir = os.path.abspath(path)
         parent, dname = os.path.split(ds_src_dir)
         ds_dst_dir = os.path.join(parent, f"{dname}.zarr")
+
+    # ensure paths are properly expanded
+    ds_src_dir = os.path.abspath(os.path.expanduser(ds_src_dir))
+    ds_dst_dir = os.path.abspath(os.path.expanduser(ds_dst_dir))
 
     main(ds_src_dir, ds_dst_dir)

@@ -70,7 +70,7 @@ setup(
             "mako",
             "click",
             "coloredlogs",
-            "prompt_toolkit>2.0.0",
+            "prompt_toolkit>=3.0",
             "tqdm",
         ],
     },

@@ -217,7 +217,7 @@ class LatticeScopeDataset(
             camera_type.add(attrs["type"])
         if len(camera_type) > 1:
             raise MalformedSettingsFileError(
-                "when I parse this stuff, it does not support twin-cam with different brand"
+                "when I write this stuff, it does not support twin-cam with different brand"
             )
         camera_type = next(iter(camera_type))
 

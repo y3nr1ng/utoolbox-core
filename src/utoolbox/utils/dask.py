@@ -8,9 +8,9 @@ __all__ = ["get_local_cluster", "get_client", "wait_futures"]
 logger = logging.getLogger("utoolbox.utils.dask")
 
 DEFAULT_WORKER_OPTIONS = {
-    "memory_target_fraction": False,
+    "memory_target_fraction": 0.5,
     "memory_spill_fraction": False,
-    "memory_pause_fraction": 0.6,
+    "memory_pause_fraction": 0.75,
 }
 
 
@@ -29,7 +29,7 @@ def get_local_cluster(*, scheduler_port=0, **kwargs):
 
 def get_client(*args, **kwargs):
     cluster = get_local_cluster(*args, **kwargs)
-    client = Client(cluster)
+    client = Client(cluster, silence_logs="error")
     logger.info(f'new client connection "{client}"')
     atexit.register(client.close)
     return client
@@ -58,6 +58,8 @@ def wait_futures(futures, return_failed=False, show_bar=True):
         except Exception as error:
             logger.exception(error)
             failed_futures.append(future)
+
+        del future  # release
 
     if failed_futures:
         logger.error(f"{len(failed_futures)} task(s) failed")
