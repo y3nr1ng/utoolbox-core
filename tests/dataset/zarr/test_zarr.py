@@ -15,7 +15,7 @@ from utoolbox.io.dataset import (
 logger = logging.getLogger("test_zarr")
 
 
-def main(ds_src_dir, ds_dst_dir, client=None):
+def main2(ds_src_dir, ds_dst_dir, client=None):
     logger.info("loading source dataset")
     ds_src = open_dataset(ds_src_dir)
 
@@ -61,6 +61,20 @@ def main(ds_src_dir, ds_dst_dir, client=None):
 
     logger.info("reload destination dataset")
     ds_dst = ZarrDataset.load(ds_dst_dir)
+
+    print(ds_dst.inventory)
+
+    iterator = TiledDatasetIterator(ds_dst, axes="zyx", return_key=True)
+    for key, value in iterator:
+        print(f"[{key}]")
+        print(value)
+        print()
+
+
+def main(ds_src_dir, ds_dst_dir, client=None):
+    ds_dst = ZarrDataset.load(ds_dst_dir)
+
+    print(ds_dst.inventory)
 
     iterator = TiledDatasetIterator(ds_dst, axes="zyx", return_key=True)
     for key, value in iterator:

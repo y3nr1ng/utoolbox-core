@@ -1,4 +1,5 @@
 import logging
+import os
 from collections import defaultdict
 from typing import List, Optional
 
@@ -131,14 +132,15 @@ class ZarrDataset(
         for i_t, (t, t_selected) in enumerate(TimeSeriesDatasetIterator(dataset)):
             t_root = root.require_group(f"t{i_t}")
 
-            try:
+            if t is None:
+                try:
+                    del t_root.attrs["timestamp"]
+                except KeyError:
+                    pass
+            else:
                 # convert from np.datetime64 to int (JSON serializable)
                 t = t.to_timedelta64()  # ns
                 t = int(t) // 1000000  # ms
-            except AttributeError:
-                # not a time series
-                pass
-            else:
                 t_root.attrs["timestamp"] = t
 
             # 2) channel
@@ -146,41 +148,54 @@ class ZarrDataset(
                 MultiChannelDatasetIterator(t_selected)
             ):
                 c_root = t_root.require_group(f"c{i_c}")
-                c_root.attrs["channel"] = c
+                c_root.attrs["channel"] = c  # NOTE required
 
                 # 3) setup
                 i_s = 0
                 for sv, v_selected in MultiViewDatasetIterator(c_selected):
-                    attrs = {}
-                    if sv is not None:
-                        attrs["view"] = sv
                     tiles_iterator = TiledDatasetIterator(
                         v_selected, axes="zyx", return_format="both"
                     )
                     for st, selected in tiles_iterator:
-                        if st is not None:
+                        s_root = c_root.require_group(f"s{i_s}")
+                        i_s += 1
+
+                        # view attribute
+                        if sv is None:
+                            try:
+                                del s_root.attrs["view"]
+                            except KeyError:
+                                pass
+                        else:
+                            s_root.attrs["view"] = sv
+
+                        # tile attribute
+                        if st is None:
+                            for index in ("tile_index", "tile_coord"):
+                                try:
+                                    del s_root.attrs[index]
+                                except KeyError:
+                                    pass
+                        else:
                             index, coord = st
                             names = tiles_iterator.index
                             names = [name.split("_")[-1] for name in names]
                             # NOTE numpy dtypes are not serializable, use native
-                            attrs["tile_index"] = {
+                            s_root.attrs["tile_index"] = {
                                 k: int(v) for k, v in zip(names, index)
                             }
-                            attrs["tile_coord"] = {
+                            s_root.attrs["tile_coord"] = {
                                 k: float(v) for k, v in zip(names, coord)
                             }
 
-                        s_root = c_root.require_group(f"s{i_s}")
-                        i_s += 1
-                        s_root.attrs.update(attrs)
-
                         # 4) level
                         l0_group = s_root.require_group("0")
+                        l0_group.attrs["voxel_size"] = dataset.voxel_size
                         if label in l0_group:
                             if not overwrite:
                                 logger.info(f'"{l0_group.path}" already has "{label}"')
                                 continue
-                        # TODO review from here
+
                         # 5) data
                         logger.debug(l0_group)  # FIXME remove debug
                         data = dataset[selected]
@@ -203,6 +218,9 @@ class ZarrDataset(
                             data_dst, overwrite=overwrite, compute=False
                         )
                         tasks.append(task)
+
+        if not tasks:
+            return  # nothing to do
 
         # submit the task to cluster
         try:
@@ -377,10 +395,25 @@ class ZarrDataset(
                 )
             mapping[key] = value
 
-        return list(mapping.values())
+        # NOTE duing `_update_inventory_index`, we rely on None to determine columns to
+        # drop
+        attrs = list(mapping.values())
+        return attrs if attrs else None
 
     def _load_voxel_size(self):
-        raise RuntimeError("DEBUG, _load_voxel_size")
+        voxel_size = set()
+        for array in self.files:
+            group = os.path.dirname(array)
+            group = self.handle[group]
+            voxel_size.add(tuple(group.attrs["voxel_size"]))
+
+        inconsist = len(voxel_size) > 1
+        voxel_size = next(iter(voxel_size))
+        if inconsist:
+            logger.error(f"voxel size varies, using {voxel_size}")
+
+        return voxel_size
 
     def _retrieve_file_list(self, coord_dict):
+        print(coord_dict) # TODO lookup attributes -> group number idF
         raise RuntimeError("DEBUG, _retrieve_file_list")
