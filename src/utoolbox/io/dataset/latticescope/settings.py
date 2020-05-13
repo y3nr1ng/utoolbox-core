@@ -176,12 +176,14 @@ class Settings(AttrDict):
             "exposure": r"^Exp\(s\)\D+([\d\.]+)",
             "cycle": r"^Cycle\(s\)\D+([\d\.]+)",
             "roi": r"^ROI :\tLeft=(\d+) Top=(\d+) Right=(\d+) Bot=(\d+)",
+            "binning": r"^Binning :\tX=(\d+) Y=(\d+)",
         }
 
         converter = {
             "exposure": lambda x: float(x),
             "cycle": lambda x: float(x),
             "roi": lambda x: tuple([int(i) for i in x]),
+            "binning": lambda x: tuple([int(i) for i in x]),
         }
 
         parsed = AttrDict()

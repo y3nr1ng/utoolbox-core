@@ -150,7 +150,11 @@ class LatticeScopeDataset(
     def _load_array_info(self):
         camera = self.metadata["camera"]
         left, top, right, bottom = camera["roi"]
-        shape = (bottom - top + 1, right - left + 1)
+        bin_x, bin_y = camera["binning"]
+
+        logger.debug(f"binning (x={bin_x}, y={bin_y})")
+        # NOTE camera should coerce the binning range to proper range, using int-div
+        shape = ((bottom - top + 1) // bin_y, (right - left + 1) // bin_x)
 
         if self.metadata["general"]["mode"] == AcquisitionMode.Z_STACK:
             scan_type = self.metadata["waveform"]["type"]
