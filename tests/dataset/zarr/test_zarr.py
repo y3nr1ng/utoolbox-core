@@ -1,9 +1,10 @@
 import logging
 import os
 from pprint import pprint
-from prompt_toolkit.shortcuts import button_dialog
 
 import pandas as pd
+from dask.distributed import Client
+from prompt_toolkit.shortcuts import button_dialog
 
 from utoolbox.io.dataset import (
     LatticeScopeTiledDataset,
@@ -94,7 +95,7 @@ if __name__ == "__main__":
     if True:
         # Case 1)
         ds_src_dir = "X:/charm/20200424_ExM_Thy1_testis_dapi_z2um_1"
-        ds_dst_dir = "~/Desktop/20200424_ExM_Thy1_testis_dapi_z2um_1.zarr"
+        ds_dst_dir = "U:/charm/20200424_ExM_Thy1_testis_dapi_z2um_1.zarr"
     else:
         # Case 2)
         cwd = os.path.dirname(os.path.abspath(__file__))
@@ -108,4 +109,7 @@ if __name__ == "__main__":
     ds_src_dir = os.path.abspath(os.path.expanduser(ds_src_dir))
     ds_dst_dir = os.path.abspath(os.path.expanduser(ds_dst_dir))
 
-    main2(ds_src_dir, ds_dst_dir)
+    client = Client("10.109.20.6:8786")
+    print(client)
+
+    main2(ds_src_dir, ds_dst_dir, client=client)

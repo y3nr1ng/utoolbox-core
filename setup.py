@@ -46,7 +46,8 @@ setup(
     #   install_requires -> necessity
     #   requirements.txt
     install_requires=[
-        "dask[complete]~=2.12.0",
+        "dask[complete]~=2.16.0",
+        "distributed~=2.16.0",
         "h5py>=2.9",
         "humanfriendly",
         "imageio[ffmpeg]",

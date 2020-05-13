@@ -7,7 +7,7 @@ import dask.array as da
 import numpy as np
 import pandas as pd
 import zarr
-from dask.distributed import as_completed
+from dask.distributed import fire_and_forget
 
 from utoolbox.utils.dask import get_client, wait_futures
 
@@ -220,18 +220,20 @@ class ZarrDataset(
                         # instead of int
                         data_src = data.rechunk(data_dst.chunks)
                         task = data_src.to_zarr(
-                            data_dst, overwrite=overwrite, compute=False
+                            data_dst, overwrite=overwrite, compute=True
                         )
-                        tasks.append(task)
+                        # tasks.append(task)
+                        # TODO add callback here to update progressbar
 
         if not tasks:
             return  # nothing to do
 
         # submit the task to cluster
-        if not client:
-            client = get_client()
-        futures = client.compute(tasks)
-        wait_futures(futures)
+        # if not client:
+        #    client = get_client()
+        # for task in tasks:
+        #    future = client.compute(task)
+        #    fire_and_forget(future)
 
     ##
 
