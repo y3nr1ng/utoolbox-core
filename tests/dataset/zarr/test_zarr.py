@@ -108,4 +108,4 @@ if __name__ == "__main__":
     ds_src_dir = os.path.abspath(os.path.expanduser(ds_src_dir))
     ds_dst_dir = os.path.abspath(os.path.expanduser(ds_dst_dir))
 
-    main(ds_src_dir, ds_dst_dir)
+    main2(ds_src_dir, ds_dst_dir)

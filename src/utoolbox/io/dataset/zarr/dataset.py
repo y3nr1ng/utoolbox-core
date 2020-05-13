@@ -191,25 +191,30 @@ class ZarrDataset(
                         # 4) level
                         l0_group = s_root.require_group("0")
                         l0_group.attrs["voxel_size"] = dataset.voxel_size
+
+                        # 5) data
+                        logger.debug(f'writing "{l0_group.path}"')
+                        data = dataset[selected]
+                        # NOTE compression benchmark reference http://alimanfoo.github.
+                        # io/2016/09/21/genotype-compression-benchmark.html
                         if label in l0_group:
                             if not overwrite:
                                 logger.info(f'"{l0_group.path}" already has "{label}"')
                                 continue
 
-                        # 5) data
-                        logger.debug(l0_group)  # FIXME remove debug
-                        data = dataset[selected]
-                        # NOTE compression benchmark reference http://alimanfoo.github.
-                        # io/2016/09/21/genotype-compression-benchmark.html
-                        data_dst = l0_group.empty_like(
-                            label,
-                            data,
-                            chunks=True,
-                            compression="blosc",
-                            compression_opts=dict(
-                                cname="lz4", clevel=5, shuffle=zarr.blosc.SHUFFLE
-                            ),
-                        )
+                            # select existing array
+                            data_dst = l0_group[label]
+                        else:
+                            # create new array
+                            data_dst = l0_group.empty_like(
+                                label,
+                                data,
+                                chunks=True,
+                                compression="blosc",
+                                compression_opts=dict(
+                                    cname="lz4", clevel=5, shuffle=zarr.blosc.SHUFFLE
+                                ),
+                            )
                         # NOTE using default chunk shape after rechunk will cause
                         # problem, since chunk size is composite of chunks as tuples
                         # instead of int
@@ -223,11 +228,9 @@ class ZarrDataset(
             return  # nothing to do
 
         # submit the task to cluster
-        try:
-            futures = client.compute(tasks)
-        except AttributeError:
+        if not client:
             client = get_client()
-            futures = client.compute(tasks)
+        futures = client.compute(tasks)
         wait_futures(futures)
 
     ##
@@ -415,5 +418,5 @@ class ZarrDataset(
         return voxel_size
 
     def _retrieve_file_list(self, coord_dict):
-        print(coord_dict) # TODO lookup attributes -> group number idF
+        print(coord_dict)  # TODO lookup attributes -> group number idF
         raise RuntimeError("DEBUG, _retrieve_file_list")
