@@ -27,11 +27,34 @@ def get_local_cluster(*, scheduler_port=0, **kwargs):
     return cluster
 
 
-def get_client(*args, **kwargs):
+def get_client(worker_log_level="ERROR", *args, **kwargs):
     cluster = get_local_cluster(*args, **kwargs)
-    client = Client(cluster, silence_logs="error")
+    client = Client(cluster)
     logger.info(f'new client connection "{client}"')
-    atexit.register(client.close)
+
+    def close_client():
+        logger.info(f'client "{client}" closed')
+        client.close()
+
+    atexit.register(close_client)
+
+    # register loggers
+    try:
+        import coloredlogs
+    except ImportError:
+        logger.install("install `coloredlogs` to configure loggers automatically")
+    else:
+
+        def install_logger(dask_worker):
+            coloredlogs.install(
+                level=worker_log_level,
+                fmt="%(asctime)s %(levelname)s %(message)s",
+                datefmt="%H:%M:%S",
+            )
+
+        logger.debug(f'install logger for workers, level="{worker_log_level}"')
+        client.register_worker_callbacks(install_logger)
+
     return client
 
 
