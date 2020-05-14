@@ -241,8 +241,13 @@ class ZarrDataset(
     ##
 
     def _open_session(self):
-        z = zarr.open(self.root_dir, mode="r")  # don't create it
-        self._handle = z[self.path]
+        try:
+            z = zarr.open(self.root_dir, mode="r")  # don't create it
+        except ValueError:
+            # nothing to open here, unlikely a zarr dataset
+            return
+        else:
+            self._handle = z[self.path]
 
         # preview the internal structure
         if logger.getEffectiveLevel() <= logging.DEBUG:
@@ -382,14 +387,20 @@ class ZarrDataset(
             dim_name (str): dimension name to extract
             required (bool, optional): the attribute must exist
         """
+        print(self.metadata)
+
         mapping = defaultdict(set)
         for key, attrs in self.metadata[dim_name].items():
             for attr in attrs:
                 try:
-                    mapping[key].add(attr[dim_name])
+                    value = attr[dim_name]
                 except KeyError:
                     if required:
                         raise KeyError(f'"{key}" does not have attribute "{dim_name}"')
+                else:
+                    # NOTE split to try-except-else to ensure we do not create 
+                    # unncessary keys
+                    mapping[key].add(value)
 
         for key, value in mapping.items():
             inconsist = len(value) > 1
