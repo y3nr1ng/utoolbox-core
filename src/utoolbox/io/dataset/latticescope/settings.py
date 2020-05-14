@@ -32,7 +32,7 @@ Channel = namedtuple(
 )
 
 
-class Settings(AttrDict):
+class Settings(dict):
     """
     Object-oriented modeling of the Settings.txt from LatticeScope.
 
@@ -86,7 +86,7 @@ class Settings(AttrDict):
 
         converter = {"mode": AcquisitionMode}
 
-        parsed = AttrDict()
+        parsed = {}
         for field, pattern in patterns.items():
             value = re.findall(pattern, lines, re.MULTILINE)[0]
             try:
@@ -128,7 +128,7 @@ class Settings(AttrDict):
             "sample_piezo_n_steps": int,
         }
 
-        parsed = AttrDict()
+        parsed = {}
         for field, pattern in patterns.items():
             # NOTE exception here, multiple channels may exist
             value = re.findall(pattern, lines, re.MULTILINE)[0]
@@ -186,7 +186,7 @@ class Settings(AttrDict):
             "binning": lambda x: tuple([int(i) for i in x]),
         }
 
-        parsed = AttrDict()
+        parsed = {}
         for field, pattern in patterns.items():
             value = re.findall(pattern, lines, re.MULTILINE)[0]
             try:
@@ -204,7 +204,7 @@ class Settings(AttrDict):
 
         converter = {"mode": TriggerMode}
 
-        parsed = AttrDict()
+        parsed = {}
         for field, pattern in patterns.items():
             value = re.findall(pattern, lines, re.MULTILINE)[0]
             try:
