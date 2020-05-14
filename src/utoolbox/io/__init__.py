@@ -1,1 +1,1 @@
-from .dataset import open_dataset
+from .dataset.utils import open_dataset

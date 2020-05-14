@@ -8,8 +8,6 @@ import numpy as np
 import pandas as pd
 import zarr
 
-from utoolbox.utils.dask import get_client, wait_futures
-
 from ..base import (
     DenseDataset,
     MultiChannelDataset,
@@ -31,7 +29,12 @@ RAW_DATA_LABEL = "raw"
 
 
 class ZarrDataset(
-    SessionDataset, DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset
+    SessionDataset,
+    DenseDataset,
+    MultiChannelDataset,
+    MultiViewDataset,
+    TiledDataset,
+    TimeSeriesDataset,
 ):
     version = 1
 
@@ -223,6 +226,7 @@ class ZarrDataset(
                         )
                         # tasks.append(task)
                         # TODO add callback here to update progressbar
+                        # TODO add hash verification here, and validate it
 
         if not tasks:
             return  # nothing to do

@@ -2,21 +2,17 @@ import logging
 import os
 from pprint import pprint
 
-import pandas as pd
 from dask.distributed import Client
-from prompt_toolkit.shortcuts import button_dialog
 
-from utoolbox.io.dataset import (
-    LatticeScopeTiledDataset,
-    TiledDatasetIterator,
-    ZarrDataset,
-    open_dataset,
-)
+from utoolbox.io import open_dataset
+from utoolbox.io.dataset import TiledDatasetIterator
+
 
 logger = logging.getLogger("test_zarr")
 
+
 def main(ds_src_dir, ds_dst_dir, client=None):
-    ds_dst = ZarrDataset.load(ds_dst_dir)
+    ds_dst = open_dataset(ds_dst_dir)
 
     print(ds_dst.inventory)
 

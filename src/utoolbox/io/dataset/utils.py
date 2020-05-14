@@ -1,12 +1,14 @@
 import logging
 
 from utoolbox.io.dataset import (
-    MicroManagerV1Dataset,
-    MicroManagerV2Dataset,
     LatticeScopeDataset,
     LatticeScopeTiledDataset,
+    MicroManagerV1Dataset,
+    MicroManagerV2Dataset,
     SmartSpimDataset,
+    ZarrDataset
 )
+
 from .base import UnsupportedDatasetError
 
 __all__ = ["open_dataset", "SUPPORTED_DATASET_CLASS"]
@@ -15,11 +17,13 @@ logger = logging.getLogger("utoolbox.io.dataset")
 
 
 SUPPORTED_DATASET_CLASS = [
+    # Zarr
+    ZarrDataset,
     # uManager
     MicroManagerV2Dataset,
     MicroManagerV1Dataset,
     # LatticeScope
-    LatticeScopeTiledDataset, # we must test the tiled-form first
+    LatticeScopeTiledDataset,  # we must test the tiled-form first
     LatticeScopeDataset,
     # SmartSPIM
     SmartSpimDataset,
