@@ -53,7 +53,7 @@ setup(
         "imageio[ffmpeg]",
         "numpy>=1.17",
         "pandas",
-        "prompt_toolkit",
+        "prompt_toolkit>=3.0",
         "zarr",
     ],
     # additional groups of dependencies here for the "extras" syntax
@@ -63,15 +63,10 @@ setup(
         "gpu": ["cupy-cuda101"],
         "viewer": ["napari"],
         "original": [
-            "scipy",
-            # file io
-            "imageio-ffmpeg",
-            "tifffile",
             # utils
             "mako",
             "click",
             "coloredlogs",
-            "prompt_toolkit>=3.0",
             "tqdm",
         ],
     },
