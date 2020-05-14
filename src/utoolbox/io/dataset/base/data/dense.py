@@ -25,7 +25,6 @@ class DenseDataset(BaseDataset, metaclass=ABCMeta):
 
             shape, dtype = self._load_array_info()
 
-            logger.debug("preloading...")
             data_uuid = []
             for coord in self.inventory:
                 coord_dict = {k: v for k, v in zip(self.inventory.names, coord)}

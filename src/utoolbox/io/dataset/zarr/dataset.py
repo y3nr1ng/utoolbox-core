@@ -7,7 +7,6 @@ import dask.array as da
 import numpy as np
 import pandas as pd
 import zarr
-from dask.distributed import fire_and_forget
 
 from utoolbox.utils.dask import get_client, wait_futures
 
@@ -267,6 +266,8 @@ class ZarrDataset(
         #   /time/channel/setup/level
 
         l_str = str(self.level)
+        logger.info(f'searching level {l_str} for label "{self.label}"')
+
         files = []
         for t, t_root in self.handle.groups():
             for c, c_root in t_root.groups():
@@ -279,9 +280,6 @@ class ZarrDataset(
                         # build path
                         path = f"/{t}/{c}/{s}/{l_str}/{self.label}"
                         files.append(path)
-        logger.info(
-            f'found {len(files)} file(s) for label "{self.label}", level {self.level}'
-        )
 
         return files
 
@@ -366,9 +364,7 @@ class ZarrDataset(
         return df
 
     def _load_timestamps(self) -> List[np.datetime64]:
-        return self._load_injective_attributes(
-            "time"
-        )  # TODO should i ignore attr when not a timeseries dataset?
+        return self._load_injective_attributes("time")
 
     def _load_view_info(self):
         return self._load_injective_attributes("view")
