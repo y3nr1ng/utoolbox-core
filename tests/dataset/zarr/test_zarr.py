@@ -100,7 +100,7 @@ if __name__ == "__main__":
         # Case 2)
         cwd = os.path.dirname(os.path.abspath(__file__))
         # ds_src_dir = os.path.join(cwd, "../data/demo_3D_2x2x2_CMTKG-V3")
-        path = os.path.join(cwd, "../data/demo_3D_2x2x2_CMTKG-V3")
+        path = os.path.join(cwd, "../data/demo_3D_3x1x3_CMTKG-V3")
         ds_src_dir = os.path.abspath(path)
         parent, dname = os.path.split(ds_src_dir)
         ds_dst_dir = os.path.join(parent, f"{dname}.zarr")

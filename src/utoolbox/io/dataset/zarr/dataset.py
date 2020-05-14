@@ -387,8 +387,6 @@ class ZarrDataset(
             dim_name (str): dimension name to extract
             required (bool, optional): the attribute must exist
         """
-        print(self.metadata)
-
         mapping = defaultdict(set)
         for key, attrs in self.metadata[dim_name].items():
             for attr in attrs:
@@ -398,7 +396,7 @@ class ZarrDataset(
                     if required:
                         raise KeyError(f'"{key}" does not have attribute "{dim_name}"')
                 else:
-                    # NOTE split to try-except-else to ensure we do not create 
+                    # NOTE split to try-except-else to ensure we do not create
                     # unncessary keys
                     mapping[key].add(value)
 
