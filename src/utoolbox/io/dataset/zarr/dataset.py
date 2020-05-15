@@ -4,11 +4,13 @@ from collections import defaultdict
 from typing import List, Optional
 
 import dask.array as da
+from dask.distributed import as_completed
+from dask import delayed
 import numpy as np
-import pandas as pd
 import xxhash
+import pandas as pd
 import zarr
-
+from utoolbox.utils.dask import get_client, wait_futures
 from ..base import (
     DenseDataset,
     MultiChannelDataset,
@@ -127,7 +129,9 @@ class ZarrDataset(
             root = root.open_group(path, mode="w")
 
         hash_gen = xxhash.xxh64()
-        tasks = []  # conversion tasks, batch submit after populated all of them
+
+        client = client if client else get_client()
+        futures = {}  # conversion tasks, batch submit after populated all of them
 
         # start populating the container structure
         #   /time/channel/setup/level
@@ -199,17 +203,41 @@ class ZarrDataset(
                         # 5) data
                         logger.debug(f'writing "{l0_group.path}"')
                         data = dataset[selected]
-                        # NOTE compression benchmark reference http://alimanfoo.github.
-                        # io/2016/09/21/genotype-compression-benchmark.html
+
                         if label in l0_group:
-                            if not overwrite:
-                                logger.info(f'"{l0_group.path}" already has "{label}"')
-                                continue
+                            # get the hash
+                            hash_gen.update(data.compute())
+                            src_hash = hash_gen.hexdigest()
+                            hash_gen.reset()
+
+                            try:
+                                dst_hash = l0_group.attrs["checksum"]
+                                if dst_hash != src_hash:
+                                    raise ValueError
+                            except KeyError:
+                                # hash does not exist, since it is only updated when
+                                # dump was complete
+                                logger.warning("last dump was incomplete")
+                            except ValueError:
+                                # hash mismatch
+                                logger.warning(
+                                    "existing hash does not match the source"
+                                )
+                            else:
+                                # array exists, and checksum matches
+                                if not overwrite:
+                                    logger.info(
+                                        f'"{l0_group.path}" already has "{label}"'
+                                    )
+                                    continue
 
                             # select existing array
                             data_dst = l0_group[label]
                         else:
                             # create new array
+
+                            # NOTE compression benchmark reference http://alimanfoo.
+                            # github.io/2016/09/21/genotype-compression-benchmark.html
                             data_dst = l0_group.empty_like(
                                 label,
                                 data,
@@ -219,42 +247,41 @@ class ZarrDataset(
                                     cname="lz4", clevel=5, shuffle=zarr.blosc.SHUFFLE
                                 ),
                             )
+
                         # NOTE using default chunk shape after rechunk will cause
                         # problem, since chunk size is composite of chunks as tuples
                         # instead of int
                         data_src = data.rechunk(data_dst.chunks)
-                        task = data_src.to_zarr(
-                            data_dst, overwrite=overwrite, compute=True
+                        array = data_src.to_zarr(
+                            data_dst,
+                            overwrite=overwrite,
+                            compute=False,
+                            return_stored=True,
                         )
 
-                        # add checksum
-                        hash_gen.update(data.compute())
-                        print(hash_gen.hexdigest())
-                        hash_gen.reset()
+                        @delayed
+                        def calc_checksum(array):
+                            # NOTE cannot create external dependency in delayed funcs,
+                            # map futures to their target groups instead
+                            return xxhash.xxh64(array).hexdigest()
 
-                        hash_gen.update(np.array(data_dst))
-                        print(hash_gen.hexdigest())
-                        hash_gen.reset()
-
-                        # @delayed
-                        # def add_checksum(task):
-                        #    # NOTE the upstream zarr task creates dependency for this
-                        #    # task
-                        #    pass
-
-                        # tasks.append(task)
+                        checksum = calc_checksum(array)
+                        future = client.compute(checksum)
+                        futures[future] = l0_group
                         # TODO add callback here to update progressbar
-                        # TODO add hash verification here, and validate it
 
-        if not tasks:
+        if not futures:
             return  # nothing to do
 
-        # submit the task to cluster
-        # if not client:
-        #    client = get_client()
-        # for task in tasks:
-        #    future = client.compute(task)
-        #    fire_and_forget(future)
+        # TODO count failed tasks
+        for future in as_completed(futures.keys()):
+            try:
+                group, checksum = futures[future], future.result()
+            except Exception:
+                logger.error(f'failed to serialize "{group.path}"')
+            else:
+                logger.debug(f'"{group.path}" xxh64="{checksum}"')
+                group.attrs["checksum"] = checksum
 
     ##
 
