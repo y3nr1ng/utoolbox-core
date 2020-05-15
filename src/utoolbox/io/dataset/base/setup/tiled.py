@@ -216,6 +216,7 @@ class TiledDatasetIterator(DatasetIterator):
 
         for result in super().__iter__():
             if requires_lookup:
+                # return: COORD
                 key_index, selected = result
 
                 if key_index:
@@ -231,6 +232,8 @@ class TiledDatasetIterator(DatasetIterator):
                     key_coord = tuple(
                         key_coord[header].iloc[0] for header in key_header
                     )
+                else:
+                    key_coord = None  # not a tiled dataset, nothing to lookup
 
                 if self.return_format == "both":
                     key = key_index, key_coord
@@ -241,6 +244,7 @@ class TiledDatasetIterator(DatasetIterator):
 
                 yield key, selected
             else:
+                # return: NO KEY / INDEX
                 yield result
 
     ##

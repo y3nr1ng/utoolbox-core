@@ -6,6 +6,7 @@ from typing import List, Optional
 import dask.array as da
 import numpy as np
 import pandas as pd
+import xxhash
 import zarr
 
 from ..base import (
@@ -125,6 +126,7 @@ class ZarrDataset(
         if path:
             root = root.open_group(path, mode="w")
 
+        hash_gen = xxhash.xxh64()
         tasks = []  # conversion tasks, batch submit after populated all of them
 
         # start populating the container structure
@@ -224,6 +226,22 @@ class ZarrDataset(
                         task = data_src.to_zarr(
                             data_dst, overwrite=overwrite, compute=True
                         )
+
+                        # add checksum
+                        hash_gen.update(data.compute())
+                        print(hash_gen.hexdigest())
+                        hash_gen.reset()
+
+                        hash_gen.update(np.array(data_dst))
+                        print(hash_gen.hexdigest())
+                        hash_gen.reset()
+
+                        # @delayed
+                        # def add_checksum(task):
+                        #    # NOTE the upstream zarr task creates dependency for this
+                        #    # task
+                        #    pass
+
                         # tasks.append(task)
                         # TODO add callback here to update progressbar
                         # TODO add hash verification here, and validate it
