@@ -1,22 +1,24 @@
-from functools import partial, reduce
 import logging
 import operator
 import os
+from functools import partial, reduce
 from xml.etree.ElementTree import Element, ElementTree, SubElement
 
 import h5py
 import numpy as np
+from humanfriendly import format_size
 
 from ..base import (
+    TILED_INDEX,
     DenseDataset,
     MultiChannelDataset,
-    MultiViewDataset,
-    TiledDataset,
     MultiChannelDatasetIterator,
+    MultiViewDataset,
     MultiViewDatasetIterator,
+    TiledDataset,
     TiledDatasetIterator,
-    TILED_INDEX,
 )
+from .error import InvalidChunkSizeError
 
 __all__ = ["BigDataViewerDataset"]
 
@@ -219,7 +221,7 @@ class BigDataViewerHDF5(object):
 
         nslots = reduce(operator.mul, cache_n_chunks, 1)
         nbytes = reduce(operator.mul, cache_chunk_size, 1) * nslots * 2
-        logger.info(f"cache size: {nbytes} bytes")
+        logger.info(f"cache size: {format_size(nbytes, binary=True)}")
 
         self._func = partial(
             h5py.File, self.path, mode, rdcc_nbytes=nbytes, rdcc_nslots=nslots
@@ -270,10 +272,15 @@ class BigDataViewerHDF5(object):
             sdata = sdata.compute()
 
             group = self.handle.create_group(path)
-            group.create_dataset(
-                "cells", data=sdata, chunks=chunk, compression=compression
-            )
-            self.handle.flush()
+            try:
+                group.create_dataset(
+                    "cells", data=sdata, chunks=chunk, compression=compression
+                )
+            except ValueError as err:
+                err_str = str(err)
+                raise InvalidChunkSizeError(err_str)
+            finally:
+                self.handle.flush()
 
     def close(self):
         self.handle.close()
@@ -336,6 +343,8 @@ class BigDataViewerDataset(
             raise TypeError("dataset is not a DenseDataset")
         voxel_size = dataset.voxel_size
 
+        print(voxel_size)
+
         shape, _ = dataset._load_array_info()
 
         if dry_run:
@@ -366,18 +375,20 @@ class BigDataViewerDataset(
                     for (index, coord), selected in TiledDatasetIterator(
                         v_selected, axes="xyz", return_key=True, return_format="both"
                     ):
-                        # generate queries
-                        statements = [
-                            f"{k}=={v}" for k, v in zip(sorted(TILED_INDEX), coord)
-                        ]
-                        query_stmt = " & ".join(statements)
                         # find tile linear index
-                        result = dataset.tile_coords.query(query_stmt)
+                        coords = {
+                            k: v for k, v in zip(sorted(TILED_INDEX), index)
+                        }  # in XYZ order
+                        result = dataset.tile_coords.xs(
+                            list(coords.values()),
+                            axis="index",
+                            level=list(coords.keys()),
+                        )
                         row_index = result.iloc[0].name
                         linear_index = dataset.tile_coords.index.get_loc(row_index)
 
                         uuid = selected.inventory.values[0]
-                        
+
                         ss = xml.add_view(
                             shape,
                             name=uuid,
@@ -396,8 +407,8 @@ class BigDataViewerDataset(
                         factor = tuple(s / min_voxel_size for s in voxel_size)
 
                         # 3d transformation, pad info if missing
-                        if len(index) == 2:
-                            index, coord = index + (0,), coord + (0,)
+                        if len(coord) == 2:
+                            coord = coord + (0,)
 
                         # transformation
                         matrix = np.zeros((3, 4))

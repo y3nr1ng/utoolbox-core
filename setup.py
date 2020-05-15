@@ -46,6 +46,8 @@ setup(
     #   install_requires -> necessity
     #   requirements.txt
     install_requires=[
+        "click",
+        "coloredlogs",
         "dask[complete]~=2.16.0",
         "distributed~=2.16.0",
         "h5py>=2.9",
@@ -58,17 +60,10 @@ setup(
     ],
     # additional groups of dependencies here for the "extras" syntax
     extras_require={
-        # TODO how to add test dependencies? [coloredlogs]
         # TODO remove rest of the sections
         "gpu": ["cupy-cuda101"],
         "viewer": ["napari"],
-        "original": [
-            # utils
-            "mako",
-            "click",
-            "coloredlogs",
-            "tqdm",
-        ],
+        "original": ["mako", "tqdm"],
     },
     # data files included in packages
     package_data={},
@@ -77,6 +72,6 @@ setup(
     # data files outside of packages, installed into '<sys.prefix>/my_data'
     data_files=[],
     # executable scripts
-    entry_points={"console_scripts": []},
+    entry_points={"console_scripts": ["mm2bdv=utoolbox.cli.converter.mm2bdv:main"]},
     zip_safe=True,
 )

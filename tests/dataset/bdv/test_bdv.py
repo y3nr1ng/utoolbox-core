@@ -8,10 +8,7 @@ from dask.distributed import Client
 from prompt_toolkit.shortcuts import button_dialog
 
 from utoolbox.io import open_dataset
-from utoolbox.io.dataset import (
-    BigDataViewerDataset,
-    TiledDatasetIterator,
-)
+from utoolbox.io.dataset import BigDataViewerDataset, TiledDatasetIterator
 
 logger = logging.getLogger("test_zarr")
 
@@ -46,6 +43,7 @@ def main(ds_src_dir, ds_dst_dir, client=None):
         ).run()
         if dump:
             # we have to unlink first
+            logger.warning("remove previous dataset dump")
             rmtree(ds_dst_dir)
     else:
         dump = True
@@ -53,7 +51,7 @@ def main(ds_src_dir, ds_dst_dir, client=None):
     if dump:
         logger.info("convert to zarr dataset")
         BigDataViewerDataset.dump(
-            ds_dst_dir, ds_src, pyramid=[(1, 1, 1), (2, 4, 4)], chunks=(64, 64, 64)
+            ds_dst_dir, ds_src, pyramid=[(1, 1, 1), (2, 4, 4)], chunks=(16, 128, 128)
         )
 
 
@@ -73,10 +71,10 @@ if __name__ == "__main__":
         # Case 2)
         cwd = os.path.dirname(os.path.abspath(__file__))
         # ds_src_dir = os.path.join(cwd, "../data/demo_3D_2x2x2_CMTKG-V3")
-        path = os.path.join(cwd, "../data/demo_3D_3x1x3_CMTKG-V3")
+        path = os.path.join(cwd, "../data/ExM_E15_olympus4X_canon300mm_2x3_1")
         ds_src_dir = os.path.abspath(path)
         parent, dname = os.path.split(ds_src_dir)
-        ds_dst_dir = os.path.join(parent, f"{dname}.zarr")
+        ds_dst_dir = os.path.join(parent, f"{dname}_bdv")
 
     # ensure paths are properly expanded
     ds_src_dir = os.path.abspath(os.path.expanduser(ds_src_dir))
