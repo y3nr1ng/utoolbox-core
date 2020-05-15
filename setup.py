@@ -56,6 +56,7 @@ setup(
         "numpy>=1.17",
         "pandas",
         "prompt_toolkit>=3.0",
+        "xxhash",
         "zarr",
     ],
     # additional groups of dependencies here for the "extras" syntax
