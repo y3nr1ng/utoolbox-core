@@ -7,7 +7,16 @@ from xml.etree.ElementTree import Element, ElementTree, SubElement
 import h5py
 import numpy as np
 
-from ..base import DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset
+from ..base import (
+    DenseDataset,
+    MultiChannelDataset,
+    MultiViewDataset,
+    TiledDataset,
+    MultiChannelDatasetIterator,
+    MultiViewDatasetIterator,
+    TiledDatasetIterator,
+    TILED_INDEX,
+)
 
 __all__ = ["BigDataViewerDataset"]
 
@@ -292,6 +301,8 @@ class BigDataViewerDataset(
 
         self._root_dir = root_dir
 
+        # TODO replace with open_session
+
     ##
 
     @property
@@ -304,9 +315,10 @@ class BigDataViewerDataset(
 
     ##
 
-    @staticmethod
+    @classmethod
     def dump(
-        dst_dir,
+        cls,
+        dst_dir: str,
         dataset,
         pyramid=[(1, 1, 1), (2, 4, 4)],
         chunks=(64, 128, 128),
@@ -322,7 +334,7 @@ class BigDataViewerDataset(
         xml = BigDataViewerXML(h5_path)
         if not isinstance(dataset, DenseDataset):
             raise TypeError("dataset is not a DenseDataset")
-        voxel_size = dataset._load_voxel_size()
+        voxel_size = dataset.voxel_size
 
         shape, _ = dataset._load_array_info()
 
@@ -347,6 +359,69 @@ class BigDataViewerDataset(
             klass = BigDataViewerHDF5
 
         with klass(h5_path, "w") as h:
+            for channel, c_selected in MultiChannelDatasetIterator(dataset):
+                for view, v_selected in MultiViewDatasetIterator(c_selected):
+                    kwargs = {"channel": channel, "illumination": view}
+
+                    for (index, coord), selected in TiledDatasetIterator(
+                        v_selected, axes="xyz", return_key=True, return_format="both"
+                    ):
+                        # generate queries
+                        statements = [
+                            f"{k}=={v}" for k, v in zip(sorted(TILED_INDEX), coord)
+                        ]
+                        query_stmt = " & ".join(statements)
+                        # find tile linear index
+                        result = dataset.tile_coords.query(query_stmt)
+                        row_index = result.iloc[0].name
+                        linear_index = dataset.tile_coords.index.get_loc(row_index)
+
+                        uuid = selected.inventory.values[0]
+                        
+                        ss = xml.add_view(
+                            shape,
+                            name=uuid,
+                            voxel_size=voxel_size,
+                            tile=linear_index,
+                            **kwargs,
+                        )
+                        logger.info(f" [{ss}] {uuid}")
+
+                        # anisotropic factor
+                        min_voxel_size = min(voxel_size)
+                        factor = tuple(s / min_voxel_size for s in voxel_size)
+
+                        # anisotropic factor
+                        min_voxel_size = min(voxel_size)
+                        factor = tuple(s / min_voxel_size for s in voxel_size)
+
+                        # 3d transformation, pad info if missing
+                        if len(index) == 2:
+                            index, coord = index + (0,), coord + (0,)
+
+                        # transformation
+                        matrix = np.zeros((3, 4))
+                        matrix[range(3), range(3)] = 1
+                        matrix[range(3), -1] = [
+                            c / v * s * f
+                            for c, v, s, f in zip(
+                                coord,
+                                reversed(voxel_size),
+                                (-1, -1, -1),
+                                reversed(factor),
+                            )
+                        ]
+                        xml.views[ss].add_transform(
+                            "Translation to Regular Grid", matrix
+                        )
+
+                        # write data
+                        h.add_view(ss, dataset[selected], pyramid, chunks, compression)
+
+            xml.serialize()
+
+            """
+
             for coords, uuid in dataset.inventory.items():
                 coord_dict = {
                     k: v for k, v in zip(dataset.inventory.index.names, coords)
@@ -401,6 +476,8 @@ class BigDataViewerDataset(
                 h.add_view(ss, dataset[uuid], pyramid, chunks, compression)
 
         xml.serialize()
+
+        """
 
     ##
 
