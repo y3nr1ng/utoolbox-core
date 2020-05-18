@@ -58,9 +58,17 @@ class BaseDataset(metaclass=ABCMeta):
             uuid = key.values[0]
         elif isinstance(key, dict):
             # rebuild coordinate
-            coord_list = tuple(key[k] for k in self.inventory.index.names if k in key)
-            # TODO use df.xs
-            uuid = self.inventory.__getitem__(coord_list)
+            uuid = self.inventory.xs(
+                list(key.values()), axis="index", level=list(key.keys())
+            )
+            if len(uuid) > 1:
+                desc = [f"{k}={v}" for k, v in key.items()]
+                desc = ", ".join(desc)
+                logger.debug(f"using key ({desc})")
+                logger.warning(
+                    f"ambiguous key ({len(uuid)} matches), using first returned result"
+                )
+            uuid = uuid.iloc[0]
         elif isinstance(key, str):
             # direct uuid
             uuid = key

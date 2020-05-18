@@ -6,7 +6,7 @@ from utoolbox.io.dataset import (
     MicroManagerV1Dataset,
     MicroManagerV2Dataset,
     SmartSpimDataset,
-    ZarrDataset
+    ZarrDataset,
 )
 
 from .base import UnsupportedDatasetError
@@ -34,7 +34,7 @@ def open_dataset(path):
     for _klass in SUPPORTED_DATASET_CLASS:
         try:
             ds = _klass.load(path)
-            logger.info(f'"{path}" is a "{_klass}"')
+            logger.info(f'"{path}" is a "{_klass.__name__}"')
             break
         except UnsupportedDatasetError:
             logger.debug(f'not a "{_klass}"')
