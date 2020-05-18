@@ -58,7 +58,8 @@ class BaseDataset(metaclass=ABCMeta):
             uuid = key.values[0]
         elif isinstance(key, dict):
             # rebuild coordinate
-            coord_list = tuple(key[k] for k in self.inventory.index.names)
+            coord_list = tuple(key[k] for k in self.inventory.index.names if k in key)
+            # TODO use df.xs
             uuid = self.inventory.__getitem__(coord_list)
         elif isinstance(key, str):
             # direct uuid

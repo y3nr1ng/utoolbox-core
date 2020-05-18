@@ -369,6 +369,7 @@ class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
 
     def _retrieve_file_list(self, coord_dict):
         file_list = super()._retrieve_file_list(coord_dict, cascade=True)
+
         # generate queries
         statements = [f"{k}=={coord_dict[k]}" for k in TILED_INDEX]
         query_stmt = " & ".join(statements)
