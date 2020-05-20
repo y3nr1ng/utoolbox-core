@@ -37,7 +37,6 @@ class BaseDataset(metaclass=ABCMeta):
 
         def list_files():
             self._files = self._enumerate_files()
-            # self._files.sort()  # FIXME use natsort
             self._files.sort(key=natsort_keygen())
             logger.info(f"found {len(self.files)} file(s)")
 
