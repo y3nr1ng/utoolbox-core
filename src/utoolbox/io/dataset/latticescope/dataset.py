@@ -28,6 +28,8 @@ __all__ = ["LatticeScopeDataset", "LatticeScopeTiledDataset"]
 
 logger = logging.getLogger("utoolbox.io.dataset")
 
+PIXEL_SIZE_LUT = {"Orca4.0": 6.5}
+
 
 class LatticeScopeDataset(
     DirectoryDataset,
@@ -226,7 +228,7 @@ class LatticeScopeDataset(
         camera_type = next(iter(camera_type))
 
         try:
-            value = {"Orca4.0": 6.5}[camera_type]
+            value = PIXEL_SIZE_LUT[camera_type]
             logger.debug(f'camera identified as "{camera_type}", pixel size {value} um')
             mag = self.metadata["hardware"]["detection"]["magnification"]
             value /= mag

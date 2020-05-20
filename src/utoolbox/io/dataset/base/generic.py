@@ -2,11 +2,12 @@ import logging
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from enum import IntEnum
-from typing import Callable, Optional, Tuple, Mapping, Iterable, Any
+from typing import Any, Callable, Iterable, Mapping, Optional, Tuple
 from uuid import uuid4
 
 import pandas as pd
 from humanfriendly.tables import format_pretty_table
+from natsort import natsort_keygen
 
 from .error import PreloadError, UnsupportedDatasetError
 
@@ -36,7 +37,8 @@ class BaseDataset(metaclass=ABCMeta):
 
         def list_files():
             self._files = self._enumerate_files()
-            self._files.sort()
+            # self._files.sort()  # FIXME use natsort
+            self._files.sort(key=natsort_keygen())
             logger.info(f"found {len(self.files)} file(s)")
 
         self.register_preload_func(test_readability, priority=20)

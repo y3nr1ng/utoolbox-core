@@ -53,6 +53,7 @@ setup(
         "h5py>=2.9",
         "humanfriendly",
         "imageio[ffmpeg]",
+        "natsort",
         "numpy>=1.17",
         "pandas",
         "prompt_toolkit>=3.0",

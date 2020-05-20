@@ -65,7 +65,7 @@ def main(src_dir, dst_dir, dry_run, downsamples, chunk):
         downsamples (tuple of int, optional): downsample ratio along (X, Y, Z) axis
         chunk (tuple of int, optional): chunk size
     """
-    ds_src = open_dataset(src_dir)
+    ds_src = open_dataset(src_dir, show_trace=True)
 
     if dst_dir is None:
         dst_dir = f"{src_dir}_bdv"
@@ -86,8 +86,6 @@ def main(src_dir, dst_dir, dry_run, downsamples, chunk):
     if dump:
         # NOTE we should already deal with FileExistError
         os.mkdir(dst_dir)
-
-        print(downsamples)
 
         # ensure downsamples is wrapped
         if isinstance(downsamples[0], int):

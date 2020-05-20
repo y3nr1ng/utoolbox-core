@@ -19,6 +19,18 @@ __all__ = ["MicroManagerV1Dataset", "MicroManagerV2Dataset"]
 logger = logging.getLogger("utoolbox.io.dataset")
 
 
+def prompt_pixel_size():
+    from prompt_toolkit.shortcuts import input_dialog
+
+    value = input_dialog(
+        title="Invalid pixel size",
+        text=f"Please provide the effective pixel size (um):",
+    ).run()
+    dx = float(value)
+
+    return dx
+
+
 class MicroManagerV1Dataset(
     DirectoryDataset, DenseDataset, MultiChannelDataset, TiledDataset
 ):
@@ -30,7 +42,7 @@ class MicroManagerV1Dataset(
     def read_func(self):
         def func(uri, shape, dtype):
             # order by z
-            uri.sort()
+            #uri.sort()
 
             # layered volume
             nz, shape = shape[0], shape[1:]
@@ -41,7 +53,9 @@ class MicroManagerV1Dataset(
                 ]
             )
             if array.shape[0] != nz:
-                logger.warning(f"retrieved layer mis-matched")
+                logger.warning(
+                    f"retrieved layer mis-matched (require: {nz}, provide: {array.shape[0]})"
+                )
             return array
 
         return func
@@ -183,8 +197,7 @@ class MicroManagerV1Dataset(
             self.metadata["summary"]["PixelAspect"],
         )
         if dx == 0:
-            logger.warning("pixel size undefined, default to 1")
-            dx = 1
+            dx = prompt_pixel_size()
         size = (r * dx, dx)
 
         if self.metadata["summary"]["Slices"] > 1:
@@ -270,19 +283,30 @@ class MicroManagerV2Dataset(MicroManagerV1Dataset):
         # type cast
         dx, matrix = float(dx), [float(m) for m in matrix.split(";")]
 
-        # TODO guess dx from frame_metadata["HamamatsuHam_DCAM-CameraName"]
+        if dx == 0:
+            dx = prompt_pixel_size()
 
         # fix affine matrix, default should be identity
         if all(m == 0 for m in matrix):
             logger.warning("invalid affine matrix, reset to identity")
             matrix[0] = matrix[4] = 1.0
 
+        binning = frame_metadata["Binning"]
+        binning = int(binning)
+
         # calculate affine matrix
         #   [ 1.0, 0.0, 0.0; 0.0, 1.0, 0.0 ]
-        size = (matrix[4] * dx + matrix[5], matrix[0] * dx + matrix[2])
+        size = (
+            (matrix[4] * dx + matrix[5]) * binning,
+            (matrix[0] * dx + matrix[2]) * binning,
+        )
+        logger.info(f"binning {binning}x, effective pixel size {size} um")
 
         if self.metadata["summary"]["Slices"] > 1:
             size = (abs(self.metadata["summary"]["z-step_um"]),) + size
+
+        # ensure everything is in `float`
+        size = tuple(float(s) for s in size)
 
         return size
 
