@@ -49,7 +49,7 @@ class MicroManagerV1Dataset(
     ##
 
     def _can_read(self):
-        version = self.metadata["MicroManagerVersion"]
+        version = self.metadata["summary"]["MicroManagerVersion"]
         return version.startswith("1.")
 
     def _enumerate_files(self):
@@ -58,57 +58,94 @@ class MicroManagerV1Dataset(
 
     def _load_array_info(self):
         # shape
-        shape = self.metadata["Height"], self.metadata["Width"]
+        shape = self.metadata["summary"]["Height"], self.metadata["summary"]["Width"]
         if any(s <= 0 for s in shape):
-            logger.warning(f"metadata incidcates image size has 0 ({shape}), fixing...")
-            with open(self.metadata_path, "r") as fd:
-                metadata = json.load(fd)
-                for key, block in metadata.items():
-                    try:
-                        if block["Height"] > 0 and block["Width"] > 0:
-                            shape = block["Height"], block["Width"]
-                            logger.info(f'using image shape info from "{key}"')
-                            break
-                    except KeyError:
-                        pass
-                else:
-                    raise MalformedMetadataError(
-                        "unable to determine correct image shape"
-                    )
+            logger.warning(f"invalid image size {shape}, using frame metadata")
+            shape = self.metadata["frame"]["Height"], self.metadata["frame"]["Width"]
+            if any(s <= 0 for s in shape):
+                raise MalformedMetadataError("unable to determine correct image shape")
 
-        nz = self.metadata["Slices"]
+        nz = self.metadata["summary"]["Slices"]
         if nz > 1:
             shape = (nz,) + shape
 
         # dtype
-        ptype = self.metadata["PixelType"].lower()
+        ptype = self.metadata["summary"]["PixelType"].lower()
         dtype = {"gray16": np.uint16}[ptype]
 
         return shape, dtype
 
     def _load_channel_info(self):
-        return self.metadata["ChNames"]
+        return self.metadata["summary"]["ChNames"]
 
-    def _load_metadata(self, metadata_name="metadata.txt"):
+    def _load_metadata(self, filename="metadata.txt"):
         # find all `metadata.txt` and try to open until success
-        search_path = os.path.join(self.root_dir, "*", metadata_name)
+        search_path = os.path.join(self.root_dir, "*", filename)
         for metadata_path in glob.iglob(search_path):
             try:
                 with open(metadata_path, "r") as fd:
-                    metadata = json.load(fd)
+                    raw_metadata = json.load(fd)
                     logger.info(f'found metadata at "{metadata_path}"')
+
+                    # cleanup metadata
+                    metadata = {}
+                    metadata["summary"] = raw_metadata["summary"]
+                    for key, value in raw_metadata.items():
+                        if key.startswith("Metadata") and key.endswith(".tif"):
+                            metadata["frame"] = value
+                            break
+                    else:
+                        raise MalformedMetadataError("unable to find frame metadata")
                     self._metadata_path = metadata_path
-                    return metadata["Summary"]
+                    return metadata
             except KeyError:
                 pass
             except json.decoder.JSONDecodeError as err:
-                logger.exception(str(err))
-                pass
+                logger.warning(f'metadata corruption, reason "{str(err)}"')  # try next
+                try:
+                    return self._load_corrupted_metadata(metadata_path)
+                except ImportError:
+                    # failed to use other loader, reraise
+                    raise err
         else:
             raise MissingMetadataError()
 
+    def _load_corrupted_metadata(self, path):
+        """
+        Load corrupted metadata.
+
+        If we identified the metadata, but it is corrupted somewhere, we should already 
+        have its file path. 
+
+        Args:
+            path (str): path to the metadata
+        """
+        try:
+            import ijson
+        except ImportError:
+            logger.error('requires "ijson" to perform iterative load')  # unable to try
+            raise
+
+        logger.info("attempting iterative load to bypass corruptions")
+        metadata = {}
+        with open(path, "r") as fd:
+            # 1) parse root level keys
+            parser, frame_metadata_key = ijson.parse(fd), None
+            for prefix, event, value in parser:
+                if prefix.startswith("Metadata") and prefix.endswith(".tif"):
+                    frame_metadata_key = prefix
+                    break
+            else:
+                raise MalformedMetadataError("unable to find frame metadata")
+            # 2) dump
+            fd.seek(0)
+            metadata["summary"] = next(iter(ijson.items(fd, "Summary")))
+            fd.seek(0)
+            metadata["frame"] = next(iter(ijson.items(fd, frame_metadata_key)))
+        return metadata
+
     def _load_mapped_coordinates(self):  # TODO update to new format
-        positions = self.metadata["InitialPositionList"]
+        positions = self.metadata["summary"]["InitialPositionList"]
 
         coords = defaultdict(list)
         labels = dict()
@@ -141,14 +178,17 @@ class MicroManagerV1Dataset(
         return pd.DataFrame({k: np.array(v) for k, v in coords.items()})
 
     def _load_voxel_size(self):
-        dx, r = self.metadata["PixelSize_um"], self.metadata["PixelAspect"]
+        dx, r = (
+            self.metadata["summary"]["PixelSize_um"],
+            self.metadata["summary"]["PixelAspect"],
+        )
         if dx == 0:
             logger.warning("pixel size undefined, default to 1")
             dx = 1
         size = (r * dx, dx)
 
-        if self.metadata["Slices"] > 1:
-            size = (abs(self.metadata["z-step_um"]),) + size
+        if self.metadata["summary"]["Slices"] > 1:
+            size = (abs(self.metadata["summary"]["z-step_um"]),) + size
 
         return size
 
@@ -165,11 +205,11 @@ class MicroManagerV1Dataset(
 
 class MicroManagerV2Dataset(MicroManagerV1Dataset):
     def _can_read(self):
-        version = self.metadata["MicroManagerVersion"]
+        version = self.metadata["summary"]["MicroManagerVersion"]
         return version.startswith("2.")
 
     def _load_channel_info(self):
-        channels = self.metadata["ChNames"]
+        channels = self.metadata["summary"]["ChNames"]
         if len(channels) == 1 and channels[0] == "Default":
             channels = ["*"]
 
@@ -181,7 +221,7 @@ class MicroManagerV2Dataset(MicroManagerV1Dataset):
     def _load_mapped_coordinates(self):
         coords, index = [], []
         labels = []
-        for position in self.metadata["StagePositions"]:
+        for position in self.metadata["summary"]["StagePositions"]:
             # NOTE MicroManager only tiles in 2D
             index.append({"x": position["GridCol"], "y": position["GridRow"]})
 
@@ -224,25 +264,25 @@ class MicroManagerV2Dataset(MicroManagerV1Dataset):
         return df
 
     def _load_voxel_size(self):
-        # extract sample frame from the metadata file
-        sample_frame = None
-        with open(self.metadata_path, "r") as fd:
-            metadata = json.load(fd)
-            for key in metadata.keys():
-                if key.startswith("Metadata"):
-                    sample_frame = metadata[key]
-                    break
-            else:
-                raise MalformedMetadataError()
+        frame_metadata = self.metadata["frame"]
+        dx, matrix = frame_metadata["PixelSizeUm"], frame_metadata["PixelSizeAffine"]
 
-        dx, matrix = sample_frame["PixelSizeUm"], sample_frame["PixelSizeAffine"]
+        # type cast
+        dx, matrix = float(dx), [float(m) for m in matrix.split(";")]
+
+        # TODO guess dx from frame_metadata["HamamatsuHam_DCAM-CameraName"]
+
+        # fix affine matrix, default should be identity
+        if all(m == 0 for m in matrix):
+            logger.warning("invalid affine matrix, reset to identity")
+            matrix[0] = matrix[4] = 1.0
+
         # calculate affine matrix
         #   [ 1.0, 0.0, 0.0; 0.0, 1.0, 0.0 ]
-        matrix = [float(m) for m in matrix.split(";")]
         size = (matrix[4] * dx + matrix[5], matrix[0] * dx + matrix[2])
 
-        if self.metadata["Slices"] > 1:
-            size = (abs(self.metadata["z-step_um"]),) + size
+        if self.metadata["summary"]["Slices"] > 1:
+            size = (abs(self.metadata["summary"]["z-step_um"]),) + size
 
         return size
 
