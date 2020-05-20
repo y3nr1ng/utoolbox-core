@@ -101,6 +101,9 @@ class MicroManagerV1Dataset(
                     return metadata["Summary"]
             except KeyError:
                 pass
+            except json.decoder.JSONDecodeError as err:
+                logger.exception(str(err))
+                pass
         else:
             raise MissingMetadataError()
 

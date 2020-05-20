@@ -31,8 +31,8 @@ class BaseDataset(metaclass=ABCMeta):
                 self._metadata = self._load_metadata()
                 if not self._can_read():
                     raise UnsupportedDatasetError()
-            except Exception as e:
-                raise UnsupportedDatasetError(str(e))
+            except Exception as err:
+                raise UnsupportedDatasetError(str(err))
 
         def list_files():
             self._files = self._enumerate_files()
