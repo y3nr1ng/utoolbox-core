@@ -100,7 +100,7 @@ class MicroManagerV1Dataset(
 
                     # cleanup metadata
                     metadata = {}
-                    metadata["summary"] = raw_metadata["summary"]
+                    metadata["summary"] = raw_metadata["Summary"]
                     for key, value in raw_metadata.items():
                         if key.startswith("Metadata") and key.endswith(".tif"):
                             metadata["frame"] = value
