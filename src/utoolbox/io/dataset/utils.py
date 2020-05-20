@@ -30,14 +30,15 @@ SUPPORTED_DATASET_CLASS = [
 ]
 
 
-def open_dataset(path):
+def open_dataset(path, show_trace=False):
     for _klass in SUPPORTED_DATASET_CLASS:
         try:
             ds = _klass.load(path)
             logger.info(f'"{path}" is a "{_klass.__name__}"')
             break
-        except UnsupportedDatasetError:
-            logger.debug(f'not a "{_klass}"')
+        except UnsupportedDatasetError as err:
+            print_func = logger.exception if show_trace else logger.debug
+            print_func(f'not a "{_klass}", {str(err)}')
     else:
         raise UnsupportedDatasetError("no supported dataset format")
     return ds
