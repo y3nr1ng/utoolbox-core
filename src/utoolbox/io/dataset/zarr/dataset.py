@@ -4,13 +4,15 @@ from collections import defaultdict
 from typing import List, Optional
 
 import dask.array as da
-from dask.distributed import as_completed
-from dask import delayed
 import numpy as np
-import xxhash
 import pandas as pd
+import xxhash
 import zarr
+from dask import delayed
+from dask.distributed import as_completed
+
 from utoolbox.utils.dask import get_client, wait_futures
+
 from ..base import (
     DenseDataset,
     MultiChannelDataset,
@@ -50,12 +52,12 @@ class ZarrDataset(
     Args:
         store (str): path to the data store
         label (str, optional): label of the data array
-        path (str, optional): internal group path
         level (int, optional): resolution level
+        path (str, optional): internal group path
     """
 
     def __init__(
-        self, store: str, label: str = RAW_DATA_LABEL, path: str = "/", level: int = 0
+        self, store: str, label: str = RAW_DATA_LABEL, level: int = 0, path: str = "/",
     ):
         self._label, self._level = label, 0
 
@@ -93,19 +95,26 @@ class ZarrDataset(
         store: str,
         dataset,
         label: str = RAW_DATA_LABEL,
+        level: int = 0,
         path: Optional[str] = None,
         overwrite=False,
         client=None,
         **kwargs,
     ):
         """
-        Dump dataset.
+        Dump dataset into Zarr dataset.
+
+        The target storing location is defined by:
+        - label, name of this dataset
+        - level, what level of detail does it contain (lowest is finest)
+        - path, what internal location (generally, at root, '/')
 
         Args:
             store (str): path to the data store
             dataset : serialize the provided dataset
             label (str, optional): label of the data array
-            path (str, optional): internal path
+            level (int, optional): resolution level
+            path (str, optional): internal group path
             overwrite (bool, optional): overwrite _data_ if it already exists
             client (Client, optional): remote cluster client
             **kwargs : additional argument for `zarr.open` function
@@ -196,7 +205,45 @@ class ZarrDataset(
                                 k: float(v) for k, v in zip(names, coord)
                             }
 
-                        # 4) level
+                        ## WIP
+
+                        # 4-1) retrieve info
+                        data = dataset[selected]
+
+                        # 4-2) label
+                        if label in s_root:
+                            lbl_group = s_root[label]
+                        else:
+                            # never seen this label before, create new one
+                            lbl_group = s_root.require_group(label)
+                            lbl_group.attrs["voxel_size"] = dataset.voxel_size
+
+                        # 5) level
+                        level = str(level)
+                        if level in lbl_group:
+                            data_dst = lbl_group[level]
+                            # generate before, but not this resolution level
+                            raise NotImplementedError
+                            # TODO ask user to regenerate other resolution level or not
+                        else:
+                            # create new array
+                            # NOTE compression benchmark reference http://alimanfoo.
+                            # github.io/2016/09/21/genotype-compression-benchmark.html
+                            data_dst = lbl_group.empty_like(
+                                level,
+                                data,
+                                chunks=True,
+                                compression="blosc",
+                                compression_opts=dict(
+                                    cname="lz4", clevel=5, shuffle=zarr.blosc.SHUFFLE
+                                ),
+                            )
+
+                        ## WIP
+
+                        ## >>> TO REFACTOR
+
+                        # 4) level # FIXME swap order with label, label -> level
                         l0_group = s_root.require_group("0")
                         l0_group.attrs["voxel_size"] = dataset.voxel_size
 
@@ -248,6 +295,8 @@ class ZarrDataset(
                                 ),
                             )
 
+                        ## <<< TO REFACTOR
+
                         # NOTE using default chunk shape after rechunk will cause
                         # problem, since chunk size is composite of chunks as tuples
                         # instead of int
@@ -273,15 +322,18 @@ class ZarrDataset(
         if not futures:
             return  # nothing to do
 
-        # TODO count failed tasks
+        n_failed = 0
         for future in as_completed(futures.keys()):
             try:
                 group, checksum = futures[future], future.result()
             except Exception:
                 logger.error(f'failed to serialize "{group.path}"')
+                n_failed += 1
             else:
                 logger.debug(f'"{group.path}" xxh64="{checksum}"')
                 group.attrs["checksum"] = checksum
+        if n_failed > 0:
+            logger.error(f"{n_failed} failed serialization task(s)")
 
     ##
 
