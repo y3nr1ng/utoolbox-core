@@ -288,10 +288,12 @@ class MicroManagerV2Dataset(MicroManagerV1Dataset):
         binning = frame_metadata["Binning"]
         binning = int(binning)
 
-        # calculate affine matrix
+        # affine matrix
         #   [ 1.0, 0.0, 0.0; 0.0, 1.0, 0.0 ]
-        # NOTE we don't care about directions at this stage
-        size = (abs(matrix[4] * binning), abs(matrix[0] * binning))
+        # NOTE
+        #   - we don't care about directions at this stage
+        #   - MM already factor in binning to the matrix
+        size = (abs(matrix[4]), abs(matrix[0]))
         logger.info(f"binning {binning}x, effective pixel size {size} um")
 
         if self.metadata["summary"]["Slices"] > 1:

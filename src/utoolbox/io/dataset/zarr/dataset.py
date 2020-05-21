@@ -251,20 +251,18 @@ class ZarrDataset(
                         if "multiscales" in lbl_group.attrs:
                             # delete all existing levels
                             multiscales = lbl_group.attrs["multiscales"]
-                            for multiscale in multiscales:
-                                for path in multiscale["datasets"]:
-                                    del lbl_group[path["path"]]
-                        # TODO fuck, what am i doing here?
-                        # regenerate
-                        multiscales = []
-                        if level > 0:
-                            logger.error(
-                                "on-the-fly generate level pyramid is not supported yet"
-                            )
-                        for lvl in levels:
-                            pass
+                            if multiscales:
+                                logger.warning("dropping existing multiscale datasets")
+                                for multiscale in multiscales:
+                                    for path in multiscale["datasets"]:
+                                        del lbl_group[path["path"]]
 
-                        # multiscale = {"name": label, "datasets": [], "version": "0.1"}
+                        # generate 0-level, single-level only
+                        multiscales = [
+                            {"name": label, "datasets": [], "version": "0.1"}
+                        ]
+                        # TODO probe the data array existence
+
                         level = str(level)
                         if level in lbl_group:
                             data_dst = lbl_group[level]
