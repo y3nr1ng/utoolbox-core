@@ -18,7 +18,7 @@ logger = logging.getLogger("test_zarr")
 
 def main2(ds_src_dir, ds_dst_dir, client=None):
     logger.info("loading source dataset")
-    ds_src = open_dataset(ds_src_dir)
+    ds_src = open_dataset(ds_src_dir, show_trace=True)
 
     if isinstance(ds_src, LatticeScopeTiledDataset):
         ds_src.remap_tiling_axes({"x": "z", "y": "x", "z": "y"})
@@ -100,7 +100,7 @@ if __name__ == "__main__":
         # Case 2)
         cwd = os.path.dirname(os.path.abspath(__file__))
         # ds_src_dir = os.path.join(cwd, "../data/demo_3D_2x2x2_CMTKG-V3")
-        path = os.path.join(cwd, "../data/ExM_E15_olympus4X_canon300mm_2x3_1")
+        path = os.path.join(cwd, "../data/ExM_E15_olympus4X_canon300mm_2x3_z20_1")
         ds_src_dir = os.path.abspath(path)
         parent, dname = os.path.split(ds_src_dir)
         ds_dst_dir = os.path.join(parent, f"{dname}.zarr")

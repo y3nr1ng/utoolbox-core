@@ -2,8 +2,8 @@
 This module provides basic book-keeping for different dataset access types.
 """
 import logging
+import os
 from abc import ABCMeta, abstractmethod
-from typing import Optional
 
 from .generic import BaseDataset
 
@@ -16,6 +16,10 @@ class DirectoryDataset(BaseDataset, metaclass=ABCMeta):
     def __init__(self, root_dir: str):
         super().__init__()
 
+        # NOTE most scripts only uses ~, expandvars is not needed
+        root_dir = os.path.expanduser(root_dir)
+        if not os.path.exists(root_dir):
+            raise ValueError(f'"{root_dir}" directory does not exist')
         self._root_dir = root_dir
 
     ##
