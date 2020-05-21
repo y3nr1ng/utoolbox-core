@@ -254,7 +254,7 @@ class ZarrDataset(
                             for multiscale in multiscales:
                                 for path in multiscale["datasets"]:
                                     del lbl_group[path["path"]]
-
+                        # TODO fuck, what am i doing here?
                         # regenerate
                         multiscales = []
                         if level > 0:
