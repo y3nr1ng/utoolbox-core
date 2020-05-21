@@ -95,7 +95,6 @@ class ZarrDataset(
         store: str,
         dataset,
         label: str = RAW_DATA_LABEL,
-        level: int = 0,
         path: Optional[str] = None,
         overwrite=False,
         client=None,
@@ -106,14 +105,13 @@ class ZarrDataset(
 
         The target storing location is defined by:
         - label, name of this dataset
-        - level, what level of detail does it contain (lowest is finest)
+        - level, dump operation always assume it has the highest resolution
         - path, what internal location (generally, at root, '/')
 
         Args:
             store (str): path to the data store
             dataset : serialize the provided dataset
             label (str, optional): label of the data array
-            level (int, optional): resolution level
             path (str, optional): internal group path
             overwrite (bool, optional): overwrite _data_ if it already exists
             client (Client, optional): remote cluster client
@@ -213,12 +211,60 @@ class ZarrDataset(
                         # 4-2) label
                         if label in s_root:
                             lbl_group = s_root[label]
+
+                            # get the hash
+                            hash_gen.update(data.compute())
+                            src_hash = hash_gen.hexdigest()
+                            hash_gen.reset()
+
+                            try:
+                                dst_hash = lbl_group.attrs["checksum"]
+                                if dst_hash != src_hash:
+                                    raise ValueError
+                            except KeyError:
+                                # hash does not exist, since it is only updated when
+                                # dump was completed
+                                logger.warning(
+                                    f'"{lbl_group.path}" contains partial dump, rewrite'
+                                )
+                            except ValueError:
+                                # hash mismatch
+                                logger.warning(
+                                    "existing hash does not match the source"
+                                )
+                            else:
+                                # array exists, and checksum matches
+                                if not overwrite:
+                                    logger.info(f'"{lbl_group.path}" already exists')
+                                    continue
                         else:
                             # never seen this label before, create new one
+                            # NOTE raw data will always be multiscale
                             lbl_group = s_root.require_group(label)
                             lbl_group.attrs["voxel_size"] = dataset.voxel_size
 
                         # 5) level
+                        # NOTE comply with multiscale arrays v0.1
+                        # https://forum.image.sc/t/multiscale-arrays-v0-1/37930
+
+                        # drop current multiscale attributes
+                        if "multiscales" in lbl_group.attrs:
+                            # delete all existing levels
+                            multiscales = lbl_group.attrs["multiscales"]
+                            for multiscale in multiscales:
+                                for path in multiscale["datasets"]:
+                                    del lbl_group[path["path"]]
+
+                        # regenerate
+                        multiscales = []
+                        if level > 0:
+                            logger.error(
+                                "on-the-fly generate level pyramid is not supported yet"
+                            )
+                        for lvl in levels:
+                            pass
+
+                        # multiscale = {"name": label, "datasets": [], "version": "0.1"}
                         level = str(level)
                         if level in lbl_group:
                             data_dst = lbl_group[level]
