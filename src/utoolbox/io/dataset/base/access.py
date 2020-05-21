@@ -19,7 +19,7 @@ class DirectoryDataset(BaseDataset, metaclass=ABCMeta):
         # NOTE most scripts only uses ~, expandvars is not needed
         root_dir = os.path.expanduser(root_dir)
         if not os.path.exists(root_dir):
-            raise ValueError(f'"{root_dir}" directory does not exist')
+            raise ValueError(f'"{root_dir}" does not exist')
         self._root_dir = root_dir
 
     ##

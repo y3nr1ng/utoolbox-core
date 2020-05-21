@@ -210,7 +210,7 @@ class ZarrDataset(
 
                         # 4-2) label
                         if label in s_root:
-                            lbl_group = s_root[label]
+                            label_group = s_root[label]
 
                             # get the hash
                             hash_gen.update(data.compute())
@@ -218,126 +218,124 @@ class ZarrDataset(
                             hash_gen.reset()
 
                             try:
-                                dst_hash = lbl_group.attrs["checksum"]
+                                dst_hash = label_group.attrs["checksum"]
                                 if dst_hash != src_hash:
                                     raise ValueError
                             except KeyError:
                                 # hash does not exist, since it is only updated when
                                 # dump was completed
                                 logger.warning(
-                                    f'"{lbl_group.path}" contains partial dump, rewrite'
+                                    f'"{label_group.path}" contains partial dump, rewrite'
                                 )
                             except ValueError:
                                 # hash mismatch
                                 logger.warning(
                                     "existing hash does not match the source"
                                 )
+                                # reset
+                                del label_group.attrs["checksum"]
                             else:
                                 # array exists, and checksum matches
                                 if not overwrite:
-                                    logger.info(f'"{lbl_group.path}" already exists')
+                                    logger.info(f'"{label_group.path}" already exists')
                                     continue
                         else:
                             # never seen this label before, create new one
                             # NOTE raw data will always be multiscale
-                            lbl_group = s_root.require_group(label)
-                            lbl_group.attrs["voxel_size"] = dataset.voxel_size
+                            label_group = s_root.require_group(label)
+                            label_group.attrs["voxel_size"] = dataset.voxel_size
 
                         # 5) level
                         # NOTE comply with multiscale arrays v0.1
                         # https://forum.image.sc/t/multiscale-arrays-v0-1/37930
 
                         # drop current multiscale attributes
-                        if "multiscales" in lbl_group.attrs:
+                        if "multiscales" in label_group.attrs:
                             # delete all existing levels
-                            multiscales = lbl_group.attrs["multiscales"]
+                            multiscales = label_group.attrs["multiscales"]
                             if multiscales:
                                 logger.warning("dropping existing multiscale datasets")
                                 for multiscale in multiscales:
                                     for path in multiscale["datasets"]:
-                                        del lbl_group[path["path"]]
+                                        del label_group[path["path"]]
 
                         # generate 0-level, single-level only
+                        level_str = str("0")
                         multiscales = [
-                            {"name": label, "datasets": [], "version": "0.1"}
+                            {
+                                "name": label,
+                                "datasets": [{"path": level_str}],
+                                "version": "0.1",
+                            }
                         ]
-                        # TODO probe the data array existence
-
-                        level = str(level)
-                        if level in lbl_group:
-                            data_dst = lbl_group[level]
-                            # generate before, but not this resolution level
-                            raise NotImplementedError
-                            # TODO ask user to regenerate other resolution level or not
-                        else:
-                            # create new array
-                            # NOTE compression benchmark reference http://alimanfoo.
-                            # github.io/2016/09/21/genotype-compression-benchmark.html
-                            data_dst = lbl_group.empty_like(
-                                level,
-                                data,
-                                chunks=True,
-                                compression="blosc",
-                                compression_opts=dict(
-                                    cname="lz4", clevel=5, shuffle=zarr.blosc.SHUFFLE
-                                ),
-                            )
+                        # NOTE compression benchmark reference http://alimanfoo.
+                        # github.io/2016/09/21/genotype-compression-benchmark.html
+                        data_dst = label_group.empty_like(
+                            level_str,
+                            data,
+                            chunks=True,
+                            compression="blosc",
+                            compression_opts=dict(
+                                cname="lz4", clevel=5, shuffle=zarr.blosc.SHUFFLE
+                            ),
+                        )
+                        label_group.attrs['multiscales'] = multiscales
 
                         ## WIP
 
                         ## >>> TO REFACTOR
 
-                        # 4) level # FIXME swap order with label, label -> level
-                        l0_group = s_root.require_group("0")
-                        l0_group.attrs["voxel_size"] = dataset.voxel_size
+                        ## 4) level # FIXME swap order with label, label -> level
+                        # l0_group = s_root.require_group("0")
+                        # l0_group.attrs["voxel_size"] = dataset.voxel_size
 
-                        # 5) data
-                        logger.debug(f'writing "{l0_group.path}"')
-                        data = dataset[selected]
+                        ## 5) data
+                        # logger.debug(f'writing "{l0_group.path}"')
+                        # data = dataset[selected]
 
-                        if label in l0_group:
-                            # get the hash
-                            hash_gen.update(data.compute())
-                            src_hash = hash_gen.hexdigest()
-                            hash_gen.reset()
+                        # if label in l0_group:
+                        #    # get the hash
+                        #    hash_gen.update(data.compute())
+                        #    src_hash = hash_gen.hexdigest()
+                        #    hash_gen.reset()
 
-                            try:
-                                dst_hash = l0_group.attrs["checksum"]
-                                if dst_hash != src_hash:
-                                    raise ValueError
-                            except KeyError:
-                                # hash does not exist, since it is only updated when
-                                # dump was complete
-                                logger.warning("last dump was incomplete")
-                            except ValueError:
-                                # hash mismatch
-                                logger.warning(
-                                    "existing hash does not match the source"
-                                )
-                            else:
-                                # array exists, and checksum matches
-                                if not overwrite:
-                                    logger.info(
-                                        f'"{l0_group.path}" already has "{label}"'
-                                    )
-                                    continue
+                        #    try:
+                        #        dst_hash = l0_group.attrs["checksum"]
+                        #        if dst_hash != src_hash:
+                        #            raise ValueError
+                        #    except KeyError:
+                        #        # hash does not exist, since it is only updated when
+                        #        # dump was complete
+                        #        logger.warning("last dump was incomplete")
+                        #    except ValueError:
+                        #        # hash mismatch
+                        #        logger.warning(
+                        #            "existing hash does not match the source"
+                        #        )
+                        #    else:
+                        #        # array exists, and checksum matches
+                        #        if not overwrite:
+                        #            logger.info(
+                        #                f'"{l0_group.path}" already has "{label}"'
+                        #            )
+                        #            continue
 
-                            # select existing array
-                            data_dst = l0_group[label]
-                        else:
-                            # create new array
+                        #    # select existing array
+                        #    data_dst = l0_group[label]
+                        # else:
+                        #    # create new array
 
-                            # NOTE compression benchmark reference http://alimanfoo.
-                            # github.io/2016/09/21/genotype-compression-benchmark.html
-                            data_dst = l0_group.empty_like(
-                                label,
-                                data,
-                                chunks=True,
-                                compression="blosc",
-                                compression_opts=dict(
-                                    cname="lz4", clevel=5, shuffle=zarr.blosc.SHUFFLE
-                                ),
-                            )
+                        #    # NOTE compression benchmark reference http://alimanfoo.
+                        #    # github.io/2016/09/21/genotype-compression-benchmark.html
+                        #    data_dst = l0_group.empty_like(
+                        #        label,
+                        #        data,
+                        #        chunks=True,
+                        #        compression="blosc",
+                        #        compression_opts=dict(
+                        #            cname="lz4", clevel=5, shuffle=zarr.blosc.SHUFFLE
+                        #        ),
+                        #    )
 
                         ## <<< TO REFACTOR
 
@@ -360,7 +358,7 @@ class ZarrDataset(
 
                         checksum = calc_checksum(array)
                         future = client.compute(checksum)
-                        futures[future] = l0_group
+                        futures[future] = label_group
                         # TODO add callback here to update progressbar
 
         if not futures:
