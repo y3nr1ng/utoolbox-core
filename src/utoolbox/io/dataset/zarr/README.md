@@ -8,21 +8,23 @@ A dataset stores not only the original image data, but also other lower resoluti
 ### General container structure
 Starting from the predefined root group, hierarchy structure of the dataset includes
 ```
-/t{:d}/c{:d}/s{:d}/{:d}
+/t{:d}/c{:d}/s{:d}/{:s}/{:d}
 ```
 each level corresponds to 
 - `t` frame
 - `c` channel
 - `s` spatial setup, includes different views and tiles
-- last level defines the pyramid scale level, starts from `0`, the original resolution
+- last level contains either a simple or multiscale array
+    - simple, an array
+    - multiscale, which is in fact, a group contains multiple array
 
 ### Dataset root
-For the original dataset, it is stored under `/`, where generated dataset has an underscore prefix, `/_{:s}`, as its root.
+For the original dataset, it is stored under `/`.
 
 ### Archive
-To archive a dataset, it is recommended to remove root groups start with an underscore, and all the non-zero resolution level.
+To archive a dataset, it is recommended to keep only zero resolution level of the raw array.
 
-If desired, one may keep the `/_preview` root group to provide quick preview access.
+If desired, one may keep preview related arrays to provide quick preview access.
 
 ## Attributes
 ### Signature
