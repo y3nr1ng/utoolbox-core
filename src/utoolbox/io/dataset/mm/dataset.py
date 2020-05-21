@@ -275,28 +275,23 @@ class MicroManagerV2Dataset(MicroManagerV1Dataset):
 
     def _load_voxel_size(self):
         frame_metadata = self.metadata["frame"]
-        dx, matrix = frame_metadata["PixelSizeUm"], frame_metadata["PixelSizeAffine"]
+        matrix = frame_metadata["PixelSizeAffine"]
 
         # type cast
-        dx, matrix = float(dx), [float(m) for m in matrix.split(";")]
-
-        if dx == 0:
-            dx = prompt_pixel_size()
+        matrix = [float(m) for m in matrix.split(";")]
 
         # fix affine matrix, default should be identity
         if all(m == 0 for m in matrix):
-            logger.warning("invalid affine matrix, reset to identity")
-            matrix[0] = matrix[4] = 1.0
+            dx = prompt_pixel_size()
+            matrix[0] = matrix[4] = dx
 
         binning = frame_metadata["Binning"]
         binning = int(binning)
 
         # calculate affine matrix
         #   [ 1.0, 0.0, 0.0; 0.0, 1.0, 0.0 ]
-        size = (
-            (matrix[4] * dx + matrix[5]) * binning,
-            (matrix[0] * dx + matrix[2]) * binning,
-        )
+        # NOTE we don't care about directions at this stage
+        size = (abs(matrix[4] * binning), abs(matrix[0] * binning))
         logger.info(f"binning {binning}x, effective pixel size {size} um")
 
         if self.metadata["summary"]["Slices"] > 1:
