@@ -59,7 +59,9 @@ class ZarrDataset(
     def __init__(
         self, store: str, label: str = RAW_DATA_LABEL, level: int = 0, path: str = "/",
     ):
-        self._label, self._level = label, 0
+        if level < 0:
+            raise ValueError("resolution level should >= 0")
+        self._label, self._level = label, level
 
         super().__init__(store, path)
 
@@ -203,12 +205,11 @@ class ZarrDataset(
                                 k: float(v) for k, v in zip(names, coord)
                             }
 
-                        ## WIP
-
                         # 4-1) retrieve info
                         data = dataset[selected]
 
                         # 4-2) label
+                        write_back = True
                         if label in s_root:
                             label_group = s_root[label]
 
@@ -238,7 +239,7 @@ class ZarrDataset(
                                 # array exists, and checksum matches
                                 if not overwrite:
                                     logger.info(f'"{label_group.path}" already exists')
-                                    continue
+                                    write_back = False
                         else:
                             # never seen this label before, create new one
                             # NOTE raw data will always be multiscale
@@ -254,10 +255,15 @@ class ZarrDataset(
                             # delete all existing levels
                             multiscales = label_group.attrs["multiscales"]
                             if multiscales:
-                                logger.warning("dropping existing multiscale datasets")
+                                logger.warning("deleting existing multiscale datasets")
                                 for multiscale in multiscales:
                                     for path in multiscale["datasets"]:
-                                        del label_group[path["path"]]
+                                        try:
+                                            del label_group[path["path"]]
+                                        except KeyError:
+                                            logger.warning(
+                                                f'"{path}" is already deleted'
+                                            )
 
                         # generate 0-level, single-level only
                         level_str = str("0")
@@ -268,76 +274,25 @@ class ZarrDataset(
                                 "version": "0.1",
                             }
                         ]
-                        # NOTE compression benchmark reference http://alimanfoo.
-                        # github.io/2016/09/21/genotype-compression-benchmark.html
-                        data_dst = label_group.empty_like(
-                            level_str,
-                            data,
-                            chunks=True,
-                            compression="blosc",
-                            compression_opts=dict(
-                                cname="lz4", clevel=5, shuffle=zarr.blosc.SHUFFLE
-                            ),
-                        )
-                        label_group.attrs['multiscales'] = multiscales
+                        if level_str in label_group:
+                            data_dst = label_group[level_str]
+                        else:
+                            # NOTE compression benchmark reference http://alimanfoo.
+                            # github.io/2016/09/21/genotype-compression-benchmark.html
+                            data_dst = label_group.empty_like(
+                                level_str,
+                                data,
+                                chunks=True,
+                                compression="blosc",
+                                compression_opts=dict(
+                                    cname="lz4", clevel=5, shuffle=zarr.blosc.SHUFFLE
+                                ),
+                            )
+                        label_group.attrs["multiscales"] = multiscales
 
-                        ## WIP
-
-                        ## >>> TO REFACTOR
-
-                        ## 4) level # FIXME swap order with label, label -> level
-                        # l0_group = s_root.require_group("0")
-                        # l0_group.attrs["voxel_size"] = dataset.voxel_size
-
-                        ## 5) data
-                        # logger.debug(f'writing "{l0_group.path}"')
-                        # data = dataset[selected]
-
-                        # if label in l0_group:
-                        #    # get the hash
-                        #    hash_gen.update(data.compute())
-                        #    src_hash = hash_gen.hexdigest()
-                        #    hash_gen.reset()
-
-                        #    try:
-                        #        dst_hash = l0_group.attrs["checksum"]
-                        #        if dst_hash != src_hash:
-                        #            raise ValueError
-                        #    except KeyError:
-                        #        # hash does not exist, since it is only updated when
-                        #        # dump was complete
-                        #        logger.warning("last dump was incomplete")
-                        #    except ValueError:
-                        #        # hash mismatch
-                        #        logger.warning(
-                        #            "existing hash does not match the source"
-                        #        )
-                        #    else:
-                        #        # array exists, and checksum matches
-                        #        if not overwrite:
-                        #            logger.info(
-                        #                f'"{l0_group.path}" already has "{label}"'
-                        #            )
-                        #            continue
-
-                        #    # select existing array
-                        #    data_dst = l0_group[label]
-                        # else:
-                        #    # create new array
-
-                        #    # NOTE compression benchmark reference http://alimanfoo.
-                        #    # github.io/2016/09/21/genotype-compression-benchmark.html
-                        #    data_dst = l0_group.empty_like(
-                        #        label,
-                        #        data,
-                        #        chunks=True,
-                        #        compression="blosc",
-                        #        compression_opts=dict(
-                        #            cname="lz4", clevel=5, shuffle=zarr.blosc.SHUFFLE
-                        #        ),
-                        #    )
-
-                        ## <<< TO REFACTOR
+                        # complete updates all the attributes, early stop here
+                        if not write_back:
+                            continue
 
                         # NOTE using default chunk shape after rechunk will cause
                         # problem, since chunk size is composite of chunks as tuples
@@ -404,31 +359,34 @@ class ZarrDataset(
             return False
         else:
             # verify version
+            require_version = type(self).version
             if version != type(self).version:
+                logger.debug(
+                    f"version mis-match (require: {require_version}, provide: {version})"
+                )
                 return False
 
             logger.debug(f"a uToolbox written dataset, {magic} {version}")
             return True
 
     def _enumerate_files(self):
-        #   /time/channel/setup/level
+        #   /time/channel/setup/label/level
 
-        l_str = str(self.level)
-        logger.info(f'searching level {l_str} for label "{self.label}"')
+        level_str = str(self.level)
+        logger.info(f'searching label "{self.label}" (level: {level_str})')
 
         files = []
         for t, t_root in self.handle.groups():
             for c, c_root in t_root.groups():
                 for s, s_root in c_root.groups():
-                    if l_str not in s_root:
-                        # no data for this resolution level
+                    if self.label not in s_root:
+                        # no data for this spatial setup
                         continue
-                    s_root = s_root[l_str]
-                    if self.label in s_root:
+                    s_root = s_root[self.label]
+                    if level_str in s_root:
                         # build path
-                        path = f"/{t}/{c}/{s}/{l_str}/{self.label}"
+                        path = f"/{t}/{c}/{s}/{self.label}/{level_str}"
                         files.append(path)
-
         return files
 
     def _load_array_info(self):
@@ -453,10 +411,10 @@ class ZarrDataset(
     def _load_metadata(self):
         dim_info = defaultdict(lambda: defaultdict(list))
 
-        # /time[G]/channel[G]/setup[G]/level[G]/label[A]
-        indices = ["time", "channel", "setup", "level", "label"]
+        # /time[G]/channel[G]/setup[G]/label[G/A](/level[A])
+        groups = ["time", "channel", "setup", "label"]
 
-        def nested_iters(root, indices):
+        def nested_iters(root, groups):
             """
             Loop over each group and extract their raw attributes.
             
@@ -464,18 +422,29 @@ class ZarrDataset(
                 root (Group): the root to start with
                 indices (list of str): the index list to use as key in `dim_info`
             """
-            index = indices[0]
-            if len(indices) > 1:
+            index = groups[0]
+            if len(groups) > 1:
                 iterator = root.groups()
             else:
-                # last dimension is the array itself
+                # last dimension is label, can be
+                #   - simple, array, label[A]
+                #   - multiscale, group, label[G]/level[A]
+                if isinstance(root, zarr.Group):
+                    iterator = root.arrays()
+                
+                # TODO refactor from here below
                 iterator = root.arrays()
             for name, child in iterator:
                 dim_info[index][name].append(child.attrs)  # lazy load
                 if len(indices) > 1:
                     nested_iters(child, indices[1:])
 
-        nested_iters(self.handle, indices)
+            # TODO factor in label group/array differences
+
+        nested_iters(self.handle, groups)
+
+        print(dim_info)
+        raise RuntimeError("DEBUG")
 
         return dim_info
 
@@ -564,6 +533,9 @@ class ZarrDataset(
         voxel_size = next(iter(voxel_size))
         if inconsist:
             logger.error(f"voxel size varies, using {voxel_size}")
+
+        # TODO factor in resolution level
+        logger.warning("voxel size is native resolution")
 
         return voxel_size
 
