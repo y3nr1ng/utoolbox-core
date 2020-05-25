@@ -35,9 +35,9 @@ def main2(ds_src_dir, ds_dst_dir, client=None):
         print()
 
     with pd.option_context("display.max_rows", None):
-        print(">> tile_coords")
-        print(ds_src.tile_coords)
-        print()
+        # print(">> tile_coords")
+        # print(ds_src.tile_coords)
+        # print()
         print(">> inventory")
         print(ds_src.inventory)
         print()
@@ -100,7 +100,7 @@ if __name__ == "__main__":
         # Case 2)
         cwd = os.path.dirname(os.path.abspath(__file__))
         # ds_src_dir = os.path.join(cwd, "../data/demo_3D_2x2x2_CMTKG-V3")
-        path = os.path.join(cwd, "../data/ExM_E15_olympus4X_canon300mm_2x3_z20_1")
+        path = os.path.join(cwd, "../data/cell1a_zp6um_20ms_interval_12s")
         ds_src_dir = os.path.abspath(path)
         parent, dname = os.path.split(ds_src_dir)
         ds_dst_dir = os.path.join(parent, f"{dname}.zarr")
@@ -113,4 +113,4 @@ if __name__ == "__main__":
     # print(client)
     client = None
 
-    main2(ds_src_dir, ds_dst_dir, client=client)
+    main(ds_src_dir, ds_dst_dir, client=client)

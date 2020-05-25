@@ -505,6 +505,10 @@ class ZarrDataset(
             logger.error("coordinates and index info mismatch")
             index = self._infer_index_from_coords(coords)
 
+        if len(coords) == 0:
+            return None
+            # TODO fix this, when tile coord is non-exist, system failed
+
         # build multi-index
         df = pd.concat([index, coords], axis="columns")
         df.set_index(index.columns.to_list(), inplace=True)
@@ -514,11 +518,14 @@ class ZarrDataset(
         df.rename(coord_names_mapping, axis="columns", inplace=True)
 
         # save reverse lookup table
+        # TODO
 
         return df
 
     def _load_timestamps(self) -> List[np.datetime64]:
-        timestamps, self._timestamp_id_lut = self._load_injective_attributes("time")
+        timestamps, self._timestamp_id_lut = self._load_injective_attributes(
+            "time", "timestamp"
+        )
         return timestamps
 
     def _load_view_info(self):
@@ -541,19 +548,19 @@ class ZarrDataset(
         key = dim_name if key is None else key
 
         mapping = defaultdict(set)
-        for gruop_name, attrs in self.metadata[dim_name].items():
+        for group_name, attrs in self.metadata[dim_name].items():
             for attr in attrs:
                 try:
                     value = attr[key]
                 except KeyError:
                     if required:
                         raise KeyError(
-                            f'"{gruop_name}" does not have attribute "{key}"'
+                            f'"{group_name}" does not have attribute "{key}"'
                         )
                     value = None
                 # NOTE split to try-except-else to ensure we do not create
                 # unncessary keys
-                mapping[gruop_name].add(value)
+                mapping[group_name].add(value)
 
         for key, value in mapping.items():
             inconsist = len(value) > 1
@@ -567,7 +574,8 @@ class ZarrDataset(
         # NOTE during `_update_inventory_index`, we rely on `None` to determine columns
         # to drop
         attrs = list(mapping.values())
-        attrs = attrs if attrs and (attrs != [None]) else None
+        attrs = attrs if attrs and not all(attr is None for attr in attrs) else None
+        attrs.sort()
 
         # generate reverse mapping (used in retrieve file list)
         mapping = {v: k for k, v in mapping.items()}
