@@ -2,7 +2,7 @@ import logging
 import os
 from collections import defaultdict
 from typing import List, Optional
-
+from itertools import chain
 import dask.array as da
 import numpy as np
 import pandas as pd
@@ -54,10 +54,11 @@ class ZarrDataset(
         label (str, optional): label of the data array
         level (int, optional): resolution level
         path (str, optional): internal group path
+        strict (bool, optional): resolution level should exist instead of fallback
     """
 
     def __init__(
-        self, store: str, label: str = RAW_DATA_LABEL, level: int = 0, path: str = "/",
+        self, store: str, label: str = RAW_DATA_LABEL, level: int = 0, path: str = "/"
     ):
         if level < 0:
             raise ValueError("resolution level should >= 0")
@@ -78,6 +79,10 @@ class ZarrDataset(
 
     @level.setter
     def level(self, level: int):
+        if level < 0:
+            raise ValueError("level should >= 0")
+        self._level = level
+
         # TODO how to reload dataset from filesystem
         raise NotImplementedError
 
@@ -173,7 +178,7 @@ class ZarrDataset(
                     tiles_iterator = TiledDatasetIterator(
                         v_selected, axes="zyx", return_format="both"
                     )
-                    for st, selected in tiles_iterator:
+                    for (st_index, st_coord), selected in tiles_iterator:
                         s_root = c_root.require_group(f"s{i_s}")
                         i_s += 1
 
@@ -187,22 +192,21 @@ class ZarrDataset(
                             s_root.attrs["view"] = sv
 
                         # tile attribute
-                        if st is None:
+                        if st_index is None:
                             for index in ("tile_index", "tile_coord"):
                                 try:
                                     del s_root.attrs[index]
                                 except KeyError:
                                     pass
                         else:
-                            index, coord = st
                             names = tiles_iterator.index
                             names = [name.split("_")[-1] for name in names]
                             # NOTE numpy dtypes are not serializable, use native
                             s_root.attrs["tile_index"] = {
-                                k: int(v) for k, v in zip(names, index)
+                                k: int(v) for k, v in zip(names, st_index)
                             }
                             s_root.attrs["tile_coord"] = {
-                                k: float(v) for k, v in zip(names, coord)
+                                k: float(v) for k, v in zip(names, st_coord)
                             }
 
                         # 4-1) retrieve info
@@ -334,6 +338,36 @@ class ZarrDataset(
 
     ##
 
+    @staticmethod
+    def is_multiscales(group, strict=False):
+        if not isinstance(group, zarr.Group):
+            return False
+
+        try:
+            attrs = group.attrs["multiscales"]
+        except KeyError:
+            return False
+
+        message = None
+        try:
+            if attrs["version"] != "0.1":
+                message = "multiscale version mismatch"
+            elif attrs["name"] != group.name:
+                message = "multiscale attribute does not belong to this array"
+            elif any(info["path"] not in group for info in attrs["datasets"]):
+                message = "multiscale dataset is damaged, missing dataset"
+        except KeyError:
+            message = "multiscale dataset is damaged, missing key"
+        if message:
+            if strict:
+                raise ValueError(message)
+            else:
+                logger.warning(message)
+
+        return True
+
+    ##
+
     def _open_session(self):
         try:
             z = zarr.open(self.root_dir, mode="r")  # don't create it
@@ -383,10 +417,12 @@ class ZarrDataset(
                         # no data for this spatial setup
                         continue
                     s_root = s_root[self.label]
+
+                    path = f"/{t}/{c}/{s}/{self.label}"
                     if level_str in s_root:
-                        # build path
-                        path = f"/{t}/{c}/{s}/{self.label}/{level_str}"
-                        files.append(path)
+                        # multi-level dataset
+                        path = f"{path}/{level_str}"
+                    files.append(path)
         return files
 
     def _load_array_info(self):
@@ -406,7 +442,10 @@ class ZarrDataset(
         return shape, dtype
 
     def _load_channel_info(self):
-        return self._load_injective_attributes("channel", required=True)
+        channels, self._channel_id_lut = self._load_injective_attributes(
+            "channel", required=True
+        )
+        return channels
 
     def _load_metadata(self):
         dim_info = defaultdict(lambda: defaultdict(list))
@@ -422,42 +461,38 @@ class ZarrDataset(
                 root (Group): the root to start with
                 indices (list of str): the index list to use as key in `dim_info`
             """
-            index = groups[0]
             if len(groups) > 1:
                 iterator = root.groups()
             else:
-                # last dimension is label, can be
-                #   - simple, array, label[A]
-                #   - multiscale, group, label[G]/level[A]
-                if isinstance(root, zarr.Group):
-                    iterator = root.arrays()
-                
-                # TODO refactor from here below
-                iterator = root.arrays()
-            for name, child in iterator:
-                dim_info[index][name].append(child.attrs)  # lazy load
-                if len(indices) > 1:
-                    nested_iters(child, indices[1:])
+                iterator = chain(root.groups(), root.arrays())
 
-            # TODO factor in label group/array differences
+            for name, child in iterator:
+                index = groups[0]
+                dim_info[index][name].append(child.attrs)
+                try:
+                    nested_iters(child, groups[1:])
+                except IndexError:
+                    pass
 
         nested_iters(self.handle, groups)
-
-        print(dim_info)
-        raise RuntimeError("DEBUG")
 
         return dim_info
 
     def _load_mapped_coordinates(self):
         # NOTE we store index/coord under the same setup attrs, therefore, we construct
         # the mapped coordinate table directly
-        coords, index = [], []
-        for key, attrs in self.metadata["setup"].items():
-            for attr in attrs:
-                if "tile_coord" in attr:
-                    coords.append(attr["tile_coord"])
-                if "tile_index" in attr:
-                    index.append(attr["tile_index"])
+        coords, index, group_names = [], [], {}
+        for group_name, attrs in self.metadata["setup"].items():
+            for group_attrs in attrs:
+                if ("tile_coord" in group_attrs) and ("tile_index" in group_attrs):
+                    coords.append(group_attrs["tile_coord"])
+
+                    index_ = group_attrs["tile_index"]
+                    index.append(index_)
+
+                    group_names[group_name] = index_
+
+                # ... otherwise, this setup does not belong to a tile
 
         coords, index = pd.DataFrame(coords), pd.DataFrame(index)
 
@@ -478,35 +513,47 @@ class ZarrDataset(
         coord_names_mapping = {ax: f"{ax}_coord" for ax in coords.columns}
         df.rename(coord_names_mapping, axis="columns", inplace=True)
 
+        # save reverse lookup table
+
         return df
 
     def _load_timestamps(self) -> List[np.datetime64]:
-        return self._load_injective_attributes("time")
+        timestamps, self._timestamp_id_lut = self._load_injective_attributes("time")
+        return timestamps
 
     def _load_view_info(self):
-        return self._load_injective_attributes("view")
+        views, self._view_id_lut = self._load_injective_attributes("setup", "view")
+        return views
 
-    def _load_injective_attributes(self, dim_name, required=False):
+    def _load_injective_attributes(self, dim_name, key=None, required=False):
         """
-        Load group dimensional attributes that are 1-1 mapping across different group 
+        Load group dimensional attributes that are 1-1 mapping across different group
         names.
 
         Args:
             dim_name (str): dimension name to extract
+            key (str, optional): key name to search in the attributes
             required (bool, optional): the attribute must exist
+
+        Returns:
+            (Tuple[List[values], Mapping[reverse lookup]])
         """
+        key = dim_name if key is None else key
+
         mapping = defaultdict(set)
-        for key, attrs in self.metadata[dim_name].items():
+        for gruop_name, attrs in self.metadata[dim_name].items():
             for attr in attrs:
                 try:
-                    value = attr[dim_name]
+                    value = attr[key]
                 except KeyError:
                     if required:
-                        raise KeyError(f'"{key}" does not have attribute "{dim_name}"')
-                else:
-                    # NOTE split to try-except-else to ensure we do not create
-                    # unncessary keys
-                    mapping[key].add(value)
+                        raise KeyError(
+                            f'"{gruop_name}" does not have attribute "{key}"'
+                        )
+                    value = None
+                # NOTE split to try-except-else to ensure we do not create
+                # unncessary keys
+                mapping[gruop_name].add(value)
 
         for key, value in mapping.items():
             inconsist = len(value) > 1
@@ -517,10 +564,15 @@ class ZarrDataset(
                 )
             mapping[key] = value
 
-        # NOTE duing `_update_inventory_index`, we rely on None to determine columns to
-        # drop
+        # NOTE during `_update_inventory_index`, we rely on `None` to determine columns
+        # to drop
         attrs = list(mapping.values())
-        return attrs if attrs else None
+        attrs = attrs if attrs and (attrs != [None]) else None
+
+        # generate reverse mapping (used in retrieve file list)
+        mapping = {v: k for k, v in mapping.items()}
+
+        return attrs, mapping
 
     def _load_voxel_size(self):
         voxel_size = set()
@@ -541,4 +593,22 @@ class ZarrDataset(
 
     def _retrieve_file_list(self, coord_dict):
         print(coord_dict)  # TODO lookup attributes -> group number idF
+
+        t = self._timestamp_id_lut[coord_dict.get("timestamp", None)]
+        c = self._channel_id_lut[coord_dict.get("channel")]
+
+        from pprint import pprint
+
+        path = "/".join(["", t, c])
+        print(path)
+        print()
+
+        print(self._tile_id_lut)
+        print()
+
+        pprint(self.metadata)
+        print()
+
+        print(self._view_id_lut)
+
         raise RuntimeError("DEBUG, _retrieve_file_list")
