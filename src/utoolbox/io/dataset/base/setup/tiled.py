@@ -24,14 +24,21 @@ class TiledDataset(BaseDataset, metaclass=ABCMeta):
         def load_tiling_info():
             self._tile_coords = self._load_mapped_coordinates()
 
+            # this is not a tiled dataset, use default shape (1, )
+            if not self.tile_coords:
+                self._tile_shape = (1,)
+                return
+
             # build tile shape
-            axes = ("y", "x")
-            if "tile_z" in self._tile_coords.index.names:
-                axes = ("z",) + axes
+            names = sorted(list(TILED_INDEX), reverse=True)  # as ZYX order
             index, shape = {}, []
-            for ax in axes:
-                name = f"tile_{ax}"
-                unique = self._tile_coords.index.get_level_values(name).unique()
+            for i, name in enumerate(names):
+                if name not in self.tile_coords.index.names:
+                    if i > 0:
+                        # we only add dangling dimension for the slowest axis
+                        shape.append(1)
+                    continue
+                unique = self.tile_coords.index.get_level_values(name).unique()
                 index[name] = unique
                 shape.append(len(unique))
             self._tile_shape = tuple(shape)

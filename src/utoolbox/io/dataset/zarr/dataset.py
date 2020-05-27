@@ -506,7 +506,7 @@ class ZarrDataset(
             index = self._infer_index_from_coords(coords)
 
         if len(coords) == 0:
-            return None
+            return {}
             # TODO fix this, when tile coord is non-exist, system failed
 
         # build multi-index
