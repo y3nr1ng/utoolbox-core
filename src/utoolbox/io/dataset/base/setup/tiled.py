@@ -25,7 +25,7 @@ class TiledDataset(BaseDataset, metaclass=ABCMeta):
             self._tile_coords = self._load_mapped_coordinates()
 
             # this is not a tiled dataset, use default shape (1, )
-            if not self.tile_coords:
+            if not self.tile_coords: # TODO fixme, ambiguous comparison
                 self._tile_shape = (1,)
                 return
 

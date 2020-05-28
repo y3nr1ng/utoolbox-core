@@ -602,8 +602,17 @@ class ZarrDataset(
     def _retrieve_file_list(self, coord_dict):
         print(coord_dict)  # TODO lookup attributes -> group number idF
 
-        t = self._timestamp_id_lut[coord_dict.get("time", None)]
-        c = self._channel_id_lut[coord_dict.get("channel")]
+        # t
+        time = self._timestamp_id_lut[coord_dict.get("time", None)]
+        # c
+        channel = self._channel_id_lut[coord_dict.get("channel")]
+        # s
+        view = self._view_id_lut[coord_dict.get("view", None)]
+
+        # TODO should we add "valid_tile_index" attribute in tile base class?
+        tile = self.tile_coords.xs(
+            itemgetter(*tile_index)(coord_dict), axis="index", level=tile_index
+        )["label"].iloc[0]
 
         from pprint import pprint
 
@@ -611,12 +620,6 @@ class ZarrDataset(
         print(path)
         print()
 
-        print(self._tile_id_lut)
-        print()
-
-        pprint(self.metadata)
-        print()
-
-        print(self._view_id_lut)
+        print(self.tile_coords)
 
         raise RuntimeError("DEBUG, _retrieve_file_list")
