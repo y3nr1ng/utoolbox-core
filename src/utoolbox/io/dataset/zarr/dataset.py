@@ -602,7 +602,7 @@ class ZarrDataset(
     def _retrieve_file_list(self, coord_dict):
         print(coord_dict)  # TODO lookup attributes -> group number idF
 
-        t = self._timestamp_id_lut[coord_dict.get("timestamp", None)]
+        t = self._timestamp_id_lut[coord_dict.get("time", None)]
         c = self._channel_id_lut[coord_dict.get("channel")]
 
         from pprint import pprint
