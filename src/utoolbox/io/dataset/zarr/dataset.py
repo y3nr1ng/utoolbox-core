@@ -528,9 +528,10 @@ class ZarrDataset(
 
                 # ... otherwise, this setup does not belong to a tile
 
-        # save reverse lookup table
+        # save reverse lookup table # TODO need to convert index into tuple
         mapping = defaultdict(list)
         for setup_name, index_ in group_names.items():
+            print(index_)
             mapping[index_].append(setup_name)
         self._tile_id_lut = mapping
 
@@ -611,8 +612,10 @@ class ZarrDataset(
         # NOTE during `_update_inventory_index`, we rely on `None` to determine columns
         # to drop
         attrs = list(mapping.values())
-        attrs = attrs if attrs and not all(attr is None for attr in attrs) else None
-        attrs.sort()
+        if attrs and not all(attrs is None for attr in attrs):
+            attrs.sort()
+        else:
+            attrs = None  # compress all the None-s into None
 
         # generate reverse mapping (used in retrieve file list)
         mapping = {v: k for k, v in mapping.items()}
