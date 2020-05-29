@@ -5,7 +5,7 @@ from ..iterators import DatasetIterator
 
 __all__ = ["MultiChannelDataset", "MultiChannelDatasetIterator"]
 
-MULTI_CHANNEL_INDEX = "channel"
+MULTI_CHANNEL_INDEX_STR = "channel"
 
 
 class MultiChannelDataset(BaseDataset, metaclass=ABCMeta):
@@ -14,7 +14,7 @@ class MultiChannelDataset(BaseDataset, metaclass=ABCMeta):
 
         def load_channel_info():
             channels = self._load_channel_info()
-            self._update_inventory_index({MULTI_CHANNEL_INDEX: channels})
+            self._update_inventory_index({MULTI_CHANNEL_INDEX_STR: channels})
 
         self.register_preload_func(
             load_channel_info, priority=PreloadPriorityOffset.Metadata
@@ -31,4 +31,4 @@ class MultiChannelDataset(BaseDataset, metaclass=ABCMeta):
 
 class MultiChannelDatasetIterator(DatasetIterator):
     def __init__(self, dataset: MultiChannelDataset, **kwargs):
-        super().__init__(dataset, index=MULTI_CHANNEL_INDEX, **kwargs)
+        super().__init__(dataset, index=MULTI_CHANNEL_INDEX_STR, **kwargs)

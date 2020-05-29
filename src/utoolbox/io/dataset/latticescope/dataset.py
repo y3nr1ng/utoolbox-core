@@ -13,7 +13,7 @@ from dask import delayed
 from prompt_toolkit.shortcuts import input_dialog
 
 from ..base import (
-    TILED_INDEX,
+    TILE_INDEX_STR,
     DenseDataset,
     DirectoryDataset,
     MultiChannelDataset,
@@ -373,7 +373,7 @@ class LatticeScopeTiledDataset(LatticeScopeDataset, TiledDataset):
         file_list = super()._retrieve_file_list(coord_dict, cascade=True)
 
         # generate queries
-        statements = [f"{k}=={coord_dict[k]}" for k in TILED_INDEX]
+        statements = [f"{k}=={coord_dict[k]}" for k in TILE_INDEX_STR]
         query_stmt = " & ".join(statements)
         # find tile linear index
         result = self.tile_coords.query(query_stmt)

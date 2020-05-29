@@ -9,7 +9,7 @@ import numpy as np
 from humanfriendly import format_size
 
 from ..base import (
-    TILED_INDEX,
+    TILE_INDEX_STR,
     DenseDataset,
     MultiChannelDataset,
     MultiChannelDatasetIterator,
@@ -377,7 +377,7 @@ class BigDataViewerDataset(
                     ):
                         # find tile linear index
                         coords = {
-                            k: v for k, v in zip(sorted(TILED_INDEX), index)
+                            k: v for k, v in zip(sorted(TILE_INDEX_STR), index)
                         }  # in XYZ order
                         result = dataset.tile_coords.xs(
                             list(coords.values()),

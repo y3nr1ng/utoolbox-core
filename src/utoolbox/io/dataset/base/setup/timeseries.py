@@ -11,7 +11,7 @@ __all__ = ["TimeSeriesDataset", "TimeSeriesDatasetIterator"]
 
 logger = logging.getLogger("utoolbox.io.dataset")
 
-TIME_SERIES_INDEX = "time"
+TIME_SERIES_INDEX_STR = "time"
 
 
 class TimeSeriesDataset(BaseDataset, metaclass=ABCMeta):
@@ -21,7 +21,7 @@ class TimeSeriesDataset(BaseDataset, metaclass=ABCMeta):
         # use assign_coords to add time coords
         def load_timeseries_info():
             timestamps = self._load_timeseries_info()
-            self._update_inventory_index({TIME_SERIES_INDEX: timestamps})
+            self._update_inventory_index({TIME_SERIES_INDEX_STR: timestamps})
 
         self.register_preload_func(
             load_timeseries_info, priority=PreloadPriorityOffset.Metadata
@@ -69,4 +69,4 @@ class TimeSeriesDataset(BaseDataset, metaclass=ABCMeta):
 
 class TimeSeriesDatasetIterator(DatasetIterator):
     def __init__(self, dataset: TimeSeriesDataset, **kwargs):
-        super().__init__(dataset, index=TIME_SERIES_INDEX, **kwargs)
+        super().__init__(dataset, index=TIME_SERIES_INDEX_STR, **kwargs)

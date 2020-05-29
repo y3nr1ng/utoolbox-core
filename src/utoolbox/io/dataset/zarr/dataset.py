@@ -89,8 +89,31 @@ class ZarrDataset(
     @property
     def read_func(self):
         def func(uri, shape, dtype):
+            group = self.handle[uri]
+
+            # multi-scale?
+            if ZarrDataset.is_multiscales(group):
+                name = os.path.basename(uri)
+                for group_attrs in group.attrs["multiscales"]:
+                    # find the corresponding attributes
+                    if group_attrs["name"] == name:
+                        # get path for requested level
+                        level = group_attrs["datasets"][self.level]["path"]
+                        break
+                else:
+                    raise RuntimeError(
+                        f'corrupted multiscale dataset, unable to find path for "{name}" (level: {self.level})'
+                    )
+            else:
+                level = ""
+
+            # build final path
+            # NOTE "zarr.Group + sub-path" does not function properly, use "str + full
+            # path" instead
+            path = "/".join([uri, level])
+
             # zarr array contains shape, dtype and decompression info
-            return da.from_zarr(self.root_dir, uri)
+            return da.from_zarr(self.root_dir, path)
 
         return func
 
@@ -348,6 +371,16 @@ class ZarrDataset(
         except KeyError:
             return False
 
+        # NOTE multiscales is designed to contain multiple multiscale-dataset, scan
+        # over them
+        name = os.path.basename(group.name)
+        for group_attrs in attrs:
+            if group_attrs["name"] == name:
+                attrs = group_attrs
+                break
+        else:
+            return False
+
         message = None
         try:
             if attrs["version"] != "0.1":
@@ -407,7 +440,7 @@ class ZarrDataset(
         #   /time/channel/setup/label/level
 
         level_str = str(self.level)
-        logger.info(f'searching label "{self.label}" (level: {level_str})')
+        logger.info(f'searching for "{self.label}" (level: {level_str})')
 
         files = []
         for t, t_root in self.handle.groups():
@@ -489,11 +522,19 @@ class ZarrDataset(
 
                     index_ = group_attrs["tile_index"]
                     index.append(index_)
-
-                    group_names[group_name] = index_
+                else:
+                    index_ = None
+                group_names[group_name] = index_
 
                 # ... otherwise, this setup does not belong to a tile
 
+        # save reverse lookup table
+        mapping = defaultdict(list)
+        for setup_name, index_ in group_names.items():
+            mapping[index_].append(setup_name)
+        self._tile_id_lut = mapping
+
+        # build dataframe
         coords, index = pd.DataFrame(coords), pd.DataFrame(index)
 
         # rename index (which is a bit annoy to rename as multi-index)
@@ -505,20 +546,16 @@ class ZarrDataset(
             logger.error("coordinates and index info mismatch")
             index = self._infer_index_from_coords(coords)
 
-        if len(coords) == 0:
-            return {}
-            # TODO fix this, when tile coord is non-exist, system failed
-
         # build multi-index
         df = pd.concat([index, coords], axis="columns")
+        if df.empty:
+            # nothing to build `tile_coords`, use None
+            return None
         df.set_index(index.columns.to_list(), inplace=True)
 
         # rename coords
         coord_names_mapping = {ax: f"{ax}_coord" for ax in coords.columns}
         df.rename(coord_names_mapping, axis="columns", inplace=True)
-
-        # save reverse lookup table
-        # TODO
 
         return df
 
@@ -558,8 +595,8 @@ class ZarrDataset(
                             f'"{group_name}" does not have attribute "{key}"'
                         )
                     value = None
-                # NOTE split to try-except-else to ensure we do not create
-                # unncessary keys
+                # NOTE split to try-except-else to ensure we do not create unnecessary
+                # keys
                 mapping[group_name].add(value)
 
         for key, value in mapping.items():
@@ -600,26 +637,27 @@ class ZarrDataset(
         return voxel_size
 
     def _retrieve_file_list(self, coord_dict):
-        print(coord_dict)  # TODO lookup attributes -> group number idF
-
         # t
         time = self._timestamp_id_lut[coord_dict.get("time", None)]
         # c
         channel = self._channel_id_lut[coord_dict.get("channel")]
-        # s
+        # NOTE setups are mostly _not_ 1:1, therefore, we need to use set to filter
+        # them out
+        # s, view
         view = self._view_id_lut[coord_dict.get("view", None)]
+        view = set([view])  # ensure it is an iterable
+        # s, tile
+        tile_index = (
+            tuple(coord_dict[index] for index in self.tile_index_str)
+            if self.tile_index_str
+            else None
+        )
+        tile = set(self._tile_id_lut[tile_index])
+        # s
+        setup = set(list(view)) & set(tile)
+        assert len(setup) == 1, "unable to determine an unique setup, programmer error"
+        setup = next(iter(setup))
+        # TODO this may not work, test single/multi view and single/multi tile
 
-        # TODO should we add "valid_tile_index" attribute in tile base class?
-        tile = self.tile_coords.xs(
-            itemgetter(*tile_index)(coord_dict), axis="index", level=tile_index
-        )["label"].iloc[0]
-
-        from pprint import pprint
-
-        path = "/".join(["", t, c])
-        print(path)
-        print()
-
-        print(self.tile_coords)
-
-        raise RuntimeError("DEBUG, _retrieve_file_list")
+        path = "/".join(["", time, channel, setup, self.label])
+        return path

@@ -1,20 +1,19 @@
 import logging
-from abc import ABCMeta, abstractmethod
-from typing import List, Mapping, Tuple, Union
+from abc import ABCMeta
+from typing import Optional, Tuple
 
-import numpy as np
 import pandas as pd
 
 from ..generic import BaseDataset, PreloadPriorityOffset
 from ..iterators import DatasetIterator
 
-__all__ = ["TiledDataset", "TiledDatasetIterator", "TILED_INDEX"]
+__all__ = ["TiledDataset", "TiledDatasetIterator", "TILE_INDEX_STR"]
 
 logger = logging.getLogger("utoolbox.io.dataset")
 
 # tile position has at most 3-D
 # ... unless we figure out how to frak with data in higher dimension
-TILED_INDEX = ("tile_x", "tile_y", "tile_z")
+TILE_INDEX_STR = ("tile_x", "tile_y", "tile_z")
 
 
 class TiledDataset(BaseDataset, metaclass=ABCMeta):
@@ -24,29 +23,26 @@ class TiledDataset(BaseDataset, metaclass=ABCMeta):
         def load_tiling_info():
             self._tile_coords = self._load_mapped_coordinates()
 
-            # this is not a tiled dataset, use default shape (1, )
-            if not self.tile_coords: # TODO fixme, ambiguous comparison
-                self._tile_shape = (1,)
-                return
-
             # build tile shape
-            names = sorted(list(TILED_INDEX), reverse=True)  # as ZYX order
+            template_names = sorted(list(TILE_INDEX_STR), reverse=True)  # as ZYX order
             index, shape = {}, []
-            for i, name in enumerate(names):
-                if name not in self.tile_coords.index.names:
-                    if i > 0:
-                        # we only add dangling dimension for the slowest axis
-                        shape.append(1)
-                    continue
-                unique = self.tile_coords.index.get_level_values(name).unique()
-                index[name] = unique
-                shape.append(len(unique))
-            self._tile_shape = tuple(shape)
+            try:
+                for i, name in enumerate(template_names):
+                    if name not in self.tile_coords.index.names:
+                        if i > 0:
+                            # we only add dangling dimension for the slowest axis
+                            shape.append(1)
+                        continue
+                    unique = self.tile_coords.index.get_level_values(name).unique()
+                    index[name] = unique
+                    shape.append(len(unique))
+            except AttributeError:
+                # trigger by `self.tile_coords.index`, which should be None
+                self._tile_shape = (1,)
+            else:
+                self._tile_shape = tuple(shape)
 
             # build index
-            assert any(
-                key in index.keys() for key in TILED_INDEX
-            ), "unknown tiling definition"
             self._update_inventory_index(index)
 
         self.register_preload_func(
@@ -59,6 +55,18 @@ class TiledDataset(BaseDataset, metaclass=ABCMeta):
     def tile_coords(self):
         """Coordinate lookup table."""
         return self._tile_coords
+
+    @property
+    def tile_index_str(self) -> Optional[Tuple[str]]:
+        """Index string used in this dataset."""
+        try:
+            index_str = list(self.tile_coords.index.names)
+        except AttributeError:
+            index_str = None
+        else:
+            index_str.sort(reverse=True)  # as ZYX order
+            index_str = tuple(index_str)
+        return index_str
 
     @property
     def tile_shape(self):
@@ -115,7 +123,7 @@ class TiledDataset(BaseDataset, metaclass=ABCMeta):
 
     def _load_coordinates(self) -> pd.DataFrame:
         """
-        Load the raw coordinates recorded during acquisition. Using TILED_INDEX as 
+        Load the raw coordinates recorded during acquisition. Using TILE_INDEX_STR as 
         header.
 
         Returns:
@@ -125,7 +133,7 @@ class TiledDataset(BaseDataset, metaclass=ABCMeta):
 
     def _load_index(self) -> pd.DataFrame:
         """
-        Discrete tile index. Using TILED_INDEX as header.
+        Discrete tile index. Using TILE_INDEX_STR as header.
 
         Returns:
             (pd.DataFrame): these are used as the index
@@ -134,7 +142,7 @@ class TiledDataset(BaseDataset, metaclass=ABCMeta):
 
     def _infer_index_from_coords(self, coords: pd.DataFrame) -> pd.DataFrame:
         """
-        Discrete tile index. Using TILED_INDEX as header.
+        Discrete tile index. Using TILE_INDEX_STR as header.
 
         Returns:
             (pd.DataFrame): these are used as the index
@@ -197,8 +205,9 @@ class TiledDatasetIterator(DatasetIterator):
 
         # restore axis name
         axes = [f"tile_{axis}" for axis in axes]
-        if any(axis not in TILED_INDEX for axis in axes):
-            desc = ", ".join(f'"{axis}"' for axis in TILED_INDEX)
+        if any(axis not in TILE_INDEX_STR for axis in axes):
+            # FIXME use tile_index_str
+            desc = ", ".join(f'"{axis}"' for axis in TILE_INDEX_STR)
             raise ValueError(f"axis can only contain {desc}")
 
         # drop unsupported axis
