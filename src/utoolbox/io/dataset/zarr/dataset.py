@@ -1,8 +1,10 @@
 import logging
 import os
 from collections import defaultdict
-from typing import List, Optional
+from collections.abc import Iterable
 from itertools import chain
+from typing import List, Optional
+
 import dask.array as da
 import numpy as np
 import pandas as pd
@@ -528,10 +530,18 @@ class ZarrDataset(
 
                 # ... otherwise, this setup does not belong to a tile
 
-        # save reverse lookup table # TODO need to convert index into tuple
+        print(group_names)
+
+        # save reverse lookup table
         mapping = defaultdict(list)
         for setup_name, index_ in group_names.items():
-            print(index_)
+            try:
+                # ensure dict is sorted in ZYX order
+                index_ = dict(sorted(index_.items(), reverse=True))
+                index_ = tuple(v for v in index_.values())
+            except AttributeError:
+                # None, probably not a tile object, therefore, no index tuple
+                index_ = None
             mapping[index_].append(setup_name)
         self._tile_id_lut = mapping
 
@@ -611,16 +621,20 @@ class ZarrDataset(
 
         # NOTE during `_update_inventory_index`, we rely on `None` to determine columns
         # to drop
-        attrs = list(mapping.values())
-        if attrs and not all(attrs is None for attr in attrs):
+        attrs = list(set(mapping.values()))
+        if attrs and (attrs[0] is not None):
             attrs.sort()
         else:
             attrs = None  # compress all the None-s into None
 
         # generate reverse mapping (used in retrieve file list)
-        mapping = {v: k for k, v in mapping.items()}
+        rmapping = defaultdict(list)
+        for k, v in mapping.items():
+            rmapping[v].append(k)
+        # simplify 1 item lists
+        rmapping = {k: v if len(v) > 1 else v[0] for k, v in rmapping.items()}
 
-        return attrs, mapping
+        return attrs, rmapping
 
     def _load_voxel_size(self):
         voxel_size = set()
@@ -644,11 +658,13 @@ class ZarrDataset(
         time = self._timestamp_id_lut[coord_dict.get("time", None)]
         # c
         channel = self._channel_id_lut[coord_dict.get("channel")]
-        # NOTE setups are mostly _not_ 1:1, therefore, we need to use set to filter
+        # NOTE setups are mostly _not_ 1:1, therefore, we need to use `set` to filter
         # them out
         # s, view
         view = self._view_id_lut[coord_dict.get("view", None)]
-        view = set([view])  # ensure it is an iterable
+        view = set(
+            [view] if isinstance(view, str) else view
+        )  # ensure it is an iterable
         # s, tile
         tile_index = (
             tuple(coord_dict[index] for index in self.tile_index_str)
@@ -657,10 +673,9 @@ class ZarrDataset(
         )
         tile = set(self._tile_id_lut[tile_index])
         # s
-        setup = set(list(view)) & set(tile)
+        setup = view & tile
         assert len(setup) == 1, "unable to determine an unique setup, programmer error"
         setup = next(iter(setup))
-        # TODO this may not work, test single/multi view and single/multi tile
 
         path = "/".join(["", time, channel, setup, self.label])
         return path
