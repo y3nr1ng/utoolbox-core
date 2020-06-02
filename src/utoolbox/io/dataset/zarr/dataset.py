@@ -1,7 +1,6 @@
 import logging
 import os
 from collections import defaultdict
-from collections.abc import Iterable
 from itertools import chain
 from typing import List, Optional
 
@@ -13,7 +12,7 @@ import zarr
 from dask import delayed
 from dask.distributed import as_completed
 
-from utoolbox.utils.dask import get_client, wait_futures
+from utoolbox.utils.dask import get_client
 
 from ..base import (
     DenseDataset,
@@ -529,8 +528,6 @@ class ZarrDataset(
                 group_names[group_name] = index_
 
                 # ... otherwise, this setup does not belong to a tile
-
-        print(group_names)
 
         # save reverse lookup table
         mapping = defaultdict(list)

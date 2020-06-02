@@ -74,6 +74,11 @@ setup(
     # data files outside of packages, installed into '<sys.prefix>/my_data'
     data_files=[],
     # executable scripts
-    entry_points={"console_scripts": ["mm2bdv=utoolbox.cli.converter.mm2bdv:main"]},
+    entry_points={
+        "console_scripts": [
+            "mm2bdv=utoolbox.cli.converter.mm2bdv:main",
+            "dataset=utoolbox.cli.dataset.main:dataset",
+        ]
+    },
     zip_safe=True,
 )
