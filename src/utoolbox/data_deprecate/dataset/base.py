@@ -4,7 +4,7 @@ from collections.abc import Mapping
 import logging
 import os
 
-from utoolbox.utils import AttrDict
+from utoolbox.util import AttrDict
 
 logger = logging.getLogger(__name__)
 

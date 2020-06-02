@@ -6,7 +6,7 @@ import cupy as cp
 import imageio
 
 from utoolbox.cli.utils import processor
-from utoolbox.utils.decorator import run_once
+from utoolbox.util.decorator import run_once
 
 __all__ = ["export"]
 

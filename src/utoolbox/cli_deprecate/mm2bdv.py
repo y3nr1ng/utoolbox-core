@@ -15,7 +15,7 @@ from utoolbox.data.dataset import (
     BigDataViewerXML,
 )
 from utoolbox.data.dataset.error import DatasetError
-from utoolbox.utils.decorator import timeit
+from utoolbox.util.decorator import timeit
 
 coloredlogs.install(
     level="DEBUG", fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"

@@ -7,7 +7,7 @@ import numpy as np
 
 from utoolbox.exposure import auto_contrast
 from utoolbox.cli.utils import processor
-from utoolbox.utils.decorator import run_once
+from utoolbox.util.decorator import run_once
 
 __all__ = ["preview_datastore"]
 

@@ -5,7 +5,7 @@ import atexit
 
 __all__ = ["get_local_cluster", "get_client", "wait_futures"]
 
-logger = logging.getLogger("utoolbox.utils.dask")
+logger = logging.getLogger("utoolbox.util.dask")
 
 DEFAULT_WORKER_OPTIONS = {
     "memory_target_fraction": 0.5,

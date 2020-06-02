@@ -12,7 +12,7 @@ import zarr
 from dask import delayed
 from dask.distributed import as_completed
 
-from utoolbox.utils.dask import get_client
+from utoolbox.util.dask import get_client
 
 from ..base import (
     DenseDataset,

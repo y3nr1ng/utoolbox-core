@@ -5,8 +5,6 @@ from collections import abc, namedtuple
 from datetime import datetime
 from enum import Enum
 
-from utoolbox.utils import AttrDict
-
 from .error import MalformedSettingsFileError
 
 logger = logging.getLogger("utoolbox.io.dataset")

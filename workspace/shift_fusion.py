@@ -22,7 +22,7 @@ from utoolbox.feature import DftRegister
 from utoolbox.stitching import Sandbox
 from utoolbox.stitching.phasecorr import PhaseCorrelation
 from utoolbox.transform.projections import Orthogonal
-from utoolbox.utils.decorator import timeit
+from utoolbox.util.decorator import timeit
 
 logger = logging.getLogger(__name__)
 
