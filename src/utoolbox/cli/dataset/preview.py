@@ -2,7 +2,7 @@ import logging
 
 import click
 import numpy as np
-from tifffile import imwrite
+import tifffile
 
 from utoolbox.io import open_dataset
 from utoolbox.io.dataset import (
@@ -21,7 +21,6 @@ logger = logging.getLogger("utoolbox.cli.dataset")
 @click.pass_context
 def preview(ctx):
     """Generate previews for the dataset."""
-    pass
 
 
 @preview.command()
@@ -58,7 +57,7 @@ def net(ctx, path):
         if time is None:
             break
         else:
-            raise ValueError("surface preview does not support time series dataset")
+            raise ValueError("net generation does not support time series dataset")
 
     # calculate scale factor for nets
     scale = _normalized_scale(src_ds.voxel_size)
@@ -93,8 +92,10 @@ def net(ctx, path):
             ny, nx = nets[0].shape
             nets = np.stack(nets, axis=0)
             nets.shape = 1, 1, len(nets), ny, nx, 1
-            print(nets.shape)
-            imwrite(
-                f"{desc}.tif", nets, imagej=True, resolution=(res, res), metadata={},
+            tifffile.imwrite(
+                f"{desc}.tif",
+                nets,
+                imagej=True,
+                resolution=(res, res),
+                metadata={"unit": "um"},
             )
-            # raise RuntimeError("DEBUG, generate 1 tile, 1 view, complete channel")
