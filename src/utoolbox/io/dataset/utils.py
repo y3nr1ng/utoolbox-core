@@ -30,7 +30,7 @@ SUPPORTED_DATASET_CLASS = [
 ]
 
 
-def open_dataset(path, show_trace=False):
+def open_dataset(path, show_trace=True):
     for _klass in SUPPORTED_DATASET_CLASS:
         try:
             ds = _klass.load(path)

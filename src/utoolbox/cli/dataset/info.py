@@ -15,7 +15,7 @@ from utoolbox.io.dataset import (
     TiledDatasetIterator,
     TimeSeriesDatasetIterator,
 )
-from utoolbox.io.dataset.base import SessionDataset
+from utoolbox.io.dataset.base import DenseDataset, SessionDataset, TILE_INDEX_STR
 
 __all__ = ["info"]
 
@@ -37,23 +37,29 @@ def _extract_setup_keys(ds):
     return {k: sorted(list(v)) for k, v in setup.items()}
 
 
-def printi(line, indent=0, **kwargs):
+def printi(line, prefix="  ", indent=0, **kwargs):
     """Print with explicit indent option."""
-    prefix = "  " * indent
-    print(prefix + line, **kwargs)
+    print(prefix * indent, end="")
+    print(line, *kwargs)
 
 
 @click.command()
 @click.argument("path")
-@click.option("-a", "--all", "show_all", is_flag=True, default=False)
+@click.option(
+    "-a", "--all", "show_all", is_flag=True, default=False, help="List all attributes"
+)
 @click.pass_context
 def info(ctx, path, show_all):
     """
-    Dump dataset info.
-    
+    Dump dataset info from PATH.
+
+    This script is not designed with performance in mind, it may take sometime to 
+    compile all the info to become human-friendly texts.
+    \f
+
     Args:
         path (str): path to the dataset
-        show_all (bool, optional): show all detail attributes
+        show_all (bool, optional): list all attributes
     """
 
     ds = open_dataset(path)
@@ -103,5 +109,44 @@ def info(ctx, path, show_all):
 
     print()
 
+    # timeseries
+
+    # tiles
+    if setup["tile"][0] is not None:
+        m, M = ds.tile_coords.min().to_dict(), ds.tile_coords.max().to_dict()
+        ax_names, extents = [], []
+        for ax in TILE_INDEX_STR:
+            ax = ax.split("_")[1]
+            index = f"{ax}_coord"
+            if index in m:
+                delta = round(M[index] - m[index], 4)
+                extents.append(delta)
+                ax_names.append(ax)
+
+        # tiles - index
+        printi("Number of tiles", indent=1)
+        desc = [f"{k}:{v}" for k, v in zip(ax_names, reversed(ds.tile_shape))]
+        desc = ", ".join(desc)
+        printi(f"({desc})", indent=2)
+
+        print()
+
+        # tiles - coords
+        printi("Tile extents (um)", indent=1)
+        desc = [f"{k}:{v}" for k, v in zip(ax_names, extents)]
+        desc = ", ".join(desc)
+        printi(f"({desc})", indent=2)
+
+        print()
+
     # voxel size
-    # channels
+    if isinstance(ds, DenseDataset):
+        printi("Voxel size (um)", indent=1)
+
+        voxel_size = [round(v, 4) for v in reversed(ds.voxel_size)]
+
+        desc = [f"{k}:{v}" for k, v in zip("xyz", voxel_size)]
+        desc = ", ".join(desc)
+        printi(f"({desc})", indent=2)
+
+    print()
