@@ -51,18 +51,18 @@ def net(ctx, path):
         logger.error("please install `utoolbox-image` to support surface view")
 
     show_trace = logger.getEffectiveLevel() <= logging.DEBUG
-    src_ds = open_dataset(path, show_trace=show_trace)
+    ds = open_dataset(path, show_trace=show_trace)
 
-    for time, _ in TimeSeriesDatasetIterator(src_ds):
+    for time, _ in TimeSeriesDatasetIterator(ds):
         if time is None:
             break
         else:
             raise ValueError("net generation does not support time series dataset")
 
     # calculate scale factor for nets
-    scale = _normalized_scale(src_ds.voxel_size)
+    scale = _normalized_scale(ds.voxel_size)
     # updated resolution
-    res = scale[0] * src_ds.voxel_size[0]
+    res = scale[0] * ds.voxel_size[0]
 
     desc = ", ".join(f"{k}:{v:.3f}" for k, v in zip("xyz", reversed(scale)))
     logger.debug(f"net scale ({desc}), effective resolution {res:.3f} um")
@@ -72,7 +72,7 @@ def net(ctx, path):
     #   - Z, slice
     #   - C, channel
     iterator = TiledDatasetIterator(
-        src_ds, axes="zyx", return_key=True, return_format="index"
+        ds, axes="zyx", return_key=True, return_format="index"
     )
     for tile, t_ds in iterator:
         tile_desc = "-".join(
@@ -84,7 +84,7 @@ def net(ctx, path):
                 desc = f"view-{view}_{desc}"
             nets = []
             for channel, c_ds in MultiChannelDatasetIterator(v_ds):
-                array = src_ds[c_ds]
+                array = ds[c_ds]
                 net = cuboid_net(array, scale)
                 nets.append(net)
 

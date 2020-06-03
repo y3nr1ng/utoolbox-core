@@ -62,7 +62,8 @@ def info(ctx, path, show_all):
         show_all (bool, optional): list all attributes
     """
 
-    ds = open_dataset(path)
+    show_trace = logger.getEffectiveLevel() <= logging.DEBUG
+    ds = open_dataset(path, show_trace=show_trace)
 
     print()
 
@@ -87,6 +88,11 @@ def info(ctx, path, show_all):
     desc = " / ".join(n_keys)
     printi(desc, indent=1)
 
+    # setup - statitics
+    n_missing = (ds.inventory.values == "").sum()
+    if n_missing > 0:
+        printi(f"({n_missing} missing data)", indent=1)
+
     # setup - detail
     if show_all:
         rows = []
@@ -110,7 +116,8 @@ def info(ctx, path, show_all):
     print()
 
     # timeseries
-
+    # TODO time information
+    
     # tiles
     if setup["tile"][0] is not None:
         m, M = ds.tile_coords.min().to_dict(), ds.tile_coords.max().to_dict()
