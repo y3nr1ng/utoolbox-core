@@ -1,7 +1,9 @@
-import click
 import logging
+
+import click
 import coloredlogs
 
+from .info import info
 from .preview import preview
 
 __all__ = ["dataset"]
@@ -23,4 +25,5 @@ def dataset(ctx, verbose):
     )
 
 
+dataset.add_command(info)
 dataset.add_command(preview)

@@ -38,10 +38,6 @@ class DatasetIterator:
         self._strict = strict
 
     def __iter__(self):
-        print(
-            f"{self.__class__.__name__}.__iter__, type(dataset)={type(self.dataset).__name__}"
-        )
-
         original_inventory = self.dataset.inventory.copy()
 
         # filter dataframe and iterate over them
