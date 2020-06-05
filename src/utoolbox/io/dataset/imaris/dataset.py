@@ -93,6 +93,13 @@ class ImarisStitcherDataset(ImarisDataset, TiledDataset):
 
     ##
 
+    def _can_read(self):
+        pass
+
+    def _load_metadata(self):
+        # TODO load metadata from XML, and later pass on to load from H5 file
+        pass
+
     def _load_mapped_coordinates(self):
         # TODO should we use independent loader for index/coordinates?
         pass
