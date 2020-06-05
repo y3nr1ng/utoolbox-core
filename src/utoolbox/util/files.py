@@ -1,6 +1,5 @@
 import math
 import os
-import re
 import logging
 
 logger = logging.getLogger(__name__)
@@ -20,18 +19,6 @@ class ExtensionFilter(object):
     def __call__(self, name):
         _, name = os.path.splitext(name)
         return self._judge(name[1:])
-
-
-class SPIMFilter(object):
-    FORMAT = ".*_ch{0}_stack\d+_.*_\d+msec_.*"
-
-    def __init__(self, channel=None):
-        if not channel:
-            channel = "\d+"
-        self._program = re.compile(SPIMFilter.FORMAT.format(channel))
-
-    def __call__(self, name):
-        return self._program.match(name) is not None
 
 
 def list_files(root, name_filters=None):
