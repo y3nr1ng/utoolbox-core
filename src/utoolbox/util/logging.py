@@ -1,23 +1,7 @@
 import logging
 
-from tqdm import tqdm
 
-__all__ = ["TqdmLoggingHandler", "change_logging_level"]
-
-
-class TqdmLoggingHandler(logging.Handler):
-    def __init__(self, level=logging.NOTSET):
-        super().__init__(level)
-
-    def emit(self, record):
-        try:
-            msg = self.format(record)
-            tqdm.write(msg)
-            self.flush()
-        except (KeyboardInterrupt, SystemExit):
-            raise
-        except Exception:
-            self.handleError(record)
+__all__ = ["change_logging_level"]
 
 
 class change_logging_level:

@@ -57,6 +57,7 @@ setup(
         "numpy>=1.17",
         "pandas",
         "prompt_toolkit>=3.0",
+        "tifffile",  # use the latest version, imageio bundles with older one
         "xxhash",
         "zarr",
     ],
