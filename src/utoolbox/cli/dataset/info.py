@@ -51,7 +51,7 @@ def printi(line, prefix="  ", indent=0, **kwargs):
 @click.pass_context
 def info(ctx, path, show_all):
     """
-    Dump dataset info from PATH.
+    Dump dataset info.
 
     This script is not designed with performance in mind, it may take sometime to 
     compile all the info to become human-friendly texts.

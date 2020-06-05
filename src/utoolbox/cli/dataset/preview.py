@@ -57,7 +57,9 @@ def net(ctx, path):
         if time is None:
             break
         else:
-            raise ValueError("net generation does not support time series dataset")
+            raise TypeError(
+                "net generation currently does not support time series dataset"
+            )
 
     # calculate scale factor for nets
     scale = _normalized_scale(ds.voxel_size)

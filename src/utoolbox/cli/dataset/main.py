@@ -3,6 +3,7 @@ import logging
 import click
 import coloredlogs
 
+from .export import export
 from .info import info
 from .preview import preview
 
@@ -27,3 +28,4 @@ def dataset(ctx, verbose):
 
 dataset.add_command(info)
 dataset.add_command(preview)
+dataset.add_command(export)
