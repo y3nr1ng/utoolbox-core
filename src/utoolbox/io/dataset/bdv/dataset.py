@@ -300,6 +300,17 @@ class BigDataViewerHDF5(object):
         handle.create_dataset(name, data=matrix, maxshape=shape)
 
 
+class DummyBigDataViewerHDF5(BigDataViewerHDF5):
+    def add_view(self, *args, **kwargs):
+        pass
+
+    def open(self):
+        logger.info("BigDataViewerDataset DRY RUN dump()")
+
+    def close(self):
+        pass
+
+
 class BigDataViewerDataset(
     DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset
 ):
@@ -349,21 +360,7 @@ class BigDataViewerDataset(
 
         if dry_run:
 
-            class DummyHDF5(object):
-                def __init__(self, *args, **kwargs):
-                    pass
-
-                def __enter__(self):
-                    logger.info("BigDataViewerDataset DRY RUN dump()")
-                    return self
-
-                def __exit__(self, exc_type, exc_val, exc_tb):
-                    pass
-
-                def add_view(self, *args, **kwargs):
-                    pass
-
-            klass = DummyHDF5
+            klass = DummyBigDataViewerHDF5
         else:
             klass = BigDataViewerHDF5
 
