@@ -42,8 +42,9 @@ def _normalized_scale(scale):
 
 @preview.command()
 @click.argument("path")
+@click.option("-g", "--gap", type=int, default=1, help="Gap between faces.")
 @click.pass_context
-def net(ctx, path):
+def net(ctx, path, gap):
     """Generate net of data blocks."""
     try:
         from utoolbox.util.preview import cuboid_net
@@ -87,7 +88,7 @@ def net(ctx, path):
             nets = []
             for channel, c_ds in MultiChannelDatasetIterator(v_ds):
                 array = ds[c_ds]
-                net = cuboid_net(array, scale)
+                net = cuboid_net(array, scale, gap=gap)
                 nets.append(net)
 
             # reshape to TZCYXS

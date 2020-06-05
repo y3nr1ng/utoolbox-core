@@ -15,6 +15,7 @@ from ..base import (
     MultiChannelDatasetIterator,
     MultiViewDataset,
     MultiViewDatasetIterator,
+    SessionDataset,
     TiledDataset,
     TiledDatasetIterator,
 )
@@ -312,16 +313,25 @@ class DummyBigDataViewerHDF5(BigDataViewerHDF5):
 
 
 class BigDataViewerDataset(
-    DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset
+    SessionDataset, DenseDataset, MultiChannelDataset, MultiViewDataset, TiledDataset
 ):
-    def __init__(self, root_dir):
-        super().__init__()
+    """
+    Using HDF5-backend BigDataViewer format.
 
-        self._root_dir = root_dir
+    Args:
+        TBD
+    """
 
-        # TODO replace with open_session
+    def __init__(self, root_dir: str):
+        super().__init__(store=root_dir, path="/")  # BDV does not allow arbitrary root
+
+        self._xml_handle, self._h5_handle = None, None
 
     ##
+
+    @property
+    def h5(self) -> BigDataViewerHDF5:
+        return self._h5_handle
 
     @property
     def read_func(self):
@@ -330,6 +340,10 @@ class BigDataViewerDataset(
     @property
     def root_dir(self):
         return self._root_dir
+
+    @property
+    def xml(self) -> BigDataViewerXML:
+        return self._xml_handle
 
     ##
 
@@ -354,12 +368,9 @@ class BigDataViewerDataset(
             raise TypeError("dataset is not a DenseDataset")
         voxel_size = dataset.voxel_size
 
-        print(voxel_size)
-
         shape, _ = dataset._load_array_info()
 
         if dry_run:
-
             klass = DummyBigDataViewerHDF5
         else:
             klass = BigDataViewerHDF5
@@ -429,6 +440,13 @@ class BigDataViewerDataset(
             xml.serialize()
 
     ##
+
+    def _open_session(self):
+        # TODO use HDF5/XML instance object instead of handle
+        pass
+
+    def _close_session(self):
+        pass
 
     def _can_read(self):
         pass
