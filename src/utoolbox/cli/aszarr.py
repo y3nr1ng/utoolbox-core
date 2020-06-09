@@ -50,7 +50,7 @@ def _remap_and_flip(ds, remap, flip):
 @click.option(
     "-o",
     "--output",
-    type=str,
+    type=click.Path(resolve_path=True),
     default=None,
     help="Destination for the new Zarr dataset.",
 )
@@ -60,6 +60,7 @@ def _remap_and_flip(ds, remap, flip):
     "client",
     type=str,
     default=None,
+    metavar="HOST",
     help="Cluster scheduler to perform the conversion.",
 )
 def aszarr(path, verbose, remap, flip, client, output):
