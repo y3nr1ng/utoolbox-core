@@ -676,3 +676,54 @@ class ZarrDataset(
 
         path = "/".join(["", time, channel, setup, self.label])
         return path
+
+
+class MutableZarrDataset(ZarrDataset):
+    @classmethod
+    def from_immutable(dataset: ZarrDataset):
+        """From immutable Zarr dataset."""
+        pass
+
+    ##
+
+    def attach_data(self, uuid, label, data, attrs=None):
+        """
+        Attach additional data to setup.
+
+        Args:
+            uuid (str): uuid of the source data group to attach
+            label (str): label for the new data
+            data : the data to store in the group
+            attrs (dict, None): attributes for the data
+        """
+        pass
+
+    def delete_data(self, uuid, label=None):
+        pass
+
+    ##
+
+    def to_multiscale(self, uuid, levels, label=None):
+        """
+        Convert a typical dense data array to Zarr multiscale format.
+
+        Args:
+            uuid (str):
+            levels (list of tuple of int):
+            label (str):
+        """
+        pass
+
+    def reduce_multiscale(self, uuid, label=None, keep_level=0):
+        """
+        Reduce multiscale to highest resolution.
+
+        If label is not specified, it will use the active label group selected during 
+        dataset creation. Default to keep level with the highest resolution.
+
+        Args:
+            uuid (str): uuid of the source data group
+            label (str, optional): label to operate on
+            keep_level (int, optional): the level to keep
+        """
+        pass

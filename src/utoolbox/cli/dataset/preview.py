@@ -26,6 +26,13 @@ def preview(ctx):
 @preview.command()
 @click.argument("path")
 @click.pass_context
+def mosaic(ctx, path):
+    """Generate mosaic for each layer."""
+
+
+@preview.command()
+@click.argument("path")
+@click.pass_context
 def mip(ctx, path):
     """Generate maximum intensity projections."""
     raise NotImplementedError
