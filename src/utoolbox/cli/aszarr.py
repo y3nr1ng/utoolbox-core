@@ -8,6 +8,7 @@ from prompt_toolkit.shortcuts import button_dialog
 
 from utoolbox.io import open_dataset
 from utoolbox.io.dataset import ZarrDataset
+from utoolbox.io.dataset.base import TiledDataset
 
 __all__ = ["aszarr"]
 
@@ -15,6 +16,10 @@ logger = logging.getLogger("utoolbox.cli.aszarr")
 
 
 def _remap_and_flip(ds, remap, flip):
+    if not isinstance(ds, TiledDataset):
+        # not a tiled dataset
+        return ds
+
     if len(remap) > 1 and remap != "xyz"[: len(remap)]:
         remap = {a: b for a, b in zip("xyz", remap)}
         ds.remap_tiling_axes(remap)
