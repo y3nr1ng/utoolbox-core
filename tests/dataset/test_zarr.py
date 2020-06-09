@@ -84,6 +84,14 @@ def main(ds_src_dir, ds_dst_dir, client=None):
         print()
 
 
+class TestDump:
+    pass
+
+
+class TestDataset:
+    pass
+
+
 if __name__ == "__main__":
     import coloredlogs
 
@@ -114,4 +122,4 @@ if __name__ == "__main__":
     # print(client)
     client = None
 
-    main2(ds_src_dir, ds_dst_dir, client=client)
+    main(ds_src_dir, ds_dst_dir, client=client)

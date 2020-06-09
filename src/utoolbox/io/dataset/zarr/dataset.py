@@ -386,7 +386,7 @@ class ZarrDataset(
         try:
             if attrs["version"] != "0.1":
                 message = "multiscale version mismatch"
-            elif attrs["name"] != group.name:
+            elif attrs["name"] != name:
                 message = "multiscale attribute does not belong to this array"
             elif any(info["path"] not in group for info in attrs["datasets"]):
                 message = "multiscale dataset is damaged, missing dataset"

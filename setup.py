@@ -78,6 +78,7 @@ setup(
     entry_points={
         "console_scripts": [
             "mm2bdv=utoolbox.cli.converter.mm2bdv:main",
+            "aszarr=utoolbox.cli.aszarr:aszarr",
             "dataset=utoolbox.cli.dataset.main:dataset",
         ]
     },
