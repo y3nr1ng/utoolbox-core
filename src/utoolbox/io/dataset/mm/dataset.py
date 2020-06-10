@@ -23,8 +23,7 @@ def prompt_pixel_size():
     from prompt_toolkit.shortcuts import input_dialog
 
     value = input_dialog(
-        title="Invalid pixel size",
-        text=f"Please provide the effective pixel size (um):",
+        title="Invalid pixel size", text="Please provide the effective pixel size (um):"
     ).run()
     dx = float(value)
 
@@ -241,7 +240,7 @@ class MicroManagerV1Dataset(
         # find folder that contains the stack
         tile_index = ["tile_x", "tile_y"]
         label = self.tile_coords.xs(
-            itemgetter(*tile_index)(coord_dict), axis="index", level=tile_index,
+            itemgetter(*tile_index)(coord_dict), axis="index", level=tile_index
         )["label"].iloc[0]
         tile_folder = os.path.join(self.root_dir, label)
         file_list = [f for f in self.files if f.startswith(tile_folder)]
@@ -329,7 +328,7 @@ class MicroManagerV2Dataset(MicroManagerV1Dataset):
         # find folder that contains the stack
         tile_index = ["tile_x", "tile_y"]
         label = self.tile_coords.xs(
-            itemgetter(*tile_index)(coord_dict), axis="index", level=tile_index,
+            itemgetter(*tile_index)(coord_dict), axis="index", level=tile_index
         )["label"].iloc[0]
         tile_folder = os.path.join(self.root_dir, label)
         file_list = [f for f in self.files if f.startswith(tile_folder)]
