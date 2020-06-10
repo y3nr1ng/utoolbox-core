@@ -284,7 +284,7 @@ class MicroManagerV2Dataset(MicroManagerV1Dataset):
                     coord["y"] = float(coord_y)
                 elif device_name == z_stage:
                     coord_z = device["Position_um"][0]
-                    coords["z"] = float(coord_z)
+                    coord["z"] = float(coord_z)
                 else:
                     logger.warning(f"unknown device {device_name}")
             coords.append(coord)
