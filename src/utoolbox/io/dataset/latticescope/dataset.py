@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from dask import delayed
 from prompt_toolkit.shortcuts import input_dialog
-from dask.distributed.protocol.serialize import register_generic
+from distributed.protocol.serialize import register_generic
 
 from ..base import (
     TILE_INDEX_STR,
