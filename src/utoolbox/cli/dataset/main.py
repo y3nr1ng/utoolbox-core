@@ -21,8 +21,8 @@ def dataset(ctx, verbose):
     logging.getLogger("tifffile").setLevel(logging.ERROR)
 
     # convert verbose level
+    verbose = 2 if verbose > 2 else verbose
     level = {0: "WARNING", 1: "INFO", 2: "DEBUG"}.get(verbose)
-    level = "INFO" if level is None else level
     coloredlogs.install(
         level=level, fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
     )
