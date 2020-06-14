@@ -11,7 +11,6 @@ import numpy as np
 import pandas as pd
 from dask import delayed
 from prompt_toolkit.shortcuts import input_dialog
-from distributed.protocol.serialize import register_generic
 
 from ..base import (
     TILE_INDEX_STR,
@@ -28,9 +27,6 @@ from .settings import AcquisitionMode, ScanType, Settings
 __all__ = ["LatticeScopeDataset", "LatticeScopeTiledDataset"]
 
 logger = logging.getLogger("utoolbox.io.dataset")
-
-# ensure dask knows how to serialize/deserialize imageio result
-register_generic(imageio.core.util.Array)
 
 # internally coded camera pixel size
 # FIXME provide an external lookup source
@@ -61,6 +57,9 @@ class LatticeScopeDataset(
 
     @property
     def read_func(self):
+        def volread_np(uri):
+            return np.array(imageio.volread(uri))
+
         def func(uri, shape, dtype):
             if self.is_fragmented:
                 # build parts list
@@ -84,7 +83,7 @@ class LatticeScopeDataset(
                 arrays = []
                 for part_uri, part_shape in zip(uri, self._fragmented_shapes):
                     part_array = da.from_delayed(
-                        delayed(imageio.volread, pure=True)(part_uri), part_shape, dtype
+                        delayed(volread_np, pure=True)(part_uri), part_shape, dtype
                     )
                     arrays.append(part_array)
                 # fragments are 3D-only, we concat them at the slowest axis
@@ -97,7 +96,7 @@ class LatticeScopeDataset(
             else:
                 # simple array
                 return da.from_delayed(
-                    delayed(imageio.volread, pure=True)(uri), shape, dtype
+                    delayed(volread_np, pure=True)(uri), shape, dtype
                 )
 
         return func

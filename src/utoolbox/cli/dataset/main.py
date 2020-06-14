@@ -6,6 +6,7 @@ import coloredlogs
 from .export import export
 from .info import info
 from .preview import preview
+from .pyramid import pyramid
 
 __all__ = ["dataset"]
 
@@ -20,7 +21,8 @@ def dataset(ctx, verbose):
     logging.getLogger("tifffile").setLevel(logging.ERROR)
 
     # convert verbose level
-    level = {0: "WARNING", 1: "INFO", 2: "DEBUG"}.get(verbose, "INFO")
+    verbose = 2 if verbose > 2 else verbose
+    level = {0: "WARNING", 1: "INFO", 2: "DEBUG"}.get(verbose)
     coloredlogs.install(
         level=level, fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
     )
@@ -28,4 +30,5 @@ def dataset(ctx, verbose):
 
 dataset.add_command(info)
 dataset.add_command(preview)
+dataset.add_command(pyramid)
 dataset.add_command(export)
