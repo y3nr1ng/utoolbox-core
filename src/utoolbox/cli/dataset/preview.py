@@ -4,6 +4,8 @@ import click
 import numpy as np
 import tifffile
 
+import dask.array as da
+
 from utoolbox.io import open_dataset
 from utoolbox.io.dataset import (
     MultiChannelDatasetIterator,
@@ -28,6 +30,37 @@ def preview(ctx):
 @click.pass_context
 def mosaic(ctx, path):
     """Generate mosaic for each layer."""
+    show_trace = logger.getEffectiveLevel() <= logging.DEBUG
+    ds = open_dataset(path, show_trace=show_trace)
+
+    _, dy, dx = ds.voxel_size
+
+    iz = 0
+    for tz, ds_xy in TiledDatasetIterator(ds, axes="z", return_key=True):
+        if tz:
+            logger.info(f"iterate over z tile, {tz}")
+
+        # populating layers
+        layer = []
+        for ds_x in TiledDatasetIterator(ds_xy, axes='y', return_key=False):
+            row = []
+            for uuid in TiledDatasetIterator(ds_x, axes='x', return_key=False):
+                row.append(ds[uuid])
+            layer.append(row)
+        layer = da.block(layer)
+
+        for mosaic in layer:
+            print(iz)
+            
+            tifffile.imwrite(
+                f"mosaic_z{iz:05}.tif",
+                mosaic,
+                imagej=True,
+                resolution=(dx, dy),
+                metadata={"unit": "um"},
+            )
+
+            iz += 1
 
 
 @preview.command()

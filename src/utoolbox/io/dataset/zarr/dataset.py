@@ -27,7 +27,7 @@ from ..base import (
     TimeSeriesDatasetIterator,
 )
 
-__all__ = ["ZarrDataset"]
+__all__ = ["ZarrDataset", "MutableZarrDataset"]
 
 logger = logging.getLogger("utoolbox.io.dataset")
 
@@ -680,9 +680,10 @@ class ZarrDataset(
 
 class MutableZarrDataset(ZarrDataset):
     @classmethod
-    def from_immutable(dataset: ZarrDataset):
+    def from_immutable(cls, dataset: ZarrDataset):
         """From immutable Zarr dataset."""
-        pass
+        dataset.__class__ = cls  # inherited, should be fine using this hacky method
+        return dataset
 
     ##
 
@@ -696,12 +697,22 @@ class MutableZarrDataset(ZarrDataset):
             data : the data to store in the group
             attrs (dict, None): attributes for the data
         """
+        raise NotImplementedError
         pass
 
     def delete_data(self, uuid, label=None):
+
+        # TODO set inventory entry to empty if label is None
+        # TODO delete array/group
         pass
 
     ##
+
+    def add_multiscale_level(self, uuid, level, data, label=None):
+        pass
+
+    def delete_multiscale_level(self, uuid, level, label=None):
+        pass
 
     def to_multiscale(self, uuid, levels, label=None):
         """
@@ -712,6 +723,10 @@ class MutableZarrDataset(ZarrDataset):
             levels (list of tuple of int):
             label (str):
         """
+
+        # TODO create multiscale definition
+        # TODO use add_multiscale_level to populate
+
         pass
 
     def reduce_multiscale(self, uuid, label=None, keep_level=0):

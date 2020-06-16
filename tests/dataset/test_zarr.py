@@ -11,12 +11,13 @@ from utoolbox.io.dataset import (
     TiledDatasetIterator,
     LatticeScopeTiledDataset,
     ZarrDataset,
+    MutableZarrDataset
 )
 
 logger = logging.getLogger("test_zarr")
 
 
-def main2(ds_src_dir, ds_dst_dir, client=None):
+def test_dump(ds_src_dir, ds_dst_dir, client=None):
     logger.info("loading source dataset")
     ds_src = open_dataset(ds_src_dir, show_trace=True)
 
@@ -72,7 +73,7 @@ def main2(ds_src_dir, ds_dst_dir, client=None):
         print()
 
 
-def main(ds_src_dir, ds_dst_dir, client=None):
+def test_load(ds_src_dir, ds_dst_dir, client=None):
     ds_dst = ZarrDataset.load(ds_dst_dir)
 
     print(ds_dst.inventory)
@@ -82,6 +83,25 @@ def main(ds_src_dir, ds_dst_dir, client=None):
         print(f"[{key}]")
         print(value)
         print()
+
+
+def test_mutable(ds_src_dir, ds_dst_dir, client=None):
+    print(ds_dst_dir)
+    if False:
+        ds = MutableZarrDataset.load(ds_dst_dir)
+    else:
+        ds = ZarrDataset.load(ds_dst_dir)
+        ds = MutableZarrDataset.from_immutable(ds)
+
+    print(type(ds).__name__)
+    print(ds.inventory)
+
+    iterator = TiledDatasetIterator(ds, axes="zyx", return_key=True)
+    for key, value in iterator:
+        print(f"[{key}]")
+        print(value)
+        print()
+
 
 
 class TestDump:
@@ -109,7 +129,7 @@ if __name__ == "__main__":
         cwd = os.path.dirname(os.path.abspath(__file__))
         # path = os.path.join(cwd, "../data/cell1a_zp6um_20ms_interval_12s")
         # path = os.path.join(cwd, "../data/demo_3D_2x2x2_CMTKG-V3")
-        path = os.path.join(cwd, "../data/ExM_E15_olympus4X_canon300mm_2x3_z20_1")
+        path = os.path.join(cwd, "data/ExM_E15_olympus4X_canon300mm_2x3_z20_1")
         ds_src_dir = os.path.abspath(path)
         parent, dname = os.path.split(ds_src_dir)
         ds_dst_dir = os.path.join(parent, f"{dname}.zarr")
@@ -122,4 +142,4 @@ if __name__ == "__main__":
     # print(client)
     client = None
 
-    main(ds_src_dir, ds_dst_dir, client=client)
+    test_mutable(ds_src_dir, ds_dst_dir, client)
