@@ -268,16 +268,3 @@ class TiledDatasetIterator(DatasetIterator):
     @property
     def return_format(self) -> str:
         return self._return_format
-
-
-class TiledSlabDatasetIterator(DatasetIterator):
-    """
-    Treat Z slices as slabs. 
-
-    This iterator batches tiles within the same layers or multiple layers (a slab).
-    """
-
-    def __init__(
-        self, dataset: TiledDataset, *, layers=1, **kwargs
-    ):
-        pass
