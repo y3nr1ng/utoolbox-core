@@ -79,7 +79,8 @@ def aszarr(path, verbose, remap, flip, client, output):
     logging.getLogger("tifffile").setLevel(logging.ERROR)
 
     # convert verbose level
-    level = {0: "WARNING", 1: "INFO", 2: "DEBUG"}.get(verbose, "INFO")
+    verbose = 2 if verbose > 2 else verbose
+    level = {0: "WARNING", 1: "INFO", 2: "DEBUG"}.get(verbose)
     coloredlogs.install(
         level=level, fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
     )
