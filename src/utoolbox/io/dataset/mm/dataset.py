@@ -39,12 +39,15 @@ class MicroManagerV1Dataset(
 
     @property
     def read_func(self):
+        def imread_np(uri):
+            return np.array(imageio.imread(uri))
+
         def func(uri, shape, dtype):
             # layered volume
             nz, shape = shape[0], shape[1:]
             array = da.stack(
                 [
-                    da.from_delayed(delayed(imageio.imread)(file_path), shape, dtype)
+                    da.from_delayed(delayed(imread_np)(file_path), shape, dtype)
                     for file_path in uri
                 ]
             )
