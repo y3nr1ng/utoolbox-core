@@ -12,8 +12,9 @@ import zarr
 from dask import delayed
 from dask.distributed import as_completed
 from prefect import Flow, Parameter, task, unmapped
+from prefect.engine.executors import DaskExecutor
 
-from utoolbox.pipeline.tasks import ZarrWriteArray, CalcXxHash
+from utoolbox.pipeline.tasks import CalcXxHash, ZarrWriteArray
 from utoolbox.util.dask import get_client
 
 from ..base import (
@@ -245,6 +246,8 @@ class ZarrDataset(
                         if label in s_root:
                             label_group = s_root[label]
 
+                            # TODO start prefect task from here
+
                             # get the hash
                             hash_gen.update(data.compute())
                             src_hash = hash_gen.hexdigest()
@@ -360,9 +363,12 @@ class ZarrDataset(
             return  # nothing to do
 
         # [B]
-        # build work flow
         write_array = ZarrWriteArray(rechunk="auto")
         calc_checksum = CalcXxHash(method="xxh64", return_format="hex")
+
+        @task
+        def extract_tuple(pairs, index):
+            return pairs[index]
 
         @task
         def write_checksum(group, checksum):
@@ -370,20 +376,28 @@ class ZarrDataset(
             group.attrs["checksum"] = checksum
 
         with Flow("Dump ZarrDataset") as flow:
-            tasks = Parameter("tasks")
+            # build work flow
 
-            group, src, dst = tasks
+            pairs = Parameter("tasks")
+
+            group = extract_tuple.map(pairs, unmapped(0))
+            src = extract_tuple.map(pairs, unmapped(1))
+            dst = extract_tuple.map(pairs, unmapped(2))
 
             dst_zarr = write_array.map(
-                src, dst, overwrite=unmapped(True), compute=unmapped(False)
+                src,
+                dst,
+                overwrite=unmapped(True),
+                compute=unmapped(False),
+                return_stored=unmapped(True),
             )
 
             checksum = calc_checksum.map(dst_zarr)
 
             write_checksum.map(group, checksum)
 
-        # flow.run(tasks=tasks)
-        flow.visualize()
+        executor = DaskExecutor(address="tcp://localhost:8786")
+        flow.run(tasks=tasks, executor=executor)
 
         # [A]
         # n_failed = 0
