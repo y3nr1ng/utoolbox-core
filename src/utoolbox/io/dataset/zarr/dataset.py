@@ -11,9 +11,9 @@ import xxhash
 import zarr
 from dask import delayed
 from dask.distributed import as_completed
-from prefect import Flow
+from prefect import Flow, Parameter, task, unmapped
 
-from utoolbox.pipeline.tasks import ZarrWriteArray
+from utoolbox.pipeline.tasks import ZarrWriteArray, CalcXxHash
 from utoolbox.util.dask import get_client
 
 from ..base import (
@@ -170,10 +170,10 @@ class ZarrDataset(
 
         hash_gen = xxhash.xxh64()
 
-        client = client if client else get_client()
-        futures = {}  # conversion tasks, batch submit after populated all of them
+        # client = client if client else get_client()
+        # futures = {}  # conversion tasks, batch submit after populated all of them
 
-        src_dst = []
+        tasks = []
 
         # start populating the container structure
         #   /time/channel/setup/level
@@ -335,7 +335,9 @@ class ZarrDataset(
                         #    data_dst, overwrite=True, compute=False, return_stored=True,
                         # )
                         # [B]
-                        src_dst.append((data, data_dst))  # append new request
+                        tasks.append(
+                            (label_group, data, data_dst)
+                        )  # append new request
 
                         # [A]
                         # @delayed
@@ -354,26 +356,48 @@ class ZarrDataset(
         # if not futures:
         #    return  # nothing to do
         # [B]
-        if not src_dst:
+        if not tasks:
             return  # nothing to do
 
         # [B]
         # build work flow
-        with Flow('Dump ZarrDataset') as flow:
-            pass
-        
-        n_failed = 0
-        for future in as_completed(futures.keys()):
-            try:
-                group, checksum = futures[future], future.result()
-            except Exception:
-                logger.error(f'failed to serialize "{group.path}"')
-                n_failed += 1
-            else:
-                logger.debug(f'"{group.path}" xxh64="{checksum}"')
-                group.attrs["checksum"] = checksum
-        if n_failed > 0:
-            logger.error(f"{n_failed} failed serialization task(s)")
+        write_array = ZarrWriteArray(rechunk="auto")
+        calc_checksum = CalcXxHash(method="xxh64", return_format="hex")
+
+        @task
+        def write_checksum(group, checksum):
+            logger.debug(f'"{group.path}" xxh64="{checksum}"')
+            group.attrs["checksum"] = checksum
+
+        with Flow("Dump ZarrDataset") as flow:
+            tasks = Parameter("tasks")
+
+            group, src, dst = tasks
+
+            dst_zarr = write_array.map(
+                src, dst, overwrite=unmapped(True), compute=unmapped(False)
+            )
+
+            checksum = calc_checksum.map(dst_zarr)
+
+            write_checksum.map(group, checksum)
+
+        # flow.run(tasks=tasks)
+        flow.visualize()
+
+        # [A]
+        # n_failed = 0
+        # for future in as_completed(futures.keys()):
+        #    try:
+        #        group, checksum = futures[future], future.result()
+        #    except Exception:
+        #        logger.error(f'failed to serialize "{group.path}"')
+        #        n_failed += 1
+        #    else:
+        #        logger.debug(f'"{group.path}" xxh64="{checksum}"')
+        #        group.attrs["checksum"] = checksum
+        # if n_failed > 0:
+        #    logger.error(f"{n_failed} failed serialization task(s)")
 
     ##
 
