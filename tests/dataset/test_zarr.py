@@ -97,19 +97,10 @@ def test_mutable(ds_src_dir, ds_dst_dir, client=None):
     print(ds.inventory)
 
     iterator = TiledDatasetIterator(ds, axes="zyx", return_key=True)
-    for key, value in iterator:
+    for key, uuid in iterator:
         print(f"[{key}]")
-        print(value)
+        print(uuid.inventory)
         print()
-
-
-
-class TestDump:
-    pass
-
-
-class TestDataset:
-    pass
 
 
 if __name__ == "__main__":

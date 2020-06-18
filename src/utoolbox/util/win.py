@@ -5,17 +5,24 @@ Reference:
     How to enable Windows console QuickEdit Mode from python
     https://stackoverflow.com/a/37505496
 """
-import atexit
 import ctypes
+import logging
 import msvcrt
 import os
 from ctypes import wintypes
 from enum import IntFlag
+from typing import Optional
 
-kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+__all__ = ["get_console_mode", "set_console_mode", "console_mode"]
 
-# input flags
-class ConsoleInputFlag(IntFlag):
+logger = logging.getLogger("utoolbox.util.win")
+
+
+class ConsoleIOFlag(IntFlag):
+    """Base class for consoole mode flags."""
+
+
+class ConsoleInputFlag(ConsoleIOFlag):
     ProcessedInput = 0x01
     LineInput = 0x02
     EchoInput = 0x04
@@ -26,25 +33,10 @@ class ConsoleInputFlag(IntFlag):
     ExtendedFlags = 0x80
 
 
-ENABLE_PROCESSED_INPUT = 0x0001
-ENABLE_LINE_INPUT = 0x0002
-ENABLE_ECHO_INPUT = 0x0004
-ENABLE_WINDOW_INPUT = 0x0008
-ENABLE_MOUSE_INPUT = 0x0010
-ENABLE_INSERT_MODE = 0x0020
-ENABLE_QUICK_EDIT_MODE = 0x0040
-ENABLE_EXTENDED_FLAGS = 0x0080
-
-# output flags
-class ConsoleOutputFlag(IntFlag):
+class ConsoleOutputFlag(ConsoleIOFlag):
     ProcessedOutput = 0x01
     WrapAtEOL = 0x02
-    VT100 = 0x04
-
-
-ENABLE_PROCESSED_OUTPUT = 0x0001
-ENABLE_WRAP_AT_EOL_OUTPUT = 0x0002
-ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004  # VT100 (Win 10)
+    VT100 = 0x04  # Win10 feature
 
 
 def check_zero(result, func, args):
@@ -55,11 +47,19 @@ def check_zero(result, func, args):
     return args
 
 
+kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+
 kernel32.GetConsoleMode.errcheck = check_zero
-kernel32.GetConsoleMode.argtypes = (wintypes.HANDLE, wintypes.LPDWORD)
+kernel32.GetConsoleMode.argtypes = (
+    wintypes.HANDLE,  # _In_  HANDLE  hConsoleHandle
+    wintypes.LPDWORD,  # _Out_ LPDWORD lpMode
+)
 
 kernel32.SetConsoleMode.errcheck = check_zero
-kernel32.SetConsoleMode.argtypes = (wintypes.HANDLE, wintypes.DWORD)
+kernel32.SetConsoleMode.argtypes = (
+    wintypes.HANDLE,  # _In_ HANDLE hConsoleHandle,
+    wintypes.DWORD,  # _In_ DWORD  dwMode
+)
 
 
 class Console:
@@ -90,7 +90,7 @@ class ConsoleOutput(Console):
         super().__init__("CONOUT$", **kwargs)
 
 
-def get_console_mode(output=False):
+def get_console_mode(output: bool = False):
     """
     Get the mode of the active console input or output　buffer. 
     
@@ -103,10 +103,11 @@ def get_console_mode(output=False):
     with con_klass() as con:
         mode = wintypes.DWORD()
         kernel32.GetConsoleMode(con.handle, ctypes.byref(mode))
-        return mode.value
+        value = mode.value
+    return ConsoleOutputFlag(value) if output else ConsoleInputFlag(value)
 
 
-def set_console_mode(mode, output=False):
+def set_console_mode(mode: ConsoleIOFlag, output: bool = False):
     """
     Set the mode of the active console input or output　buffer. 
     
@@ -121,39 +122,59 @@ def set_console_mode(mode, output=False):
         kernel32.SetConsoleMode(con.handle, mode)
 
 
-def update_console_mode(flags: IntFlag, mask: IntFlag, output=False, restore=False):
+class console_mode:
     """
-    Update a masked subset of the current mode of the active console input or output 
-    buffer. 
-
-    If the process isn't attached to a console, this function raises an EBADF IOError.
+    This class provides a context managed console mode environment, ensure that flags are restored to its original state when exiting the scope.
 
     Args:
         flags (IntFlag): flags wanted
         mask (IntFlag): flags to remove (masked)
         output (bool, optional): select console output if True
-        restore (bool, optional): restore console mode after termination
-    
-    TODO restore, atexit not working
     """
-    current_mode = get_console_mode(output)
-    if current_mode & mask != flags & mask:
-        mode = current_mode & ~mask | flags & mask
-        set_console_mode(mode, output)
-    else:
-        restore = False
-    if restore:
-        atexit.register(set_console_mode, current_mode, output)
+
+    def __init__(
+        self,
+        *,
+        flags: Optional[ConsoleIOFlag] = 0,
+        mask: Optional[ConsoleIOFlag] = 0,
+        output: bool = False,
+    ):
+        self._flags, self._mask = flags, mask
+
+        self._output = output
+
+    def __enter__(self):
+        current_mode = get_console_mode(self._output)
+
+        # modify console mode if required
+        target_mode = current_mode | self._flags & ~self._mask
+        if current_mode != target_mode:
+            logger.debug(
+                f"modify console mode from {current_mode:#04x} to {target_mode:#04x}"
+            )
+            set_console_mode(target_mode, output=self._output)
+        else:
+            # we use None to hint that no need to restore console mode
+            current_mode = None
+        self._current_mode = current_mode
+
+        return self
+
+    def __exit__(self, *exc):
+        if self._current_mode is not None:
+            logger.debug(f"reset console mode to {self._current_mode:#04x}")
+            set_console_mode(self._current_mode, output=self._output)
 
 
 if __name__ == "__main__":
     import time
+    import coloredlogs
 
-    print("%#06x, %#06x" % (get_console_mode(), get_console_mode(output=True)))
+    coloredlogs.install(
+        level="DEBUG", fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
+    )
 
-    flags = mask = ENABLE_EXTENDED_FLAGS | ENABLE_INSERT_MODE
-    update_console_mode(flags, mask, restore=True)
-
-    print("%#06x, %#06x" % (get_console_mode(), get_console_mode(output=True)))
-
-    time.sleep(10)  # check console properties
+    with console_mode(
+        flags=ConsoleInputFlag.InsertMode | ConsoleInputFlag.QuickEditMode
+    ):
+        time.sleep(5)  # check console properties

@@ -11,7 +11,9 @@ import xxhash
 import zarr
 from dask import delayed
 from dask.distributed import as_completed
+from prefect import Flow
 
+from utoolbox.pipeline.tasks import ZarrWriteArray
 from utoolbox.util.dask import get_client
 
 from ..base import (
@@ -171,6 +173,8 @@ class ZarrDataset(
         client = client if client else get_client()
         futures = {}  # conversion tasks, batch submit after populated all of them
 
+        src_dst = []
+
         # start populating the container structure
         #   /time/channel/setup/level
         # welp, i have no idea how to do this cleanly without nested structure
@@ -325,28 +329,39 @@ class ZarrDataset(
                         # NOTE using default chunk shape after rechunk will cause
                         # problem, since chunk size is composite of chunks as tuples
                         # instead of int
-                        data_src = data.rechunk(data_dst.chunks)
-                        array = data_src.to_zarr(
-                            data_dst,
-                            overwrite=overwrite,
-                            compute=False,
-                            return_stored=True,
-                        )
+                        # [A]
+                        # data_src = data.rechunk(data_dst.chunks)
+                        # array = data_src.to_zarr(
+                        #    data_dst, overwrite=True, compute=False, return_stored=True,
+                        # )
+                        # [B]
+                        src_dst.append((data, data_dst))  # append new request
 
-                        @delayed
-                        def calc_checksum(array):
-                            # NOTE cannot create external dependency in delayed funcs,
-                            # map futures to their target groups instead
-                            return xxhash.xxh64(array).hexdigest()
+                        # [A]
+                        # @delayed
+                        # def calc_checksum(array):
+                        #    # NOTE cannot create external dependency in delayed funcs,
+                        #    # map futures to their target groups instead
+                        #    return xxhash.xxh64(array).hexdigest()
 
-                        checksum = calc_checksum(array)
-                        future = client.compute(checksum)
-                        futures[future] = label_group
+                        # [A]
+                        # checksum = calc_checksum(array)
+                        # future = client.compute(checksum)
+                        # futures[future] = label_group
                         # TODO add callback here to update progressbar
 
-        if not futures:
+        # [A]
+        # if not futures:
+        #    return  # nothing to do
+        # [B]
+        if not src_dst:
             return  # nothing to do
 
+        # [B]
+        # build work flow
+        with Flow('Dump ZarrDataset') as flow:
+            pass
+        
         n_failed = 0
         for future in as_completed(futures.keys()):
             try:
@@ -679,11 +694,42 @@ class ZarrDataset(
 
 
 class MutableZarrDataset(ZarrDataset):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.active_label = None
+
+    def __setitem__(self, key, value):
+        # TODO key -> uuid reference, value -> data to write in the corresponding group
+        pass
+
+    ##
+
+    @property
+    def active_label(self) -> str:
+        """Active label are the one we are currently mutating."""
+        if self._active_label is None:
+            self.active_label = self.label  # NOTE should trigger another warning
+        return self._active_label
+
+    @active_label.setter
+    def active_label(self, label: Optional[str]) -> str:
+        if label == self.label:
+            logger.warning(
+                f'mutate on inventoried label "{label}" will lead to data inconsistency, please reload after modification'
+            )
+        self._active_label = label
+
+    ##
+
     @classmethod
     def from_immutable(cls, dataset: ZarrDataset):
         """From immutable Zarr dataset."""
-        dataset.__class__ = cls  # inherited, should be fine using this hacky method
-        return dataset
+        name = os.path.basename(dataset.root_dir)
+        logger.info(f'reloading "{name}" as mutable Zarr dataset')
+
+        # constructor needs:
+        #   store / label / level / path
+        return cls(dataset.root_dir, dataset.label, dataset.level, dataset.path)
 
     ##
 

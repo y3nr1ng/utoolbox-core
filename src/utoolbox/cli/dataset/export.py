@@ -5,7 +5,7 @@ import click
 
 from utoolbox.io import open_dataset
 from utoolbox.io.dataset.base import SessionDataset, TiledDataset
-from utoolbox.util.logging import change_logging_level
+from utoolbox.util.log import change_logging_level
 
 __all__ = ["export"]
 
