@@ -56,6 +56,7 @@ setup(
         "natsort",
         "numpy>=1.17",
         "pandas",
+        "prefect",
         "prompt_toolkit>=3.0",
         "tifffile",  # use the latest version, imageio bundles with older one
         "xxhash",
