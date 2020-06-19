@@ -321,7 +321,7 @@ class ZarrDataset(
         batch_size = 8
         for i in range(0, len(checksums), batch_size):
             futures = {
-                data_dst: client.compute(checksum)
+                client.compute(checksum): data_dst
                 for data_dst, checksum in checksums[i : i + batch_size]
             }
             for future in as_completed(futures.keys()):
