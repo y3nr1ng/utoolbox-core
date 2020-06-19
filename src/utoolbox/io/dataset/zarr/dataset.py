@@ -171,10 +171,8 @@ class ZarrDataset(
 
         hash_gen = xxhash.xxh64()
 
-        # client = client if client else get_client()
-        # futures = {}  # conversion tasks, batch submit after populated all of them
-
-        tasks = []
+        client = client if client else get_client()
+        checksums = []
 
         # start populating the container structure
         #   /time/channel/setup/level
@@ -244,7 +242,7 @@ class ZarrDataset(
                         # 4-2) label
                         write_back = True
                         if label in s_root:
-                            label_group = s_root[label]
+                            data_dst = s_root[label]
 
                             # TODO start prefect task from here
 
@@ -254,14 +252,14 @@ class ZarrDataset(
                             hash_gen.reset()
 
                             try:
-                                dst_hash = label_group.attrs["checksum"]
+                                dst_hash = data_dst.attrs["checksum"]
                                 if dst_hash != src_hash:
                                     raise ValueError
                             except KeyError:
                                 # hash does not exist, since it is only updated when
                                 # dump was completed
                                 logger.warning(
-                                    f'"{label_group.path}" contains partial dump, rewrite'
+                                    f'"{data_dst.path}" contains partial dump, rewrite'
                                 )
                             except ValueError:
                                 # hash mismatch
@@ -269,53 +267,17 @@ class ZarrDataset(
                                     "existing hash does not match the source"
                                 )
                                 # reset
-                                del label_group.attrs["checksum"]
+                                del data_dst.attrs["checksum"]
                             else:
                                 # array exists, and checksum matches
                                 if not overwrite:
-                                    logger.info(f'"{label_group.path}" already exists')
+                                    logger.info(f'"{data_dst.path}" already exists')
                                     write_back = False
                         else:
                             # never seen this label before, create new one
-                            # NOTE raw data will always be multiscale
-                            label_group = s_root.require_group(label)
-                            label_group.attrs["voxel_size"] = dataset.voxel_size
-
-                        # 5) level
-                        # NOTE comply with multiscale arrays v0.1
-                        # https://forum.image.sc/t/multiscale-arrays-v0-1/37930
-
-                        # drop current multiscale attributes
-                        if "multiscales" in label_group.attrs:
-                            # delete all existing levels
-                            multiscales = label_group.attrs["multiscales"]
-                            if multiscales:
-                                logger.warning("deleting existing multiscale datasets")
-                                for multiscale in multiscales:
-                                    for path in multiscale["datasets"]:
-                                        try:
-                                            del label_group[path["path"]]
-                                        except KeyError:
-                                            logger.warning(
-                                                f'"{path}" is already deleted'
-                                            )
-
-                        # generate 0-level, single-level only
-                        level_str = str("0")
-                        multiscales = [
-                            {
-                                "name": label,
-                                "datasets": [{"path": level_str}],
-                                "version": "0.1",
-                            }
-                        ]
-                        if level_str in label_group:
-                            data_dst = label_group[level_str]
-                        else:
-                            # NOTE compression benchmark reference http://alimanfoo.
-                            # github.io/2016/09/21/genotype-compression-benchmark.html
-                            data_dst = label_group.empty_like(
-                                level_str,
+                            # NOTE raw data assume to be simple dataset
+                            data_dst = s_root.empty_like(
+                                label,
                                 data,
                                 chunks=True,
                                 compression="blosc",
@@ -323,7 +285,9 @@ class ZarrDataset(
                                     cname="lz4", clevel=5, shuffle=zarr.blosc.SHUFFLE
                                 ),
                             )
-                        label_group.attrs["multiscales"] = multiscales
+
+                        # update voxel size
+                        data_dst.attrs["voxel_size"] = dataset.voxel_size
 
                         # complete updates all the attributes, early stop here
                         if not write_back:
@@ -332,75 +296,45 @@ class ZarrDataset(
                         # NOTE using default chunk shape after rechunk will cause
                         # problem, since chunk size is composite of chunks as tuples
                         # instead of int
-                        # [A]
-                        # data_src = data.rechunk(data_dst.chunks)
-                        # array = data_src.to_zarr(
-                        #    data_dst, overwrite=True, compute=False, return_stored=True,
-                        # )
-                        # [B]
-                        tasks.append(
-                            (label_group, data, data_dst)
-                        )  # append new request
+                        data_src = data.rechunk(data_dst.chunks)
+                        array = data_src.to_zarr(
+                            data_dst,
+                            overwrite=True,  # early stopped by write_back
+                            compute=False,  # use delayed to submit result in batches
+                            return_stored=True,  # need this for downstream checksum wb
+                        )
 
-                        # [A]
-                        # @delayed
-                        # def calc_checksum(array):
-                        #    # NOTE cannot create external dependency in delayed funcs,
-                        #    # map futures to their target groups instead
-                        #    return xxhash.xxh64(array).hexdigest()
+                        @delayed
+                        def calc_checksum(array):
+                            # NOTE cannot create external dependency in delayed funcs,
+                            # map futures to their target groups instead
+                            return xxhash.xxh64(array).hexdigest()
 
-                        # [A]
-                        # checksum = calc_checksum(array)
-                        # future = client.compute(checksum)
-                        # futures[future] = label_group
-                        # TODO add callback here to update progressbar
+                        checksum = calc_checksum(array)
+                        checksums.append((data_dst, checksum))
 
-        # [A]
-        # if not futures:
-        #    return  # nothing to do
-        # [B]
-        if not tasks:
+        if not checksums:
             return  # nothing to do
 
-        # [B]
-        write_array = ZarrWriteArray(rechunk="auto")
-        calc_checksum = CalcXxHash(method="xxh64", return_format="hex")
+        n_failed = 0
+        # batch checksum tasks
+        batch_size = 8
+        for i in range(0, len(checksums), batch_size):
+            futures = {
+                data_dst: client.compute(checksum)
+                for data_dst, checksum in checksums[i : i + batch_size]
+            }
+            for future in as_completed(futures.keys()):
+                data_dst = futures[future]
+                try:
+                    checksum = future.result()
+                except Exception:
+                    logger.error(f'failed to serialize "{data_dst.path}"')
+                    n_failed += 1
+                else:
+                    logger.debug(f'"{data_dst.path}" xxh64="{checksum}"')
+                    data_dst.attrs["checksum"] = checksum
 
-        @task
-        def extract_tuple(pairs, index):
-            return pairs[index]
-
-        @task
-        def write_checksum(group, checksum):
-            logger.debug(f'"{group.path}" xxh64="{checksum}"')
-            group.attrs["checksum"] = checksum
-
-        with Flow("Dump ZarrDataset") as flow:
-            # build work flow
-
-            pairs = Parameter("tasks")
-
-            group = extract_tuple.map(pairs, unmapped(0))
-            src = extract_tuple.map(pairs, unmapped(1))
-            dst = extract_tuple.map(pairs, unmapped(2))
-
-            dst_zarr = write_array.map(
-                src,
-                dst,
-                overwrite=unmapped(True),
-                compute=unmapped(False),
-                return_stored=unmapped(True),
-            )
-
-            checksum = calc_checksum.map(dst_zarr)
-
-            write_checksum.map(group, checksum)
-
-        executor = DaskExecutor(address="tcp://localhost:8786")
-        flow.run(tasks=tasks, executor=executor)
-
-        # [A]
-        # n_failed = 0
         # for future in as_completed(futures.keys()):
         #    try:
         #        group, checksum = futures[future], future.result()
@@ -410,8 +344,8 @@ class ZarrDataset(
         #    else:
         #        logger.debug(f'"{group.path}" xxh64="{checksum}"')
         #        group.attrs["checksum"] = checksum
-        # if n_failed > 0:
-        #    logger.error(f"{n_failed} failed serialization task(s)")
+        if n_failed > 0:
+            logger.error(f"{n_failed} failed serialization task(s)")
 
     ##
 
