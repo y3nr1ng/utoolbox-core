@@ -171,7 +171,6 @@ class ZarrDataset(
 
         hash_gen = xxhash.xxh64()
 
-        client = client if client else get_client()
         checksums = []
 
         # start populating the container structure
@@ -244,9 +243,8 @@ class ZarrDataset(
                         if label in s_root:
                             data_dst = s_root[label]
 
-                            # TODO start prefect task from here
-
                             # get the hash
+                            # TODO postpone this step
                             hash_gen.update(data.compute())
                             src_hash = hash_gen.hexdigest()
                             hash_gen.reset()
@@ -313,11 +311,12 @@ class ZarrDataset(
                         checksum = calc_checksum(array)
                         checksums.append((data_dst, checksum))
 
-        if not checksums:
-            return  # nothing to do
+        client = client if client else get_client()
+
+        # roughly use number of cores as batch size
+        batch_size = sum(client.ncores())
 
         n_failed = 0
-        # batch checksum tasks
         batch_size = 8
         for i in range(0, len(checksums), batch_size):
             futures = {
@@ -335,15 +334,6 @@ class ZarrDataset(
                     logger.debug(f'"{data_dst.path}" xxh64="{checksum}"')
                     data_dst.attrs["checksum"] = checksum
 
-        # for future in as_completed(futures.keys()):
-        #    try:
-        #        group, checksum = futures[future], future.result()
-        #    except Exception:
-        #        logger.error(f'failed to serialize "{group.path}"')
-        #        n_failed += 1
-        #    else:
-        #        logger.debug(f'"{group.path}" xxh64="{checksum}"')
-        #        group.attrs["checksum"] = checksum
         if n_failed > 0:
             logger.error(f"{n_failed} failed serialization task(s)")
 
@@ -668,7 +658,7 @@ class ZarrDataset(
 class MutableZarrDataset(ZarrDataset):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.active_label = None
+        self._active_label = None
 
     def __setitem__(self, key, value):
         # TODO key -> uuid reference, value -> data to write in the corresponding group
@@ -690,6 +680,12 @@ class MutableZarrDataset(ZarrDataset):
                 f'mutate on inventoried label "{label}" will lead to data inconsistency, please reload after modification'
             )
         self._active_label = label
+
+    @property
+    def read_func(self):
+        # TODO overwrite read_func, retrieve (uri, data) instead of (data, )
+        # TODO overwrite self._register_data(self, data) -> map uuid/uri + uuid/data
+        pass
 
     ##
 
