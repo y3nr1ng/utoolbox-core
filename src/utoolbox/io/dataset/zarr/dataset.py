@@ -500,9 +500,7 @@ class ZarrDataset(
                     pass
 
         nested_iters(self.handle, groups)
-
-        print(dim_info)
-
+        
         return dim_info
 
     def _load_mapped_coordinates(self):
@@ -689,7 +687,6 @@ class MutableZarrDataset(ZarrDataset):
         else:
             path = os.path.dirname(uri)
         label = self.active_label
-        print(f"{uuid}={path} -> {label}")
 
         group = self.handle[path]
         dst_array = group.empty_like(
