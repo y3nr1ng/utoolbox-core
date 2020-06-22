@@ -116,10 +116,9 @@ def test_mutable(ds_src_dir, ds_dst_dir, client=None):
     logger.info(f'reload dataset with "{store_as}"')
     ds = ZarrDataset.load(ds_dst_dir, label=store_as)
 
-    ds.remap_tiling_axes({"x": "y", "y": "x"})
-    #ds.flip_tiling_axes(["x"])
+    ds.flip_tiling_axes(["y"])
 
-    iterator = TiledDatasetIterator(ds, axes="xyz", return_key=False)
+    iterator = TiledDatasetIterator(ds, axes="zyx", return_key=False)
     for i, uuid in enumerate(iterator):
         print(f"[{key}]")
         print(uuid.inventory)

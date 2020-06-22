@@ -706,7 +706,8 @@ class MutableZarrDataset(ZarrDataset):
             dst_array[:] = value[:]
 
     def __delitem__(self, key):
-        pass
+        # TODO
+        raise NotImplementedError
 
     ##
 
