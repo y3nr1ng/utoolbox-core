@@ -24,7 +24,7 @@ class PreloadPriorityOffset(IntEnum):
 
 class BaseDataset(metaclass=ABCMeta):
     def __init__(self):
-        self._data, self._inventory = dict(), dict()
+        self._data, self._inventory = {}, {}
         self._preload_funcs = []
 
         def test_readability():
@@ -48,37 +48,9 @@ class BaseDataset(metaclass=ABCMeta):
         return self.inventory.__getattr__(key)
 
     def __getitem__(self, key):
-        if isinstance(key, BaseDataset):
-            # extract inventory
-            key = key.inventory
-
-        if isinstance(key, pd.Series):
-            # extract uuid directly by row number
-            if len(key) > 1:
-                raise KeyError("multiple keys provided")
-            uuid = key.values[0]
-        elif isinstance(key, dict):
-            # rebuild coordinate
-            uuid = self.inventory.xs(
-                list(key.values()), axis="index", level=list(key.keys())
-            )
-            if len(uuid) > 1:
-                desc = [f"{k}={v}" for k, v in key.items()]
-                desc = ", ".join(desc)
-                logger.debug(f"using key ({desc})")
-                logger.warning(
-                    f"ambiguous key ({len(uuid)} matches), using first returned result"
-                )
-            uuid = uuid.iloc[0]
-        elif isinstance(key, str):
-            # direct uuid
-            uuid = key
-        else:
-            raise KeyError("unknown key format")
-
-        # look up the uuid
+        uuid = self._convert_key_to_uuid(key)
         try:
-            return self.data[uuid]
+            return self._data[uuid]
         except KeyError:
             return self._missing_data()
 
@@ -86,10 +58,6 @@ class BaseDataset(metaclass=ABCMeta):
         return self.inventory.__len__()
 
     ##
-
-    @property
-    def data(self):
-        return self._data
 
     @property
     def files(self):
@@ -235,6 +203,47 @@ class BaseDataset(metaclass=ABCMeta):
         index = pd.MultiIndex.from_product(coords.values(), names=coords.keys())
         self._inventory = index
 
+    def _convert_key_to_uuid(self, key, return_multiple=False, strict=False):
+        """
+        Convert search key to internal UUID.
+
+        Args:
+            key : the search key
+            return_multiple (bool, optional): allow ambiguous UUID match
+            strict (bool, optional): key-UUID should be 1:1
+
+        Returns:
+            (str or tuple of str): if multiple result is allowed, it will always return
+                tuple of str (UUID), otherwise, str is returned.
+        """
+        if isinstance(key, BaseDataset):
+            # extract inventory
+            key = key.inventory
+
+        if isinstance(key, pd.Series):
+            uuid = key.values
+        elif isinstance(key, dict):
+            # rebuild coordinate
+            uuid = self.inventory.xs(
+                list(key.values()), axis="index", level=list(key.keys())
+            )
+            uuid = uuid.iloc.values
+        elif isinstance(key, str):
+            # direct uuid, quick return
+            uuid = (key,)
+        else:
+            raise KeyError("unknown key format")
+
+        if len(uuid) > 1:
+            if strict:
+                raise KeyError(f"ambiguous key ({len(uuid)} matches)")
+            elif return_multiple:
+                logger.warning(
+                    f"ambiguous key ({len(uuid)} matches), using first returned result"
+                )
+                uuid = (uuid[0],)
+        return uuid if return_multiple else uuid[0]
+
     @abstractmethod
     def _enumerate_files(self):
         pass
@@ -248,7 +257,7 @@ class BaseDataset(metaclass=ABCMeta):
 
     def _register_data(self, data):
         uuid = str(uuid4())
-        self.data[uuid] = data
+        self._data[uuid] = data
         return uuid
 
     def _update_inventory_index(self, mapping: Mapping[str, Iterable[Any]]):

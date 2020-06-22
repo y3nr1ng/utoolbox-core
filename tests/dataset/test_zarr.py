@@ -2,16 +2,17 @@ import logging
 import os
 from pprint import pprint
 
+import imageio
 import pandas as pd
 from dask.distributed import Client
 from prompt_toolkit.shortcuts import button_dialog
 
 from utoolbox.io import open_dataset
 from utoolbox.io.dataset import (
-    TiledDatasetIterator,
     LatticeScopeTiledDataset,
+    MutableZarrDataset,
+    TiledDatasetIterator,
     ZarrDataset,
-    MutableZarrDataset
 )
 
 logger = logging.getLogger("test_zarr")
@@ -98,11 +99,38 @@ def test_mutable(ds_src_dir, ds_dst_dir, client=None):
     print(type(ds).__name__)
     print(ds.inventory)
 
+    store_as = "mip_xy"
+
     iterator = TiledDatasetIterator(ds, axes="zyx", return_key=True)
     for key, uuid in iterator:
         print(f"[{key}]")
         print(uuid.inventory)
         print()
+
+        array = ds[uuid]
+
+        ds.active_label = store_as
+        ds[uuid] = array.max(axis=0)
+
+    # reload
+    logger.info(f'reload dataset with "{store_as}"')
+    ds = ZarrDataset.load(ds_dst_dir, label=store_as)
+
+    ds.remap_tiling_axes({"x": "y", "y": "x"})
+    #ds.flip_tiling_axes(["x"])
+
+    iterator = TiledDatasetIterator(ds, axes="xyz", return_key=False)
+    for i, uuid in enumerate(iterator):
+        print(f"[{key}]")
+        print(uuid.inventory)
+
+        data = ds[uuid]
+
+        print(data.shape)
+        print()
+
+        filename = f"tile_{i:02d}.tif"
+        imageio.imwrite(filename, data)
 
 
 if __name__ == "__main__":

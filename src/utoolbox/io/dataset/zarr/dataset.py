@@ -4,6 +4,7 @@ from collections import defaultdict
 from itertools import chain
 from typing import List, Optional
 
+import dask
 import dask.array as da
 import numpy as np
 import pandas as pd
@@ -57,10 +58,16 @@ class ZarrDataset(
         level (int, optional): resolution level
         path (str, optional): internal group path
         strict (bool, optional): resolution level should exist instead of fallback
+        client (dask.distributed.Client, optional): the cluster to operate on
     """
 
     def __init__(
-        self, store: str, label: str = RAW_DATA_LABEL, level: int = 0, path: str = "/"
+        self,
+        store: str,
+        label: str = RAW_DATA_LABEL,
+        level: int = 0,
+        path: str = "/",
+        client=None,
     ):
         if level < 0:
             raise ValueError("resolution level should >= 0")
@@ -68,7 +75,15 @@ class ZarrDataset(
 
         super().__init__(store, path)
 
+        self._client = client
+
     ##
+
+    @property
+    def client(self):
+        if self._client is None:
+            self._client = get_client()
+        return self._client
 
     @property
     def label(self) -> str:
@@ -377,9 +392,9 @@ class ZarrDataset(
 
     ##
 
-    def _open_session(self):
+    def _open_session(self, mode="r"):
         try:
-            z = zarr.open(self.root_dir, mode="r")  # don't create it
+            z = zarr.open(self.root_dir, mode=mode)  # don't create it
         except ValueError:
             # nothing to open here, unlikely a zarr dataset
             return
@@ -485,6 +500,8 @@ class ZarrDataset(
                     pass
 
         nested_iters(self.handle, groups)
+
+        print(dim_info)
 
         return dim_info
 
@@ -610,11 +627,14 @@ class ZarrDataset(
         return attrs, rmapping
 
     def _load_voxel_size(self):
-        voxel_size = set()
-        for array in self.files:
-            group = os.path.dirname(array)
-            group = self.handle[group]
-            voxel_size.add(tuple(group.attrs["voxel_size"]))
+        try:
+            voxel_size = set()
+            for path in self.files:
+                array = self.handle[path]
+                voxel_size.add(tuple(array.attrs["voxel_size"]))
+        except KeyError:
+            logger.error(f'"{self.label}" does not have valid voxel_size meta')
+            return None
 
         inconsist = len(voxel_size) > 1
         voxel_size = next(iter(voxel_size))
@@ -658,26 +678,32 @@ class MutableZarrDataset(ZarrDataset):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._active_label = None
+        self._uri = {}
 
     def __setitem__(self, key, value):
-        # TODO key -> uuid reference, value -> data to write in the corresponding group
-
-        if isinstance(key, BaseDataset):
-            key = key.inventory
-
-        if isinstance(key, pd.Series):
-            if len(key) > 1:
-                raise KeyError(
-                    "multiple key provided"
-                )  # TODO allow assigning to multiple group?
-            uuid = key.values[0]
-        elif isinstance(key, dict):
-            pass
-        elif isinstance(key, str):
-            # direct uuid
-            uuid = key
+        uuid = self._convert_key_to_uuid(key)
+        try:
+            uri = self._uri[uuid]
+        except KeyError:
+            raise KeyError("unknown UUID")
         else:
-            raise KeyError("unknown key format")
+            path = os.path.dirname(uri)
+        label = self.active_label
+        print(f"{uuid}={path} -> {label}")
+
+        group = self.handle[path]
+        dst_array = group.empty_like(
+            label,
+            value,
+            overwrite=True,  # writing stuff inside, overwrite by default
+            chunks=True,
+            compression="blosc",
+            compression_opts=dict(cname="lz4", clevel=5, shuffle=zarr.blosc.SHUFFLE),
+        )
+        if isinstance(value, da.Array):
+            value.to_zarr(dst_array, overwrite=True, compute=True, return_stored=False)
+        else:
+            dst_array[:] = value[:]
 
     def __delitem__(self, key):
         pass
@@ -703,7 +729,13 @@ class MutableZarrDataset(ZarrDataset):
     def read_func(self):
         # TODO overwrite read_func, retrieve (uri, data) instead of (data, )
         # TODO overwrite self._register_data(self, data) -> map uuid/uri + uuid/data
-        pass
+        func = super().read_func
+
+        def wrapped_func(uri, shape, dtype):
+            data = func(uri, shape, dtype)
+            return uri, data
+
+        return wrapped_func
 
     ##
 
@@ -713,9 +745,7 @@ class MutableZarrDataset(ZarrDataset):
         name = os.path.basename(dataset.root_dir)
         logger.info(f'reloading "{name}" as mutable Zarr dataset')
 
-        # constructor needs:
-        #   store / label / level / path
-        return cls(dataset.root_dir, dataset.label, dataset.level, dataset.path)
+        return cls.load(dataset.root_dir)
 
     ##
 
@@ -753,3 +783,30 @@ class MutableZarrDataset(ZarrDataset):
             keep_level (int, optional): the level to keep
         """
         pass
+
+    ##
+
+    def _open_session(self):
+        super()._open_session(mode="a")
+
+    def _register_data(self, data):
+        """
+        Register URI-data pair.
+
+        Originally, dask.array is provided as data for registration, since we are 
+        granting the ability to mutate data, we need their corresponding URI instead of 
+        delegating read info entirely to dask.
+
+        Args:
+            data (tuple of (str, dask.array)): data to register
+
+        Returns:
+            str: generated UUID
+        """
+        uri, data = data
+        uuid = super()._register_data(data)
+
+        # save the UUID
+        self._uri[uuid] = uri
+
+        return uuid
