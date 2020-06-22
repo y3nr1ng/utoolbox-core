@@ -84,6 +84,8 @@ def test_load(ds_src_dir, ds_dst_dir, client=None):
         print(value)
         print()
 
+    print(f'active="{ds_dst.active_label}"')
+
 
 def test_mutable(ds_src_dir, ds_dst_dir, client=None):
     print(ds_dst_dir)

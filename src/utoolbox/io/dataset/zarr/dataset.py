@@ -314,7 +314,7 @@ class ZarrDataset(
         client = client if client else get_client()
 
         # roughly use number of cores as batch size
-        batch_size = sum(client.ncores())
+        batch_size = sum(client.ncores().values())
 
         n_failed = 0
         batch_size = 8
@@ -662,6 +662,26 @@ class MutableZarrDataset(ZarrDataset):
 
     def __setitem__(self, key, value):
         # TODO key -> uuid reference, value -> data to write in the corresponding group
+        
+        if isinstance(key, BaseDataset):
+            key = key.inventory
+
+        if isinstance(key, pd.Series):
+            if len(key) > 1:
+                raise KeyError('multiple key provided') # TODO allow assigning to multiple group?
+            uuid = key.values[0]
+        elif isinstance(key, dict):
+            pass
+        elif isinstance(key, str):
+            # direct uuid
+            uuid = key
+        else:
+            raise KeyError('unknown key format')
+    
+        
+            
+
+    def __delitem__(self, key):
         pass
 
     ##
@@ -698,27 +718,6 @@ class MutableZarrDataset(ZarrDataset):
         # constructor needs:
         #   store / label / level / path
         return cls(dataset.root_dir, dataset.label, dataset.level, dataset.path)
-
-    ##
-
-    def attach_data(self, uuid, label, data, attrs=None):
-        """
-        Attach additional data to setup.
-
-        Args:
-            uuid (str): uuid of the source data group to attach
-            label (str): label for the new data
-            data : the data to store in the group
-            attrs (dict, None): attributes for the data
-        """
-        raise NotImplementedError
-        pass
-
-    def delete_data(self, uuid, label=None):
-
-        # TODO set inventory entry to empty if label is None
-        # TODO delete array/group
-        pass
 
     ##
 
