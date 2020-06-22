@@ -11,13 +11,11 @@ import xxhash
 import zarr
 from dask import delayed
 from dask.distributed import as_completed
-from prefect import Flow, Parameter, task, unmapped
-from prefect.engine.executors import DaskExecutor
 
-from utoolbox.pipeline.tasks import CalcXxHash, ZarrWriteArray
 from utoolbox.util.dask import get_client
 
 from ..base import (
+    BaseDataset,
     DenseDataset,
     MultiChannelDataset,
     MultiChannelDatasetIterator,
