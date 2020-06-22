@@ -500,7 +500,7 @@ class ZarrDataset(
                     pass
 
         nested_iters(self.handle, groups)
-        
+
         return dim_info
 
     def _load_mapped_coordinates(self):
