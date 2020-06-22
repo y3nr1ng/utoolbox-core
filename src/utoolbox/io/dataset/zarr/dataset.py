@@ -428,12 +428,7 @@ class ZarrDataset(
                         # no data for this spatial setup
                         continue
                     s_root = s_root[self.label]
-
-                    path = f"/{t}/{c}/{s}/{self.label}"
-                    if level_str in s_root:
-                        # multi-level dataset
-                        path = f"{path}/{level_str}"
-                    files.append(path)
+                    files.append(s_root.path)
         return files
 
     def _load_array_info(self):
@@ -473,12 +468,18 @@ class ZarrDataset(
                 indices (list of str): the index list to use as key in `dim_info`
             """
             if len(groups) > 1:
+                # we always have nested-groups to query if we are not at the last level
                 iterator = root.groups()
             else:
-                iterator = chain(root.groups(), root.arrays())
+                try:
+                    # label[G]/level[A]
+                    iterator = chain(root.groups(), root.arrays())
+                except AttributeError:
+                    # label[A]
+                    iterator = [(root.name, root)]
 
+            index = groups[0]
             for name, child in iterator:
-                index = groups[0]
                 dim_info[index][name].append(child.attrs)
                 try:
                     nested_iters(child, groups[1:])
@@ -662,13 +663,15 @@ class MutableZarrDataset(ZarrDataset):
 
     def __setitem__(self, key, value):
         # TODO key -> uuid reference, value -> data to write in the corresponding group
-        
+
         if isinstance(key, BaseDataset):
             key = key.inventory
 
         if isinstance(key, pd.Series):
             if len(key) > 1:
-                raise KeyError('multiple key provided') # TODO allow assigning to multiple group?
+                raise KeyError(
+                    "multiple key provided"
+                )  # TODO allow assigning to multiple group?
             uuid = key.values[0]
         elif isinstance(key, dict):
             pass
@@ -676,10 +679,7 @@ class MutableZarrDataset(ZarrDataset):
             # direct uuid
             uuid = key
         else:
-            raise KeyError('unknown key format')
-    
-        
-            
+            raise KeyError("unknown key format")
 
     def __delitem__(self, key):
         pass
