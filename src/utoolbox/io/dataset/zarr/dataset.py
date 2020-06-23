@@ -703,8 +703,19 @@ class MutableZarrDataset(ZarrDataset):
             dst_array[:] = value[:]
 
     def __delitem__(self, key):
-        # TODO
-        raise NotImplementedError
+        uuid = self._convert_key_to_uuid(key)
+        try:
+            uri = self._uri[uuid]
+        except KeyError:
+            raise KeyError("unknown UUID")
+        else:
+            path = os.path.dirname(uri)
+        label = self.active_label
+        
+        # rebuild path using current active_label
+        path = os.path.join(path, label)
+        
+        del self.handle[path]
 
     ##
 
