@@ -33,7 +33,8 @@ def mosaic(ctx, path):
     show_trace = logger.getEffectiveLevel() <= logging.DEBUG
     ds = open_dataset(path, show_trace=show_trace)
 
-    _, dy, dx = ds.voxel_size
+    _, dy, dx = ds.voxel_sizemarshmallow
+    
 
     iz = 0
     for tz, ds_xy in TiledDatasetIterator(ds, axes="z", return_key=True):

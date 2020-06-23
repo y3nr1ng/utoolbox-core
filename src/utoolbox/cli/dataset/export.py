@@ -5,6 +5,7 @@ import click
 
 from utoolbox.io import open_dataset
 from utoolbox.io.dataset.base import SessionDataset, TiledDataset
+from utoolbox.io.dataset import ZarrDataset
 from utoolbox.util.log import change_logging_level
 
 __all__ = ["export"]
@@ -25,7 +26,7 @@ def export(ctx):
     "-p", "--precision", type=int, default=4, help="maximum number of the decimal place"
 )
 @click.pass_context
-def coords(ctx, ds_path, csv_path, precision=4):
+def coords(ctx, ds_path, csv_path, precision):
     """
     Export filename-coordinate mapping.
     \f
@@ -88,3 +89,26 @@ def coords(ctx, ds_path, csv_path, precision=4):
         header=True,  # we need column headers
         float_format=f"%.{precision}f",  # 4 digit decimals
     )
+
+
+@export.command()
+@click.argument("ds_path", metavar="dataset")
+@click.option("-l", "--level", type=int, default=0, help="resolution level to export")
+@click.pass_context
+def label(ctx, ds_path, level):
+    """
+    Export specific label from a ZarrDataset.
+    \f
+
+    Args:
+        ds_path (str): path to the dataset
+    """
+
+    show_trace = logger.getEffectiveLevel() <= logging.DEBUG
+    ds = open_dataset(ds_path, show_trace=show_trace)
+
+    if not isinstance(ds, ZarrDataset):
+        raise TypeError("input is not a ZarrDataset")
+
+    # TODO
+    raise NotImplementedError

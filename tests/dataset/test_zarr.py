@@ -77,15 +77,7 @@ def test_dump(ds_src_dir, ds_dst_dir, client=None):
 def test_load(ds_src_dir, ds_dst_dir, client=None):
     ds_dst = ZarrDataset.load(ds_dst_dir)
 
-    print(ds_dst.inventory)
-
-    iterator = TiledDatasetIterator(ds_dst, axes="zyx", return_key=True)
-    for key, value in iterator:
-        print(f"[{key}]")
-        print(value)
-        print()
-
-    print(f'active="{ds_dst.active_label}"')
+    print(ds_dst.labels)
 
 
 def test_mutable(ds_src_dir, ds_dst_dir, client=None):
@@ -110,8 +102,12 @@ def test_mutable(ds_src_dir, ds_dst_dir, client=None):
         array = ds[uuid]
 
         ds.active_label = store_as
-        ds[uuid] = array.max(axis=0)
+        if False:
+            del ds[uuid]
+        else:
+            ds[uuid] = array.max(axis=0)
 
+    return
     # reload
     logger.info(f'reload dataset with "{store_as}"')
     ds = ZarrDataset.load(ds_dst_dir, label=store_as)
@@ -162,4 +158,4 @@ if __name__ == "__main__":
     # print(client)
     client = None
 
-    test_mutable(ds_src_dir, ds_dst_dir, client)
+    test_load(ds_src_dir, ds_dst_dir, client)
