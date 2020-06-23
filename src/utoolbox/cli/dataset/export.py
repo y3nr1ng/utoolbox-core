@@ -92,7 +92,7 @@ def coords(ctx, ds_path, csv_path, precision):
 
 
 @export.command()
-@click.argument("ds_path", metavar="dataset")
+@click.argument("ds_path", metavar="DATASET")
 @click.option("-l", "--level", type=int, default=0, help="resolution level to export")
 @click.pass_context
 def label(ctx, ds_path, level):

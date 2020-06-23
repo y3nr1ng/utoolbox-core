@@ -30,10 +30,10 @@ SUPPORTED_DATASET_CLASS = [
 ]
 
 
-def open_dataset(path, show_trace=False):
+def open_dataset(path, *args, show_trace=False, **kwargs):
     for _klass in SUPPORTED_DATASET_CLASS:
         try:
-            ds = _klass.load(path)
+            ds = _klass.load(path, *args, **kwargs)
             logger.info(f'"{path}" is a "{_klass.__name__}"')
             break
         except UnsupportedDatasetError:
