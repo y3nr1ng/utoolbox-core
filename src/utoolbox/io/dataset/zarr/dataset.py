@@ -2,9 +2,8 @@ import logging
 import os
 from collections import defaultdict
 from itertools import chain
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
-import dask
 import dask.array as da
 import numpy as np
 import pandas as pd
@@ -16,7 +15,6 @@ from dask.distributed import as_completed
 from utoolbox.util.dask import get_client
 
 from ..base import (
-    BaseDataset,
     DenseDataset,
     MultiChannelDataset,
     MultiChannelDatasetIterator,
@@ -88,6 +86,11 @@ class ZarrDataset(
     @property
     def label(self) -> str:
         return self._label
+
+    @property
+    def labels(self) -> Tuple[str]:
+        """All the labels stored in this dataset."""
+        return tuple(self.metadata["label"].keys())
 
     @property
     def level(self) -> int:
@@ -711,10 +714,10 @@ class MutableZarrDataset(ZarrDataset):
         else:
             path = os.path.dirname(uri)
         label = self.active_label
-        
+
         # rebuild path using current active_label
         path = os.path.join(path, label)
-        
+
         del self.handle[path]
 
     ##

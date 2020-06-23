@@ -14,8 +14,9 @@ from utoolbox.io.dataset import (
     MultiViewDatasetIterator,
     TiledDatasetIterator,
     TimeSeriesDatasetIterator,
+    ZarrDataset,
 )
-from utoolbox.io.dataset.base import DenseDataset, SessionDataset, TILE_INDEX_STR
+from utoolbox.io.dataset.base import TILE_INDEX_STR, DenseDataset, SessionDataset
 
 __all__ = ["info"]
 
@@ -112,6 +113,15 @@ def info(ctx, path, show_all):
         table_str = table_str.split("\n")
         for row in table_str:
             printi(row, indent=1)
+
+    print()
+
+    # labels
+    if isinstance(ds, ZarrDataset):
+        printi("Available labels", indent=1)
+
+        for label in ds.labels:
+            printi(f"- {label}", indent=2)
 
     print()
 
