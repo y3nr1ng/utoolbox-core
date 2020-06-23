@@ -7,6 +7,7 @@ from utoolbox.io import open_dataset
 from utoolbox.io.dataset.base import SessionDataset, TiledDataset
 from utoolbox.io.dataset import ZarrDataset
 from utoolbox.util.log import change_logging_level
+from prompt_toolkit.shortcuts import message_dialog, radiolist_dialog
 
 __all__ = ["export"]
 
@@ -110,5 +111,28 @@ def label(ctx, ds_path, level):
     if not isinstance(ds, ZarrDataset):
         raise TypeError("input is not a ZarrDataset")
 
-    # TODO
-    raise NotImplementedError
+    labels = ds.labels
+    if len(labels) < 2:
+        if len(labels) == 1:
+            desc = "Only a single label exists in this dataset.\n"
+        else:
+            desc = "Cannot find a valid label (something very wrong?)\n"
+        message_dialog(title="Unable to export label", text=desc).run()
+        return
+
+    values = [(label,) * 2 for label in labels]
+    label = radiolist_dialog(
+        title="Found multiple labels",
+        text="Which label would you like to export?",
+        values=values,
+    ).run()
+
+    if label is None:
+        logger.info("cancelled")
+        return
+
+    # reload dataset
+    logger.info(f'reload dataset with default label "{label}"')
+    ds = open_dataset(ds_path, label=label, show_trace=show_trace)
+
+    # TODO camera -> color, nested folder, tif
