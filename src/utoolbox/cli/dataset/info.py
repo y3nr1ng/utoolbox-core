@@ -117,16 +117,21 @@ def info(ctx, path, show_all):
 
     # timeseries
     # TODO time information
-    
+
     # tiles
     if setup["tile"][0] is not None:
         m, M = ds.tile_coords.min().to_dict(), ds.tile_coords.max().to_dict()
+        shape, _ = ds._load_array_info()
+        s = {
+            k: dv * nv
+            for k, dv, nv in zip("xyz", reversed(ds.voxel_size), reversed(shape))
+        }
         ax_names, extents = [], []
         for ax in TILE_INDEX_STR:
             ax = ax.split("_")[1]
             index = f"{ax}_coord"
             if index in m:
-                delta = round(M[index] - m[index], 4)
+                delta = round(M[index] - m[index], 4) + s[ax]
                 extents.append(delta)
                 ax_names.append(ax)
 
