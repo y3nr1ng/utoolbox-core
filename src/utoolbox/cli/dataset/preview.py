@@ -18,6 +18,53 @@ __all__ = ["preview"]
 
 logger = logging.getLogger("utoolbox.cli.dataset")
 
+VALID_SCREEN_SIZE = {
+    "2160p": (3840, 2160),
+    "1440p": (2560, 1440),
+    "1080p": (1920, 1080),
+    "720p": (1280, 720),
+    "480p": (854, 480),
+}
+
+VALID_SCREEN_SIZE_CHOICES = list(VALID_SCREEN_SIZE.keys())
+
+
+def _estaimte_resize_ratio(image, resolution="1440p", portrait=None):
+    """
+    Estimate the resizing ratio for provided image, in order to generate a sufficient size result for target screen.
+    
+    Args:
+        image (array-like or tuple of int): image to estimate
+        resolution (str, optional): screen resolution
+        portrait (bool, optional): True if the screen should be in portrait mode, False 
+            for landscape, if None, auto infer the orientation
+    """
+    shape_limit = VALID_SCREEN_SIZE[resolution]
+    if portrait is None:
+        ny, nx = image.shape
+        portrait = ny > nx
+    if not portrait:
+        # in landscape, screen width > height
+        # NOTE since VALID_SCREEN_SIZE store results as (width, height), we need
+        # to reverse the shape to C-order if landscape (instead of portrait)
+        shape_limit = tuple(shape_limit[::-1])
+
+    shape = image if isinstance(image, tuple) else image.shape
+    assert len(shape) == 2, "image is not ready for 2-D screen, programmer error"
+
+    screen_area = shape_limit[0] * shape_limit[1]
+    ratio = 1
+    while True:
+        if all((s // ratio <= s_max) for s_max, s in zip(shape_limit, shape)):
+            image_area = (shape[0] // ratio) * (shape[1] // ratio)
+            break
+        else:
+            ratio *= 2
+    fill_ratio = image_area / screen_area
+    logger.info(f"target downsample ratio {ratio}x, fill ratio {fill_ratio}")
+
+    return ratio
+
 
 @click.group()
 @click.pass_context
@@ -27,14 +74,28 @@ def preview(ctx):
 
 @preview.command()
 @click.argument("path")
+@click.option(
+    "-s",
+    "--size",
+    "screen_size",
+    type=click.Choice(VALID_SCREEN_SIZE_CHOICES, case_sensitive=False),
+    default="1440p",
+    help="what screen size should we fit the result in",
+)
 @click.pass_context
-def mosaic(ctx, path):
-    """Generate mosaic for each layer."""
+def mosaic(ctx, path, screen_size):
+    """
+    Generate mosaic for each layer.
+    \f
+
+    Args:
+        path (str): path to the dataset    
+        size (str, optional): screen size to fit the result in
+    """
     show_trace = logger.getEffectiveLevel() <= logging.DEBUG
     ds = open_dataset(path, show_trace=show_trace)
 
     _, dy, dx = ds.voxel_size
-
 
     iz = 0
     for tz, ds_xy in TiledDatasetIterator(ds, axes="z", return_key=True):
@@ -43,16 +104,22 @@ def mosaic(ctx, path):
 
         # populating layers
         layer = []
-        for ds_x in TiledDatasetIterator(ds_xy, axes='y', return_key=False):
+        for ds_x in TiledDatasetIterator(ds_xy, axes="y", return_key=False):
             row = []
-            for uuid in TiledDatasetIterator(ds_x, axes='x', return_key=False):
+            for uuid in TiledDatasetIterator(ds_x, axes="x", return_key=False):
                 row.append(ds[uuid])
             layer.append(row)
         layer = da.block(layer)
 
+        sampler = None
         for mosaic in layer:
+            if sampler is None:
+                ratio = _estaimte_resize_ratio(mosaic, resolution=screen_size)
+                sampler = (slice(None, None, ratio),) * 2
+            mosaic = mosaic[sampler]
+
             print(iz)
-            
+
             tifffile.imwrite(
                 f"mosaic_z{iz:05}.tif",
                 mosaic,
