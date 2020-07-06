@@ -48,8 +48,8 @@ setup(
     install_requires=[
         "click",
         "coloredlogs",
-        "dask[complete]~=2.16.0",
-        "distributed~=2.16.0",
+        "dask[complete]~=2.20.0",
+        "distributed~=2.20.0",
         "h5py>=2.9",
         "humanfriendly",
         "imageio[ffmpeg]",
