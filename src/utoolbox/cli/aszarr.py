@@ -141,7 +141,7 @@ def aszarr(path, verbose, remap, flip, host, output):
 
     if dump:
         with SelfSupervisedClient(host, **ASZARR_SLURM_SPEC) as sc:
-            sc.cluster.scale(jobs=10)  # DEBUG
+            sc.cluster.scale(jobs=20)  # DEBUG
 
             # connect to the cluster
             client = sc.client
