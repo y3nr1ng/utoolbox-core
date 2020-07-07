@@ -14,6 +14,8 @@ __all__ = ["aszarr"]
 
 logger = logging.getLogger("utoolbox.cli.aszarr")
 
+ASZARR_SLURM_SPEC = {"cores": 4, "memory": "8GB", "project": "aszarr", "queue": "CPU"}
+
 
 def _remap_and_flip(ds, remap, flip):
     if not isinstance(ds, TiledDataset):
@@ -57,13 +59,12 @@ def _remap_and_flip(ds, remap, flip):
 @click.option(
     "-h",
     "--host",
-    "client",
     type=str,
     default=None,
     metavar="HOST",
     help="Cluster scheduler to perform the conversion.",
 )
-def aszarr(path, verbose, remap, flip, client, output):
+def aszarr(path, verbose, remap, flip, host, output):
     """
     Convert arbitrary dataset into Zarr dataset format.
 
@@ -139,7 +140,7 @@ def aszarr(path, verbose, remap, flip, client, output):
             self.cluster = None
 
     if dump:
-        with SelfSupervisedClient("slurm") as sc:
+        with SelfSupervisedClient(host, **ASZARR_SLURM_SPEC) as sc:
             client = sc.client
 
             logger.info(f'start dumping by scheduler "{client.scheduler.address}")')
