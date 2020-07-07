@@ -15,9 +15,9 @@ __all__ = ["aszarr"]
 logger = logging.getLogger("utoolbox.cli.aszarr")
 
 ASZARR_SLURM_SPEC = {
-    "cores": 4,
+    "cores": 8,
     "processes": 1,
-    "memory": "8GB",
+    "memory": "32GB",
     "project": "aszarr",
     "queue": "CPU",
 }
