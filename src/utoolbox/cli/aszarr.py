@@ -14,7 +14,7 @@ __all__ = ["aszarr"]
 
 logger = logging.getLogger("utoolbox.cli.aszarr")
 
-ASZARR_SLURM_SPEC = {"cores": 4, "memory": "8GB", "project": "aszarr", "queue": "CPU"}
+ASZARR_SLURM_SPEC = {"cores": 4, "memory": "32GB", "project": "aszarr", "queue": "CPU"}
 
 
 def _remap_and_flip(ds, remap, flip):
