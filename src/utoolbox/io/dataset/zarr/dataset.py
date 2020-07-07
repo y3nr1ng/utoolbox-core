@@ -10,9 +10,7 @@ import pandas as pd
 import xxhash
 import zarr
 from dask import delayed
-from dask.distributed import as_completed
-
-from utoolbox.util.dask import get_client
+from dask.distributed import Client, as_completed
 
 from ..base import (
     DenseDataset,
@@ -60,12 +58,7 @@ class ZarrDataset(
     """
 
     def __init__(
-        self,
-        store: str,
-        label: str = RAW_DATA_LABEL,
-        level: int = 0,
-        path: str = "/",
-        client=None,
+        self, store: str, label: str = RAW_DATA_LABEL, level: int = 0, path: str = "/",
     ):
         if level < 0:
             raise ValueError("resolution level should >= 0")
@@ -73,15 +66,7 @@ class ZarrDataset(
 
         super().__init__(store, path)
 
-        self._client = client
-
     ##
-
-    @property
-    def client(self):
-        if self._client is None:
-            self._client = get_client()
-        return self._client
 
     @property
     def label(self) -> str:
@@ -147,7 +132,6 @@ class ZarrDataset(
         label: str = RAW_DATA_LABEL,
         path: Optional[str] = None,
         overwrite=False,
-        client=None,
         **kwargs,
     ):
         """
@@ -164,7 +148,6 @@ class ZarrDataset(
             label (str, optional): label of the data array
             path (str, optional): internal group path
             overwrite (bool, optional): overwrite _data_ if it already exists
-            client (Client, optional): remote cluster client
             **kwargs : additional argument for `zarr.open` function
 
         Returns:
@@ -327,7 +310,11 @@ class ZarrDataset(
                         checksum = calc_checksum(array)
                         checksums.append((data_dst, checksum))
 
-        client = client if client else get_client()  # TODO use Client.current()
+        try:
+            client = Client.current()
+        except ValueError:
+            raise RuntimeError("please connect to a dask cluster first")
+            # TODO should we launch native cluster here?
 
         # roughly use number of cores as batch size
         batch_size = len(client.ncores())

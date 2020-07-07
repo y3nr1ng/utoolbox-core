@@ -164,6 +164,6 @@ def aszarr(path, verbose, remap, flip, host, output):
             except KeyError:
                 logger.warning(f"no dashboard")
 
-            ZarrDataset.dump(dst_path, ds, overwrite=overwrite, client=client)
+            ZarrDataset.dump(dst_path, ds, overwrite=overwrite)
 
     logger.info("complete zarr dataset conversion")
