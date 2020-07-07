@@ -141,9 +141,25 @@ def aszarr(path, verbose, remap, flip, host, output):
 
     if dump:
         with SelfSupervisedClient(host, **ASZARR_SLURM_SPEC) as sc:
-            client = sc.client
+            sc.scale(jobs=10)  # DEBUG
 
-            logger.info(f'start dumping by scheduler "{client.scheduler.address}")')
+            # connect to the cluster
+            client = sc.client
+            scheduler_info = client.scheduler_info()
+
+            # scheduler info
+            address = scheduler_info["address"]
+            logger.info(f"start dumping (scheduler: {address})")
+
+            # dashboard info
+            try:
+                port = scheduler_info["services"]["dashboard"]
+                address, _ = address.rsplit(":", maxsplit=1)
+                address = f"{address}:{port}"
+                logger.info(f"dashboard address: {address}")
+            except KeyError:
+                logger.warning(f"no dashboard")
+
             ZarrDataset.dump(dst_path, ds, overwrite=overwrite, client=client)
 
     logger.info("complete zarr dataset conversion")
