@@ -327,10 +327,10 @@ class ZarrDataset(
                         checksum = calc_checksum(array)
                         checksums.append((data_dst, checksum))
 
-        client = client if client else get_client()
+        client = client if client else get_client()  # TODO use Client.current()
 
         # roughly use number of cores as batch size
-        batch_size = sum(client.ncores().values())
+        batch_size = len(client.ncores())
 
         n_failed = 0
         for i in range(0, len(checksums), batch_size):
