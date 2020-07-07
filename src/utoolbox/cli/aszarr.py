@@ -119,21 +119,28 @@ def aszarr(path, verbose, remap, flip, host, output):
 
     class SelfSupervisedClient:
         def __init__(self, address, jobs=1, **kwargs):
+            if jobs < 1:
+                logger.error("number of jobs must be a positive integer")
+                jobs = 1
+            self._jobs = jobs
+
             if address == "slurm":
                 from dask_jobqueue import SLURMCluster
 
-                self.cluster = SLURMCluster(**kwargs)
+                cluster = SLURMCluster(**kwargs)
 
                 # scalue up immediately
                 assert jobs >= 1, "number of jobs must be a positive integer"
-                self.cluster.scale(jobs=jobs)
+                cluster.scale(jobs=self.jobs)
 
-                logger.info(f"launched {jobs} job request(s)")
+                logger.info(f"launched {self.jobs} job request(s)")
             else:
-                self.cluster = address
+                cluster = address
+            self.cluster = cluster
 
         def __enter__(self):
             self.client = Client(self.cluster)
+            self.client.wait_for_workers(self.jobs)
             return self
 
         def __exit__(self, *exc):
@@ -143,6 +150,12 @@ def aszarr(path, verbose, remap, flip, host, output):
             if self.cluster:
                 self.cluster.close()
             self.cluster = None
+
+        ##
+
+        @property
+        def jobs(self):
+            return self._jobs
 
     if dump:
         with SelfSupervisedClient(host, jobs=20, **ASZARR_SLURM_SPEC) as sc:
