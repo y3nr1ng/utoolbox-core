@@ -14,7 +14,7 @@ setup(
     #   bumpversion release
     # to next version
     #   bump patch/minor/major
-    version="0.0.22.dev15",
+    version="0.0.22.dev16",
     # one-line description for the summary field
     description="Core functions for uToolbox.",
     long_description=long_description,
