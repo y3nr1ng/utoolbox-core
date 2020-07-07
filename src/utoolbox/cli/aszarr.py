@@ -116,17 +116,33 @@ def aszarr(path, verbose, remap, flip, client, output):
     else:
         dump, overwrite = True, False
 
-    if dump:
-        desc = "start dumping"
-        if client:
-            client = Client(client)
-            desc += f' (using scheduler "{client.scheduler.address}")'
-        logger.info(desc)
+    class SelfSupervisedClient:
+        def __init__(self, address, **kwargs):
+            if address == "slurm":
+                from dask_jobqueue import SLURMCluster
 
-        try:
+                self.cluster = SLURMCluster(**kwargs)
+                logger.info(f"launched SLURM job request {self.cluster}")
+            else:
+                self.cluster = address
+
+        def __enter__(self):
+            self.client = Client(self.cluster)
+            return self
+
+        def __exit__(self, *exc):
+            self.client.close()
+            self.client = None
+
+            if self.cluster:
+                self.cluster.close()
+            self.cluster = None
+
+    if dump:
+        with SelfSupervisedClient("slurm") as sc:
+            client = sc.client
+
+            logger.info(f'start dumping by scheduler "{client.scheduler.address}")')
             ZarrDataset.dump(dst_path, ds, overwrite=overwrite, client=client)
-        finally:
-            if client:
-                client.close()
 
     logger.info("complete zarr dataset conversion")

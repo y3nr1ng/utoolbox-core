@@ -49,6 +49,7 @@ setup(
         "click",
         "coloredlogs",
         "dask[complete]~=2.20.0",
+        "dask-jobqueue",
         "distributed~=2.20.0",
         "h5py>=2.9",
         "humanfriendly",
