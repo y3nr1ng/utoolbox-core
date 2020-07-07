@@ -333,7 +333,6 @@ class ZarrDataset(
         batch_size = sum(client.ncores().values())
 
         n_failed = 0
-        batch_size = 8
         for i in range(0, len(checksums), batch_size):
             futures = {
                 client.compute(checksum): data_dst
