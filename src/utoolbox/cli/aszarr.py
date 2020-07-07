@@ -19,7 +19,8 @@ ASZARR_SLURM_SPEC = {
     "processes": 1,
     "memory": "32GB",
     "project": "aszarr",
-    "queue": "CPU",
+    "queue": "CPU",  # TODO update to use merged queue
+    "walltime": "24:00:00",  # 1d
 }
 
 
