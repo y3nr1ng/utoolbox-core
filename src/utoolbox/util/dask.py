@@ -4,7 +4,7 @@ from typing import Optional
 
 from dask.distributed import Client, as_completed
 
-__all__ = ["get_local_cluster", "get_client", "wait_futures"]
+__all__ = ["get_client", "wait_futures"]
 
 logger = logging.getLogger("utoolbox.util.dask")
 
@@ -14,11 +14,21 @@ DEFAULT_WORKER_OPTIONS = {
     "memory_pause_fraction": 0.75,
 }
 
+ASZARR_SLURM_SPEC = {
+    "cores": 8,
+    "processes": 1,
+    "memory": "32GB",
+    "project": "aszarr",
+    "queue": "CPU",  # TODO update to use merged queue
+    "walltime": "24:00:00",  # 1d
+}
+
 
 class ManagedCluster(ABC):
     def __init__(self, n_workers=4, threads_per_worker=2, memory="8GB"):
         self._n_workers = n_workers
         self._threads_per_worker = threads_per_worker
+        self._memory = memory
 
         self._cluster, self._client = None, None
 
@@ -48,6 +58,10 @@ class ManagedCluster(ABC):
     @property
     def threads_per_worker(self) -> int:
         return self._threads_per_worker
+
+    @property
+    def memory(self) -> str:
+        return self._memory
 
     @property
     def scheduler_address(self) -> str:
@@ -104,15 +118,17 @@ class ManagedCluster(ABC):
 
 
 class ManagedLocalCluster(ManagedCluster):
-    def __init__(self, address=None, n_workers=None, threads_per_worker=None):
+    def __init__(self, address=None, n_workers=None, threads_per_worker=None, **kwargs):
         # default to utilize all cores on local system
-        super().__init__(n_workers=n_workers, threads_per_worker=threads_per_worker)
+        super().__init__(
+            n_workers=n_workers, threads_per_worker=threads_per_worker, **kwargs
+        )
 
     def open(self):
         from dask.distributed import LocalCluster
 
         self._cluster = LocalCluster(
-            n_workers=self.n_workers, threads_per_worker=self.threads_per_worker
+            n_workers=self.n_workers, threads_per_worker=self.threads_per_worker, memory_limit=
         )
 
 
@@ -135,7 +151,8 @@ class ManagedSLURMCluster(ManagedCluster):
         args = {
             "cores": self.threads_per_worker,
             "processes": 1,
-            "memory" "project": self._project,
+            "memory": self.memory,
+            "project": self._project,
             "queue": self._queue,
             "walltime": self._walltime,
         }
@@ -143,11 +160,15 @@ class ManagedSLURMCluster(ManagedCluster):
         self._cluster.scale(self.n_workers)
 
 
-def get_client(address=None, worker_log_level="ERROR", **clustser_kwargs):
+def get_client(
+    address=None, auto_spawn=True, worker_log_level="ERROR", **clustser_kwargs
+):
     """
     Args:
-        address (str): address of the cluster scheduler, or 'slurm' to launch a dask 
-            cluster through SLURM
+        address (str, optional): address of the cluster scheduler, or 'slurm' to launch
+            a dask cluster through SLURM
+        auto_spawn (bool, optional): automagically spawn cluster if not found
+        work_log_level (str, optional): worker log level
     """
     if address == "slurm":
         cluster_klass = ManagedSLURMCluster
@@ -157,7 +178,8 @@ def get_client(address=None, worker_log_level="ERROR", **clustser_kwargs):
             return Client.current()
         except ValueError:
             # nothing exists, continue to spawn managed cluster
-            pass
+            if not auto_spawn:
+                raise RuntimeError("please spawn a dask cluster first")
 
         cluster_klass = ManagedLocalCluster
 

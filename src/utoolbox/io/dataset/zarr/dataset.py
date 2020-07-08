@@ -10,7 +10,9 @@ import pandas as pd
 import xxhash
 import zarr
 from dask import delayed
-from dask.distributed import Client, as_completed
+from dask.distributed import as_completed
+
+from utoolbox.util.dask import get_client
 
 from ..base import (
     DenseDataset,
@@ -310,11 +312,7 @@ class ZarrDataset(
                         checksum = calc_checksum(array)
                         checksums.append((data_dst, checksum))
 
-        try:
-            client = Client.current()
-        except ValueError:
-            raise RuntimeError("please connect to a dask cluster first")
-            # TODO should we launch native cluster here?
+        client = get_client()
 
         # roughly use number of cores as batch size
         batch_size = len(client.ncores())

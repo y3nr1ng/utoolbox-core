@@ -125,7 +125,7 @@ def aszarr(path, verbose, remap, flip, host, output):
         dump, overwrite = True, False
 
     if dump:
-        client = get_client(address=host)
+        client = get_client(address=host)  # noqa
         ZarrDataset.dump(dst_path, ds, overwrite=overwrite)
 
     logger.info("complete zarr dataset conversion")
