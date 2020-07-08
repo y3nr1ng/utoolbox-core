@@ -3,12 +3,12 @@ import os
 
 import click
 import coloredlogs
-from dask.distributed import Client
 from prompt_toolkit.shortcuts import button_dialog
 
 from utoolbox.io import open_dataset
 from utoolbox.io.dataset import ZarrDataset
 from utoolbox.io.dataset.base import TiledDataset
+from utoolbox.util.dask import get_client
 
 __all__ = ["aszarr"]
 
@@ -124,66 +124,8 @@ def aszarr(path, verbose, remap, flip, host, output):
     else:
         dump, overwrite = True, False
 
-    class SelfSupervisedClient:
-        def __init__(self, address, jobs=1, **kwargs):
-            if jobs < 1:
-                logger.error("number of jobs must be a positive integer")
-                jobs = 1
-            self._jobs = jobs
-
-            if address == "slurm":
-                from dask_jobqueue import SLURMCluster
-
-                cluster = SLURMCluster(**kwargs)
-
-                # scalue up immediately
-                assert jobs >= 1, "number of jobs must be a positive integer"
-                cluster.scale(jobs=self.jobs)
-
-                logger.info(f"launched {self.jobs} job request(s)")
-            else:
-                cluster = address
-            self.cluster = cluster
-
-        def __enter__(self):
-            self.client = Client(self.cluster)
-            self.client.wait_for_workers(self.jobs)
-            return self
-
-        def __exit__(self, *exc):
-            self.client.close()
-            self.client = None
-
-            if self.cluster:
-                self.cluster.close()
-            self.cluster = None
-
-        ##
-
-        @property
-        def jobs(self):
-            return self._jobs
-
     if dump:
-        with SelfSupervisedClient(host, jobs=20, **ASZARR_SLURM_SPEC) as sc:
-
-            # connect to the cluster
-            client = sc.client
-            scheduler_info = client.scheduler_info()
-
-            # scheduler info
-            address = scheduler_info["address"]
-            logger.info(f"start dumping (scheduler: {address})")
-
-            # dashboard info
-            try:
-                port = scheduler_info["services"]["dashboard"]
-                address, _ = address.rsplit(":", maxsplit=1)
-                address = f"{address}:{port}"
-                logger.info(f"dashboard address: {address}")
-            except KeyError:
-                logger.warning(f"no dashboard")
-
-            ZarrDataset.dump(dst_path, ds, overwrite=overwrite)
+        client = get_client(address=host)
+        ZarrDataset.dump(dst_path, ds, overwrite=overwrite)
 
     logger.info("complete zarr dataset conversion")
