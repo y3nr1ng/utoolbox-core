@@ -312,30 +312,29 @@ class ZarrDataset(
                         checksum = calc_checksum(array)
                         checksums.append((data_dst, checksum))
 
-        client = get_client(auto_spawn=False)
+        with get_client(auto_spawn=False) as client:
+            # roughly use number of workers as batch size
+            batch_size = len(client.ncores())
 
-        # roughly use number of cores as batch size
-        batch_size = len(client.ncores())
+            n_failed = 0
+            for i in range(0, len(checksums), batch_size):
+                futures = {
+                    client.compute(checksum): data_dst
+                    for data_dst, checksum in checksums[i : i + batch_size]
+                }
+                for future in as_completed(futures.keys()):
+                    data_dst = futures[future]
+                    try:
+                        checksum = future.result()
+                    except Exception:
+                        logger.error(f'failed to serialize "{data_dst.path}"')
+                        n_failed += 1
+                    else:
+                        logger.debug(f'"{data_dst.path}" xxh64="{checksum}"')
+                        data_dst.attrs["checksum"] = checksum
 
-        n_failed = 0
-        for i in range(0, len(checksums), batch_size):
-            futures = {
-                client.compute(checksum): data_dst
-                for data_dst, checksum in checksums[i : i + batch_size]
-            }
-            for future in as_completed(futures.keys()):
-                data_dst = futures[future]
-                try:
-                    checksum = future.result()
-                except Exception:
-                    logger.error(f'failed to serialize "{data_dst.path}"')
-                    n_failed += 1
-                else:
-                    logger.debug(f'"{data_dst.path}" xxh64="{checksum}"')
-                    data_dst.attrs["checksum"] = checksum
-
-        if n_failed > 0:
-            logger.error(f"{n_failed} failed serialization task(s)")
+            if n_failed > 0:
+                logger.error(f"{n_failed} failed serialization task(s)")
 
     ##
 

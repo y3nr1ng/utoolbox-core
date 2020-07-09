@@ -1,5 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from typing import Optional
 
 from dask.distributed import Client, as_completed
@@ -25,7 +26,7 @@ ASZARR_SLURM_SPEC = {
 
 
 class ManagedCluster(ABC):
-    def __init__(self, n_workers=4, threads_per_worker=2, memory="8GB"):
+    def __init__(self, n_workers=4, threads_per_worker=2, memory="16GB"):
         self._n_workers = n_workers
         self._threads_per_worker = threads_per_worker
         self._memory = memory
@@ -65,12 +66,12 @@ class ManagedCluster(ABC):
 
     @property
     def scheduler_address(self) -> str:
-        return self.client.scheduler_info["address"]
+        return self.client.scheduler_info()["address"]
 
     @property
     def dashboard_address(self) -> Optional[str]:
         try:
-            return self.client.scheduler_info["services"]["dashboard"]
+            return self.client.scheduler_info()["services"]["dashboard"]
         except KeyError:
             return None
 
@@ -162,6 +163,7 @@ class ManagedSLURMCluster(ManagedCluster):
         self._cluster.scale(self.n_workers)
 
 
+@contextmanager
 def get_client(
     address=None, auto_spawn=True, worker_log_level="ERROR", **clustser_kwargs
 ):
@@ -172,12 +174,22 @@ def get_client(
         auto_spawn (bool, optional): automagically spawn cluster if not found
         work_log_level (str, optional): worker log level
     """
+    cluster_klass = None
     if address == "slurm":
+        # create SLURM jobs
         cluster_klass = ManagedSLURMCluster
-    else:
+    elif address is None:
+        # nothing specified, use:
+        #   - already connected client
+        #   - spawn new local cluster
         try:
             # we try to acquire current session first
-            return Client.current()
+            client = Client.current()
+
+            address = client.scheduler_info()["address"]
+            logger.info(f"connect to existing cluster (scheduler: {address})")
+
+            yield client
         except ValueError:
             # nothing exists, continue to spawn managed cluster
             if not auto_spawn:
@@ -187,6 +199,13 @@ def get_client(
 
         # local cluster needs address info
         clustser_kwargs.update({"address": address})
+    else:
+        # directly specify the scheduler to connect to
+        yield Client(address)
+
+    if not cluster_klass:
+        # nothing to spawn and manage
+        return
 
     with cluster_klass(**clustser_kwargs) as cluster:
         client = cluster.client
@@ -199,6 +218,9 @@ def get_client(
         else:
 
             def install_logger(dask_worker):
+                # we know this is annoying, silence it
+                logging.getLogger("tifffile").setLevel(logging.ERROR)
+
                 coloredlogs.install(
                     level=worker_log_level,
                     fmt="%(asctime)s %(levelname)s %(message)s",
