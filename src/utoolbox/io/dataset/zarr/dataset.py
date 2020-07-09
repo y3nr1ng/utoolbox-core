@@ -10,7 +10,7 @@ import pandas as pd
 import xxhash
 import zarr
 from dask import delayed
-from dask.distributed import as_completed
+from dask.distributed import as_completed, wait
 
 from utoolbox.util.dask import get_client
 
@@ -174,6 +174,8 @@ class ZarrDataset(
 
         checksums = []
 
+        write_back_tasks, validate_tasks = [], []
+
         # start populating the container structure
         #   /time/channel/setup/level
         # welp, i have no idea how to do this cleanly without nested structure
@@ -239,6 +241,28 @@ class ZarrDataset(
                         # 4-1) retrieve info
                         data = dataset[selected]
 
+                        # 4-2) label
+                        if label in s_root:
+                            data_dst = s_root[label]
+                            validate_tasks.append((data_dst, data))
+                        else:
+                            # never seen this label before, create new one
+                            # NOTE raw data assume to be simple dataset
+                            data_dst = s_root.empty_like(
+                                label,
+                                data,
+                                chunks=True,
+                                compression="blosc",
+                                compression_opts=dict(
+                                    cname="lz4", clevel=5, shuffle=zarr.blosc.SHUFFLE
+                                ),
+                            )
+                            write_back_tasks.append((data_dst, data))
+
+                        # update voxel size
+                        data_dst.attrs["voxel_size"] = dataset.voxel_size
+
+                        """
                         # 4-2) label
                         write_back = True
                         if label in s_root:
@@ -311,10 +335,69 @@ class ZarrDataset(
 
                         checksum = calc_checksum(array)
                         checksums.append((data_dst, checksum))
+                        """
 
         with get_client(auto_spawn=False) as client:
             # roughly use number of workers as batch size
             batch_size = len(client.ncores())
+
+            print(batch_size)
+
+            @delayed
+            def calc_checksum(array):
+                # cannot create external dependency in delayed funcs, map futures to
+                # their target groups instead
+                return xxhash.xxh64(array.compute()).hexdigest()
+
+            def match_checksum(data_dst, src_hash):
+                try:
+                    dst_hash = data_dst.attrs["checksum"]
+                except KeyError:
+                    # hash does not exist, since it is only updated when dump was
+                    # completed
+                    logger.warning(f'"{data_dst.path}" contains partial dump, rewrite')
+                else:
+                    if dst_hash == src_hash:
+                        return True
+
+                    # hash mismatch
+                    logger.warning(f'"{data_dst.path}" does not match the source')
+
+                    # reset
+                    del data_dst.attrs["checksum"]
+
+                # any other path will lead to checksum mismatch
+                return False
+
+            if not overwrite:
+                checksums = client.map(
+                    calc_checksum,
+                    [data for _, data in validate_tasks],
+                    batch_size=batch_size // 4,
+                )
+                checksums = wait(checksums)
+
+                matches = client.map(
+                    match_checksum,
+                    [data_dst for data_dst, _ in validate_tasks],
+                    checksums,
+                    batch_size=batch_size,
+                )
+
+                task_lookup = {
+                    match: task for match, task in zip(matches, validate_tasks)
+                }
+                for future, is_match in as_completed(matches, with_results=True):
+                    print(future)
+                    print(is_match)
+                    if not is_match:
+                        task = task_lookup[future]
+                        write_back_tasks.append(task)
+            else:
+                # ovewrite all validation tasks
+                write_back_tasks.extend(validate_tasks)
+
+            raise RuntimeError("DEBUG")
 
             n_failed = 0
             for i in range(0, len(checksums), batch_size):
