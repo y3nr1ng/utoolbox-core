@@ -143,7 +143,7 @@ class ManagedSLURMCluster(ManagedCluster):
         walltime (str, optional): maximum wall time
     """
 
-    def __init__(self, project="", queue="CPU", walltime="24:00:00", **kwargs):
+    def __init__(self, project="", queue="batch", walltime="24:00:00", **kwargs):
         super().__init__(**kwargs)
         self._project = project
         self._queue = queue
