@@ -159,6 +159,7 @@ class ManagedSLURMCluster(ManagedCluster):
             "project": self._project,
             "queue": self._queue,
             "walltime": self._walltime,
+            "log_directory": "/tmp",
         }
         self._cluster = SLURMCluster(**args)
         self._cluster.scale(self.n_workers)
