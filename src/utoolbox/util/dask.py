@@ -144,6 +144,7 @@ class ManagedSLURMCluster(ManagedCluster):
     """
 
     def __init__(self, project="", queue="CPU", walltime="24:00:00", **kwargs):
+        super().__init__(**kwargs)
         self._project = project
         self._queue = queue
         self._walltime = walltime
