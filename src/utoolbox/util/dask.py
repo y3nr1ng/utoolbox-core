@@ -128,7 +128,9 @@ class ManagedLocalCluster(ManagedCluster):
         from dask.distributed import LocalCluster
 
         self._cluster = LocalCluster(
-            n_workers=self.n_workers, threads_per_worker=self.threads_per_worker, memory_limit=
+            n_workers=self.n_workers,
+            threads_per_worker=self.threads_per_worker,
+            memory_limit=self.memory,
         )
 
 
