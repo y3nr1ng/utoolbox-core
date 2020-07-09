@@ -14,15 +14,6 @@ __all__ = ["aszarr"]
 
 logger = logging.getLogger("utoolbox.cli.aszarr")
 
-ASZARR_SLURM_SPEC = {
-    "cores": 8,
-    "processes": 1,
-    "memory": "32GB",
-    "project": "aszarr",
-    "queue": "CPU",  # TODO update to use merged queue
-    "walltime": "24:00:00",  # 1d
-}
-
 
 def _remap_and_flip(ds, remap, flip):
     if not isinstance(ds, TiledDataset):
