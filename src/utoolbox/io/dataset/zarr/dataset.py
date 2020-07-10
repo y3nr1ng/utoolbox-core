@@ -343,7 +343,6 @@ class ZarrDataset(
 
             print(batch_size)
 
-            @delayed
             def calc_checksum(array):
                 # cannot create external dependency in delayed funcs, map futures to
                 # their target groups instead
@@ -370,12 +369,12 @@ class ZarrDataset(
                 return False
 
             if not overwrite:
-                checksums = client.map(
-                    calc_checksum,
-                    [data for _, data in validate_tasks],
-                    batch_size=batch_size // 4,
-                )
-                checksums = wait(checksums)
+                arrays = client.scatter([data for _, data in validate_tasks])
+                checksums = client.map(calc_checksum, arrays, batch_size=2)
+                for future in as_completed(checksums):
+                    print(future)
+                    print(future.result())
+                checksums = client.gather(checksums)
 
                 matches = client.map(
                     match_checksum,
