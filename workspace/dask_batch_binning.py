@@ -63,7 +63,7 @@ def main(src_dir, binning=(4, 4, 1), host=None, n_workers=1):
 
         tasks.append(task)
 
-    with get_client(address=host, n_workers=n_workers) as client:
+    with get_client(address=host, n_workers=n_workers, threads_per_worker=8) as client:
         batch_size = len(client.ncores())
 
         n_failed = 0
@@ -78,6 +78,13 @@ def main(src_dir, binning=(4, 4, 1), host=None, n_workers=1):
         if n_failed > 0:
             logger.error(f"{n_failed} failed tasks")
 
+        # init batch
+        futures = [client.compute(task) for task in tasks[:batch_size]]
+        while futures:
+            for batch in as_completed(futures).batches():
+                for future, result in batch:
+                    pass
+
 
 @click.command
 @click.argument("src_dir", type=str)
@@ -91,8 +98,8 @@ def cli_main(*args, **kwargs):
 if __name__ == "__main__":
 
     main(
-        "C:/Users/Andy/Desktop/utoolbox/utoolbox-core/workspace/data/20200704_kidney_demo-2_CamA",
+        "/home/eric/inbox/CTsao/4F_4legs_dual_LSM/kidney/20200702_kidney_ExM_7d_old_DKO4_NKCC2_488_APQ1_647_DAPI_CamB",
         (4, 4, 1),
-        "localhost:8786",
-        4,
+        "slurm",
+        20,
     )
