@@ -1,7 +1,7 @@
 import logging
 import os
 from collections import defaultdict
-from itertools import chain
+from itertools import chain, groupby
 from typing import List, Optional, Tuple
 
 import dask.array as da
@@ -170,11 +170,8 @@ class ZarrDataset(
         if path:
             root = root.open_group(path, mode="w")
 
-        hash_gen = xxhash.xxh64()
-
         checksums = []
-
-        write_back_tasks, validate_tasks = [], []
+        validate_tasks, writeback_tasks = [], []
 
         # start populating the container structure
         #   /time/channel/setup/level
@@ -257,7 +254,7 @@ class ZarrDataset(
                                     cname="lz4", clevel=5, shuffle=zarr.blosc.SHUFFLE
                                 ),
                             )
-                            write_back_tasks.append((data_dst, data))
+                            writeback_tasks.append((data_dst, data))
 
                         # update voxel size
                         data_dst.attrs["voxel_size"] = dataset.voxel_size
@@ -341,82 +338,112 @@ class ZarrDataset(
             # roughly use number of workers as batch size
             batch_size = len(client.ncores())
 
-            print(batch_size)
+            ##
 
-            def calc_checksum(array):
-                # cannot create external dependency in delayed funcs, map futures to
-                # their target groups instead
-                return xxhash.xxh64(array.compute()).hexdigest()
-
-            def match_checksum(data_dst, src_hash):
+            def validate(data_dst, data):
+                match = False
                 try:
-                    dst_hash = data_dst.attrs["checksum"]
+                    dst_checksum = data_dst.attrs["checksum"]
                 except KeyError:
-                    # hash does not exist, since it is only updated when dump was
+                    # checksum does not exist, since it is only updated when dump was
                     # completed
                     logger.warning(f'"{data_dst.path}" contains partial dump, rewrite')
                 else:
-                    if dst_hash == src_hash:
-                        return True
+                    src_checksum = xxhash.xxh64(data.compute()).hexdigest()
+                    if dst_checksum == src_checksum:
+                        match = True
+                    else:
+                        # checksum mismatch, reset
+                        logger.warning(f'"{data_dst.path}" does not match the source')
+                        del data_dst.attrs["checksum"]
 
-                    # hash mismatch
-                    logger.warning(f'"{data_dst.path}" does not match the source')
+                return match, (data_dst, data)
 
-                    # reset
-                    del data_dst.attrs["checksum"]
+            def all_equal(iterable):
+                """
+                Returns True if all the elements are equal.
+                
+                Reference:
+                    Add "equal" builtin function
+                    https://mail.python.org/pipermail/python-ideas/2016-October/042734.
+                    html
+                """
+                groups = groupby(iterable)
+                return next(groups, True) and not next(groups, False)
 
-                # any other path will lead to checksum mismatch
-                return False
+            def batch_submit(
+                func, *iterables, batch_size=1, with_results=False, **kwargs
+            ):
+                if not all_equal(len(iterable) for iterable in iterables):
+                    raise ValueError("iterables does not have the same length")
 
-            if not overwrite:
-                arrays = client.scatter([data for _, data in validate_tasks])
-                checksums = client.map(calc_checksum, arrays, batch_size=2)
-                for future in as_completed(checksums):
-                    print(future)
-                    print(future.result())
-                checksums = client.gather(checksums)
+                # jump start
+                iterables = zip(*iterables)
+                futures = []
+                for i in range(batch_size):
+                    try:
+                        futures.append(client.submit(func, *next(iterables)))
+                    except StopIteration:
+                        logger.warning(
+                            f"batch size ({batch_size}) is larger than number of iterable elements"
+                        )
+                        break
 
-                matches = client.map(
-                    match_checksum,
-                    [data_dst for data_dst, _ in validate_tasks],
-                    checksums,
-                    batch_size=batch_size,
+                if with_results:
+                    results = []
+                queue = as_completed(futures, with_results=False)
+                while queue.count():
+                    for batches in queue.batches():
+                        n = len(batches)
+                        for future in batches:
+                            try:
+                                result = future.result()  # TODO change this to yield
+                            except Exception:
+                                logger.exception("something failed")
+                                result = None
+
+                            if with_results:
+                                results.append(result)
+                            del future  # release the future
+                        for i in range(n):
+                            try:
+                                queue.add(client.submit(func, *next(iterables)))
+                            except StopIteration:
+                                logger.debug(f"no more task to submit")
+                                break
+                if with_results:
+                    return results
+
+            data_dst, data = zip(*validate_tasks)
+            matches = batch_submit(
+                validate, data_dst, data, batch_size=batch_size, with_results=True
+            )
+            for match, task in matches:
+                if not match:
+                    writeback_tasks.append(task)
+
+            logger.info(f"{len(writeback_tasks)} task(s) to write-back")
+
+            def writeback(data_dst, data):
+                data_src = data.rechunk(data_dst.chunks)
+                data = data_src.to_zarr(
+                    data_dst,
+                    overwrite=True,
+                    compute=True,  # use delayed to submit result in batches
+                    return_stored=True,  # need this for downstream checksum wb
                 )
 
-                task_lookup = {
-                    match: task for match, task in zip(matches, validate_tasks)
-                }
-                for future, is_match in as_completed(matches, with_results=True):
-                    print(future)
-                    print(is_match)
-                    if not is_match:
-                        task = task_lookup[future]
-                        write_back_tasks.append(task)
-            else:
-                # ovewrite all validation tasks
-                write_back_tasks.extend(validate_tasks)
+                dst_checksum = xxhash.xxh64(data.compute()).hexdigest()
+                data_dst.attrs["checksum"] = dst_checksum
 
-            raise RuntimeError("DEBUG")
+                return data_dst.path, dst_checksum
 
-            n_failed = 0
-            for i in range(0, len(checksums), batch_size):
-                futures = {
-                    client.compute(checksum): data_dst
-                    for data_dst, checksum in checksums[i : i + batch_size]
-                }
-                for future in as_completed(futures.keys()):
-                    data_dst = futures[future]
-                    try:
-                        checksum = future.result()
-                    except Exception:
-                        logger.error(f'failed to serialize "{data_dst.path}"')
-                        n_failed += 1
-                    else:
-                        logger.debug(f'"{data_dst.path}" xxh64="{checksum}"')
-                        data_dst.attrs["checksum"] = checksum
-
-            if n_failed > 0:
-                logger.error(f"{n_failed} failed serialization task(s)")
+            data_dst, data = zip(*writeback_tasks)
+            matches = batch_submit(
+                writeback, data_dst, data, batch_size=batch_size, with_results=True
+            )
+            for path, checksum in matches:
+                logger.debug(f"{path}, {checksum}")
 
     ##
 
