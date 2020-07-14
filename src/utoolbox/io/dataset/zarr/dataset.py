@@ -1,7 +1,7 @@
 import logging
 import os
 from collections import defaultdict
-from itertools import chain, groupby
+from itertools import chain
 from typing import List, Optional, Tuple
 
 import dask.array as da
@@ -10,9 +10,8 @@ import pandas as pd
 import xxhash
 import zarr
 from dask import delayed
-from dask.distributed import as_completed, wait
 
-from utoolbox.util.dask import get_client
+from utoolbox.util.dask import get_client, batch_submit
 
 from ..base import (
     DenseDataset,
@@ -334,114 +333,53 @@ class ZarrDataset(
                         checksums.append((data_dst, checksum))
                         """
 
-        with get_client(auto_spawn=False) as client:
-            # roughly use number of workers as batch size
-            batch_size = len(client.ncores())
-
-            ##
-
-            def validate(data_dst, data):
-                match = False
-                try:
-                    dst_checksum = data_dst.attrs["checksum"]
-                except KeyError:
-                    # checksum does not exist, since it is only updated when dump was
-                    # completed
-                    logger.warning(f'"{data_dst.path}" contains partial dump, rewrite')
+        def validate(data_dst, data):
+            match = False
+            try:
+                dst_checksum = data_dst.attrs["checksum"]
+            except KeyError:
+                # checksum does not exist, since it is only updated when dump was
+                # completed
+                logger.warning(f'"{data_dst.path}" contains partial dump, rewrite')
+            else:
+                src_checksum = xxhash.xxh64(data.compute()).hexdigest()
+                if dst_checksum == src_checksum:
+                    match = True
                 else:
-                    src_checksum = xxhash.xxh64(data.compute()).hexdigest()
-                    if dst_checksum == src_checksum:
-                        match = True
-                    else:
-                        # checksum mismatch, reset
-                        logger.warning(f'"{data_dst.path}" does not match the source')
-                        del data_dst.attrs["checksum"]
+                    # checksum mismatch, reset
+                    logger.warning(f'"{data_dst.path}" does not match the source')
+                    del data_dst.attrs["checksum"]
 
-                return match, (data_dst, data)
+            return match, (data_dst, data)
 
-            def all_equal(iterable):
-                """
-                Returns True if all the elements are equal.
-                
-                Reference:
-                    Add "equal" builtin function
-                    https://mail.python.org/pipermail/python-ideas/2016-October/042734.
-                    html
-                """
-                groups = groupby(iterable)
-                return next(groups, True) and not next(groups, False)
-
-            def batch_submit(
-                func, *iterables, batch_size=1, with_results=False, **kwargs
-            ):
-                if not all_equal(len(iterable) for iterable in iterables):
-                    raise ValueError("iterables does not have the same length")
-
-                # jump start
-                iterables = zip(*iterables)
-                futures = []
-                for i in range(batch_size):
-                    try:
-                        futures.append(client.submit(func, *next(iterables)))
-                    except StopIteration:
-                        logger.warning(
-                            f"batch size ({batch_size}) is larger than number of iterable elements"
-                        )
-                        break
-
-                if with_results:
-                    results = []
-                queue = as_completed(futures, with_results=False)
-                while queue.count():
-                    for batches in queue.batches():
-                        n = len(batches)
-                        for future in batches:
-                            try:
-                                result = future.result()  # TODO change this to yield
-                            except Exception:
-                                logger.exception("something failed")
-                                result = None
-
-                            if with_results:
-                                results.append(result)
-                            del future  # release the future
-                        for i in range(n):
-                            try:
-                                queue.add(client.submit(func, *next(iterables)))
-                            except StopIteration:
-                                logger.debug(f"no more task to submit")
-                                break
-                if with_results:
-                    return results
+        if validate_tasks:
+            logger.info(f"{len(validate_tasks)} task(s) to validate")
 
             data_dst, data = zip(*validate_tasks)
-            matches = batch_submit(
-                validate, data_dst, data, batch_size=batch_size, with_results=True
-            )
+            matches = batch_submit(validate, data_dst, data, return_results=True)
             for match, task in matches:
                 if not match:
                     writeback_tasks.append(task)
 
+        def writeback(data_dst, data):
+            data_src = data.rechunk(data_dst.chunks)
+            data = data_src.to_zarr(
+                data_dst,
+                overwrite=True,
+                compute=True,  # use delayed to submit result in batches
+                return_stored=True,  # need this for downstream checksum wb
+            )
+
+            dst_checksum = xxhash.xxh64(data.compute()).hexdigest()
+            data_dst.attrs["checksum"] = dst_checksum
+
+            return data_dst.path, dst_checksum
+
+        if writeback_tasks:
             logger.info(f"{len(writeback_tasks)} task(s) to write-back")
 
-            def writeback(data_dst, data):
-                data_src = data.rechunk(data_dst.chunks)
-                data = data_src.to_zarr(
-                    data_dst,
-                    overwrite=True,
-                    compute=True,  # use delayed to submit result in batches
-                    return_stored=True,  # need this for downstream checksum wb
-                )
-
-                dst_checksum = xxhash.xxh64(data.compute()).hexdigest()
-                data_dst.attrs["checksum"] = dst_checksum
-
-                return data_dst.path, dst_checksum
-
             data_dst, data = zip(*writeback_tasks)
-            matches = batch_submit(
-                writeback, data_dst, data, batch_size=batch_size, with_results=True
-            )
+            matches = batch_submit(writeback, data_dst, data, return_results=True)
             for path, checksum in matches:
                 logger.debug(f"{path}, {checksum}")
 

@@ -2,25 +2,20 @@ import logging
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from typing import Optional
-
+from itertools import groupby
 from dask.distributed import Client, as_completed
 
-__all__ = ["get_client", "wait_futures"]
+__all__ = ["get_client", "batch_submit"]
 
 logger = logging.getLogger("utoolbox.util.dask")
 
-DEFAULT_WORKER_OPTIONS = {
-    "memory_target_fraction": 0.5,
-    "memory_spill_fraction": False,
-    "memory_pause_fraction": 0.75,
-}
 
 ASZARR_SLURM_SPEC = {
     "cores": 8,
     "processes": 1,
     "memory": "32GB",
     "project": "aszarr",
-    "queue": "CPU",  # TODO update to use merged queue
+    "queue": "batch",
     "walltime": "24:00:00",  # 1d
 }
 
@@ -119,6 +114,12 @@ class ManagedCluster(ABC):
 
 
 class ManagedLocalCluster(ManagedCluster):
+    DEFAULT_WORKER_OPTIONS = {
+        "memory_target_fraction": 0.6,
+        "memory_spill_fraction": False,
+        "memory_pause_fraction": 0.75,
+    }
+
     def __init__(self, address=None, n_workers=None, threads_per_worker=None, **kwargs):
         # default to utilize all cores on local system
         super().__init__(
@@ -132,6 +133,7 @@ class ManagedLocalCluster(ManagedCluster):
             n_workers=self.n_workers,
             threads_per_worker=self.threads_per_worker,
             memory_limit=self.memory,
+            **self.DEFAULT_WORKER_OPTIONS,
         )
 
 
@@ -167,7 +169,7 @@ class ManagedSLURMCluster(ManagedCluster):
 
 @contextmanager
 def get_client(
-    address=None, auto_spawn=True, worker_log_level="ERROR", **clustser_kwargs
+    address=None, auto_spawn=True, worker_log_level="ERROR", **clustser_kwargs,
 ):
     """
     Args:
@@ -176,7 +178,7 @@ def get_client(
         auto_spawn (bool, optional): automagically spawn cluster if not found
         work_log_level (str, optional): worker log level
     """
-    cluster_klass = None
+    cluster_klass, client = None, None
     if address == "slurm":
         # create SLURM jobs
         cluster_klass = ManagedSLURMCluster
@@ -192,21 +194,26 @@ def get_client(
             logger.info(f"connect to existing cluster (scheduler: {address})")
 
             yield client
+            # NOTE we do NOT close client when using this method, managed by others
         except ValueError:
             # nothing exists, continue to spawn managed cluster
             if not auto_spawn:
                 raise RuntimeError("please spawn a dask cluster first")
 
-        cluster_klass = ManagedLocalCluster
+            cluster_klass = ManagedLocalCluster
 
-        # local cluster needs address info
-        clustser_kwargs.update({"address": address})
+            # local cluster needs address info
+            clustser_kwargs.update({"address": address})
     else:
         # directly specify the scheduler to connect to
-        yield Client(address)
+        client = Client(address)
+
+        yield client
+        client.close()
+        # NOTE we open this client, therefore, we need to close it ourself
 
     if not cluster_klass:
-        # nothing to spawn and manage
+        # no need to spawn a cluster
         return
 
     with cluster_klass(**clustser_kwargs) as cluster:
@@ -235,34 +242,70 @@ def get_client(
         yield client
 
 
-def wait_futures(futures, return_failed=False, show_bar=True):
+def all_equal(iterable):
     """
-    Monitor all the futures and return failed futures.
-
-    Args:
-        futures (list of Futures): list of futures
+    Returns True if all the elements are equal.
+    
+    Reference:
+        Add "equal" builtin function
+        https://mail.python.org/pipermail/python-ideas/2016-October/042734.html
     """
-    iterator = as_completed(futures)
-    if show_bar:
-        try:
-            from tqdm import tqdm
-        except ImportError:
-            logger.warning('requires "tqdm" to show progress bar')
-        else:
-            iterator = tqdm(iterator, total=len(futures))
+    groups = groupby(iterable)
+    return next(groups, True) and not next(groups, False)
 
-    failed_futures = []
-    for future in iterator:
-        try:
-            future.result()
-        except Exception as error:
-            logger.exception(error)
-            failed_futures.append(future)
 
-        del future  # release
+def batch_submit(
+    func,
+    *iterables,
+    batch_size=None,
+    return_results=False,
+    raise_error=False,
+    **kwargs,
+):
+    if not all_equal(len(iterable) for iterable in iterables):
+        raise ValueError("iterables does not have the same length")
 
-    if failed_futures:
-        logger.error(f"{len(failed_futures)} task(s) failed")
+    with get_client(auto_spawn=False) as client:
+        batch_size = batch_size if batch_size is not None else len(client.ncores())
+        logger.debug(f"batch_submit using batch_size={batch_size}")
 
-    if return_failed:
-        return failed_futures
+        # jump start
+        iterables = zip(*iterables)
+        futures = []
+        for i in range(batch_size):
+            try:
+                futures.append(client.submit(func, *next(iterables), **kwargs))
+            except StopIteration:
+                logger.warning(
+                    f"batch size ({batch_size}) is larger than number of iterable elements"
+                )
+                break
+
+        if return_results:
+            results = []
+        queue = as_completed(futures, with_results=False)
+        while queue.count():
+            for batches in queue.batches():
+                n = len(batches)
+                for future in batches:
+                    try:
+                        result = future.result()
+                    except Exception as err:
+                        if raise_error:
+                            raise
+                        elif return_results:
+                            result = err
+
+                    if return_results:
+                        results.append(result)
+                    del future  # release the future
+
+                # submit new task if there is any
+                for i in range(n):
+                    try:
+                        queue.add(client.submit(func, *next(iterables), **kwargs))
+                    except StopIteration:
+                        break
+        if return_results:
+            return results
+
