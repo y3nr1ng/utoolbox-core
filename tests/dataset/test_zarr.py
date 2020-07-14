@@ -29,13 +29,13 @@ def test_dump_from_latticescope(ds_src_dir, ds_dst_dir, overwrite=False):
         ZarrDataset.dump(ds_dst_dir, ds_src, overwrite=overwrite)
 
 
-def test_load(ds_src_dir, ds_dst_dir, client=None):
+def test_load(ds_src_dir, ds_dst_dir):
     ds_dst = ZarrDataset.load(ds_dst_dir)
 
     print(ds_dst.labels)
 
 
-def test_mutable(ds_src_dir, ds_dst_dir, client=None):
+def test_mutable(ds_src_dir, ds_dst_dir):
     print(ds_dst_dir)
     if False:
         ds = MutableZarrDataset.load(ds_dst_dir)
@@ -60,9 +60,10 @@ def test_mutable(ds_src_dir, ds_dst_dir, client=None):
         if False:
             del ds[uuid]
         else:
-            ds[uuid] = array.max(axis=0)
+            ds[uuid] = array.max(axis=0)  # TODO wrap in delayed future -> batch_submit
 
     return
+
     # reload
     logger.info(f'reload dataset with "{store_as}"')
     ds = ZarrDataset.load(ds_dst_dir, label=store_as)
@@ -94,4 +95,5 @@ if __name__ == "__main__":
     ds_src_dir = "c:/users/andy/desktop/utoolbox/utoolbox-core/workspace/data/20200704_kidney_demo-2_CamA"
     ds_dst_dir = f"{ds_src_dir}.zarr"
 
-    test_dump_from_latticescope(ds_src_dir, ds_dst_dir)
+    with get_client(address="localhost:8786"):
+        test_mutable(ds_src_dir, ds_dst_dir)
