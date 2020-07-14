@@ -7,9 +7,8 @@ import dask.array as da
 import imageio
 import numpy as np
 from dask import delayed
-from dask.distributed import as_completed
 import coloredlogs
-from utoolbox.util.dask import get_client
+from utoolbox.util.dask import get_client, batch_submit
 
 logger = logging.getLogger("dask_batch_binning")
 
@@ -63,9 +62,26 @@ def main(src_dir, binning=(4, 4, 1), host=None, n_workers=1):
 
         tasks.append(task)
 
-    with get_client(address=host, n_workers=n_workers, threads_per_worker=8) as client:
-        batch_size = len(client.ncores())
+    def downsample(src_path, dst_path=None):
+        if dst_path is None:
+            fname = os.path.basename(src_path)
+            dst_path = os.path.join(dst_dir, fname)
 
+        # extract
+        array = volread_da(src_path)
+        # transform
+        array = array[sampler]
+        # load
+        imageio.volwrite(dst_path, array)
+
+        return dst_path
+
+    with get_client(address=host, n_workers=n_workers, threads_per_worker=8):
+        dst_path = batch_submit(downsample, file_list, return_results=True)
+        for i, path in enumerate(dst_path):
+            print(f"{i+1}/{len(file_list)}, {os.path.basename(path)}")
+
+        """
         n_failed = 0
         for i in range(0, len(tasks), batch_size):
             futures = [client.compute(task) for task in tasks[i : i + batch_size]]
@@ -84,22 +100,26 @@ def main(src_dir, binning=(4, 4, 1), host=None, n_workers=1):
             for batch in as_completed(futures).batches():
                 for future, result in batch:
                     pass
+        """
 
 
-@click.command
+@click.command()
 @click.argument("src_dir", type=str)
 @click.option("-b", "--binning", nargs=3, type=int, default=(4, 4, 1))
 @click.option("-h", "--host", type=str, default="slurm")
 @click.option("-n", "--n_workers", type=int, default=4)
-def cli_main(*args, **kwargs):
-    main(*args, **kwargs)
+def cli_main(src_dir, binning, host, n_workers):
+    main(src_dir, binning, host, n_workers)
 
 
 if __name__ == "__main__":
+    cli_main()
 
+    """
     main(
         "/home/eric/inbox/CTsao/4F_4legs_dual_LSM/kidney/20200702_kidney_ExM_7d_old_DKO4_NKCC2_488_APQ1_647_DAPI_CamB",
         (4, 4, 1),
         "slurm",
         20,
     )
+    """
