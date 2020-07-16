@@ -267,7 +267,7 @@ def batch_submit(
 
     with get_client(auto_spawn=False) as client:
         batch_size = batch_size if batch_size is not None else len(client.ncores())
-        logger.debug(f"batch_submit using batch_size={batch_size}")
+        logger.debug(f"batch submission, size={batch_size}")
 
         # jump start
         iterables = zip(*iterables)

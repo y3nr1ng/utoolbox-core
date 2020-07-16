@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import logging
+from abc import ABC, abstractmethod
 from typing import Tuple
 
 __all__ = ["Dataset"]
@@ -64,4 +67,51 @@ class Dataset:
         pass
 
     def get_writer(self, request):
+        pass
+
+    ##
+
+    class BaseReaderWriter(ABC):
+        def __init__(self, dataset: Dataset):
+            self._dataset = dataset
+
+            # is this reader/writer op already terminated?
+            self._closed = False
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            pass
+
+        ##
+
+        @property
+        def closed(self) -> bool:
+            """Whether the reader/writer is closed."""
+            return self._closed
+
+        @property
+        def dataset(self) -> Dataset:
+            """The dataset object corresponding to current read/write operation."""
+            return self._dataset
+
+        ##
+
+        @abstractmethod
+        def open(self):
+            pass
+
+        @abstractmethod
+        def close(self):
+            pass
+
+    class Reader(BaseReaderWriter):
+        def __iter__(self):
+            pass
+
+        def __len__(self):
+            pass
+
+    class Writer(BaseReaderWriter):
         pass
