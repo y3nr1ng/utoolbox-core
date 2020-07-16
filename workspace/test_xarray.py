@@ -90,6 +90,13 @@ def main(src_dir):
     )
     """
 
+    # generate pyramids
+    r = 1
+    for _ in range(3):
+        r *= 2
+        sampler = (slice(None, None, r),) * 2 + (slice(None),)
+        sampler = {k: s for k, s in zip("xyz", sampler)}
+        dataset[f"bin{r}"] = dataset["raw"][sampler]
     dataset["mip_xy"] = dataset["raw"].max("z")
 
     mip_dataset = dataset["mip_xy"][dataset.grid_z == 0]
