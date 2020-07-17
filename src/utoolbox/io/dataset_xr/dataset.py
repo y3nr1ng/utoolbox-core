@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Tuple
 from pathlib import Path
+from typing import Any, Dict, Tuple
 
 __all__ = ["Dataset", "DatasetFormatManager"]
 
@@ -11,6 +11,11 @@ logger = logging.getLogger("utoolbox.io.dataset")
 
 
 class Dataset(ABC):
+    def __init__(self):
+        pass
+
+
+class Format(ABC):
     """
     Represents an implementation to read/write a particular dataset format.
 
@@ -43,11 +48,11 @@ class Dataset(ABC):
 
     ##
 
-    def get_reader(self, uri: Path):
-        return self.Reader(self, uri)
+    def get_reader(self, uri: Path, **kwargs):
+        return self.Reader(self, uri, **kwargs)
 
-    def get_writer(self, uri: Path):
-        return self.Writer(self, uri)
+    def get_writer(self, uri: Path, **kwargs):
+        return self.Writer(self, uri, **kwargs)
 
     @abstractmethod
     def can_read(self, uri: Path) -> bool:
@@ -75,19 +80,18 @@ class Dataset(ABC):
         functions.
         """
 
-        def __init__(self, dataset: Dataset, uri: Path, **kwargs):
-            self._dataset = dataset
+        def __init__(self, format: Format, uri: Path, **kwargs):
+            self._format = format
             self._uri = Path(uri)
 
             # is this reader/writer op already terminated?
             self._closed = False
 
             # open the dataset
-            self.open(**kwargs)
+            self.open(**kwargs)  # TODO move open() to __enter__
 
         def __enter__(self):
-            if self.closed:
-                raise RuntimeError(f"{self.uri} is already closed")
+            self._assert_closed()
             return self
 
         def __exit__(self, *exc):
@@ -101,9 +105,9 @@ class Dataset(ABC):
             return self._closed
 
         @property
-        def dataset(self) -> Dataset:
+        def format(self) -> Format:
             """The dataset object corresponding to current read/write operation."""
-            return self._dataset
+            return self._format
 
         @property
         def uri(self) -> Path:
@@ -128,6 +132,25 @@ class Dataset(ABC):
 
         ##
 
+        def get_index(self):
+            pass
+
+        @abstractmethod
+        def set_index(self, **index):
+            """
+            Set the internal pointer such that the next to :func:`.get_next_data()` 
+            returns the data specified this index.
+            
+            Args:
+                **index : TBD
+            """
+
+        ##
+
+        def _assert_closed(self):
+            if self.closed:
+                raise RuntimeError(f"{self.uri} is already closed")
+
         def _close(self):
             """
             Wrapper function for the actual :func:`.close`. Therefore, close has no
@@ -146,9 +169,41 @@ class Dataset(ABC):
         """
 
         def __iter__(self):
+            self._assert_closed()
+            # TODO loop over all the data by setting index sequentially
+
+        @abstractmethod
+        def __len__(self):
+            """Get the number of data in the dataset."""
+
+        ##
+
+        @abstractmethod
+        def get_data(self, **index):
+            """
+            Read data from the dataset using provided multi-dimensional index.
+
+            Args:
+                **index : TBD
+            """
+
+        @abstractmethod
+        def get_next_data(self):
+            """
+            Return the next data from the series.
+
+            TODO how to specify dimensional order?
+            """
             pass
 
-        def __len__(self):
+        @abstractmethod
+        def get_metadata(self, **index):
+            """
+            Read metadata of the data at provided index. If the index is None, this returns the global metadata.
+
+            Args:
+                **index : TBD
+            """
             pass
 
     class Writer(BaseReaderWriter):
@@ -157,8 +212,20 @@ class Dataset(ABC):
         should be obtained by calling :func:`.get_writer`.
         """
 
+        @abstractmethod
+        def set_data(self, data, **index):
+            pass
 
-class LatticeScopeDataset(Dataset):
+        @abstractmethod
+        def append_data(self, data):
+            pass
+
+        @abstractmethod
+        def set_metadata(self, data: Dict[str, Any]):
+            pass
+
+
+class ZarrDataset(Dataset):
     def can_read(self, uri):
         pass
 
@@ -166,18 +233,41 @@ class LatticeScopeDataset(Dataset):
         pass
 
     class Reader(Dataset.Reader):
-        pass
+        def __len__(self):
+            pass
+
+        ##
+
+        def open(self, **kwargs):
+            pass
+
+        def close(self):
+            pass
+
+        ##
+
+        def get_data(self, **index):
+            pass
+
+        def get_next_data(self):
+            pass
+
+        def get_metadata(self, **index):
+            pass
+
+        def set_index(self, **index):
+            pass
 
     class Writer(Dataset.Writer):
         pass
 
 
-class DatasetFormatManager:
+class FormatManager:
     def __init__(self):
         self._formats = []
 
     def __repr__(self):
-        return f"<DatasetFormatManager, {len(self)} registered formats>"
+        return f"<FormatManager, {len(self)} registered formats>"
 
     def __iter__(self):
         return iter(self._formats)
@@ -188,7 +278,7 @@ class DatasetFormatManager:
     ##
 
     def add_format(self, format, overwrite=False):
-        if not isinstance(format, Dataset):
+        if not isinstance(format, Format):
             pass
 
     def search_read_format(self, uri):
