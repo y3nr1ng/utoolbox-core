@@ -20,11 +20,11 @@ class Dataset:
 
         # the actual dataset instance
         self._data = None
-        
+
         if not isinstance(mode, str):
-            raise ValueError('mode should be a string')
+            raise ValueError("mode should be a string")
         self._mode = mode
-        
+
         self._parse_uri(uri)
 
     ##
@@ -43,15 +43,16 @@ class Dataset:
     def extension(self) -> str:
         """
         Extension of the requested filename.
-
-        This can be an empty string if the request is not based on a filename.
+        
+        Note:
+            This can be an empty string if the request is not based on a filename.
         """
         return self._extension
 
     @property
     def mode(self) -> str:
         """
-        The mode of the request. 
+        Access mode of this dataset request.
 
         TBD
         """

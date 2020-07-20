@@ -4,7 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, Tuple
-
+from .dataset import Dataset
 
 logger = logging.getLogger("utoolbox.io.dataset.format")
 
@@ -42,28 +42,28 @@ class Format(ABC):
 
     ##
 
-    def get_reader(self, uri: Path, **kwargs):
-        return self.Reader(self, uri, **kwargs)
+    def get_reader(self, dataset: Dataset, **kwargs):
+        return self.Reader(self, dataset, **kwargs)
 
-    def get_writer(self, uri: Path, **kwargs):
-        return self.Writer(self, uri, **kwargs)
-
-    @abstractmethod
-    def can_read(self, uri: Path) -> bool:
-        """
-        Whether this dataset can read data from the specified uri.
-
-        Args:
-            uri (Path): path to the dataset
-        """
+    def get_writer(self, dataset: Dataset, **kwargs):
+        return self.Writer(self, dataset, **kwargs)
 
     @abstractmethod
-    def can_write(self, uri: Path) -> bool:
+    def can_read(self, dataset: Dataset) -> bool:
         """
-        Whether this dataset can write data to the specified uri.
+        Whether this dataset can read data from the specified dataset object.
 
         Args:
-            uri (Path): path to the dataset
+            dataset (Dataset): dataset of interest
+        """
+
+    @abstractmethod
+    def can_write(self, dataset: Dataset) -> bool:
+        """
+        Whether this dataset can write data to the specified dataset object.
+
+        Args:
+            dataset (Dataset): dataset of interest
         """
 
     ##
@@ -74,9 +74,9 @@ class Format(ABC):
         functions.
         """
 
-        def __init__(self, format: Format, uri: Path, **kwargs):
+        def __init__(self, format: Format, dataset: Dataset, **kwargs):
             self._format = format
-            self._uri = Path(uri)
+            self._dataset = dataset
 
             # is this reader/writer op already terminated?
             self._closed = False
@@ -104,9 +104,9 @@ class Format(ABC):
             return self._format
 
         @property
-        def uri(self) -> Path:
+        def dataset(self) -> Dataset:
             """The uri to dataset corresponding to current read/write operation."""
-            return self._uri
+            return self._dataset
 
         ##
 
@@ -118,11 +118,18 @@ class Format(ABC):
             work with.
             """
 
-        @abstractmethod
         def close(self):
             """
-            Called when the reader/writer is closed.
+            Called when the reader/writer is closed. 
+
+            Note:
+                It has no effect if the dataset is already closed.
             """
+            if self.closed:
+                return
+
+            self._closed = True
+            self._close()
 
         ##
 
@@ -143,18 +150,11 @@ class Format(ABC):
 
         def _assert_closed(self):
             if self.closed:
-                raise RuntimeError(f"{self.uri} is already closed")
+                cname = type(self.dataset).__name__
+                raise RuntimeError(f"{cname} is already closed")
 
         def _close(self):
-            """
-            Wrapper function for the actual :func:`.close`. Therefore, close has no
-            effect if it is already closed.
-            """
-            if self.closed:
-                return
-
-            self._closed = True
-            self.close()
+            """Cleanup resources used during dataset access."""
 
     class Reader(BaseReaderWriter):
         """
