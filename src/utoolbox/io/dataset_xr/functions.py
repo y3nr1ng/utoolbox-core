@@ -1,8 +1,11 @@
 from contextlib import contextmanager
 
+from .dataset import Dataset
+from ... import formats
+
 
 @contextmanager
-def open_dataset(uri, mode, **kwargs):
+def open_dataset(uri, mode="r", format=None, **kwargs):
     """
     Open a dataset and clean up resource after use automagically.
 
@@ -11,3 +14,10 @@ def open_dataset(uri, mode, **kwargs):
         mode (str) : TBD
         **kwargs : TBD
     """
+    dataset = Dataset(uri, mode, **kwargs)
+
+    # get format
+    if format is not None:
+        format = formats[format]
+    else:
+        format = format.search_

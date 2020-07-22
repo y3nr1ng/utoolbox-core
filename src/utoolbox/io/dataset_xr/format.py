@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
+
 from .dataset import Dataset
 
 logger = logging.getLogger("utoolbox.io.dataset.format")
@@ -219,43 +219,6 @@ class Format(ABC):
             pass
 
 
-class ZarrDataset(Dataset):
-    def can_read(self, uri):
-        pass
-
-    def can_write(self, uri):
-        pass
-
-    class Reader(Dataset.Reader):
-        def __len__(self):
-            pass
-
-        ##
-
-        def open(self, **kwargs):
-            pass
-
-        def close(self):
-            pass
-
-        ##
-
-        def get_data(self, **index):
-            pass
-
-        def get_next_data(self):
-            pass
-
-        def get_metadata(self, **index):
-            pass
-
-        def set_index(self, **index):
-            pass
-
-    class Writer(Dataset.Writer):
-        pass
-
-
 class FormatManager:
     def __init__(self):
         self._formats = []
@@ -269,11 +232,29 @@ class FormatManager:
     def __len__(self):
         return len(self._formats)
 
+    def __str__(self):
+        ss = []
+        for format in self:
+            s = f"{format.name} - {format.description}"
+            ss.append(s)
+        return "\n".join(ss)
+
     ##
 
     def add_format(self, format, overwrite=False):
         if not isinstance(format, Format):
-            pass
+            raise TypeError("add_format needs argument to be a Format object")
+        elif format in self._formats:
+            raise ValueError("format is already registered")
+        elif format.name in self.get_format_names():
+            if overwrite:
+                # TODO overwrite existing format
+                pass
+            else:
+                raise ValueError(
+                    f'format with name "{format.name}" is already registered'
+                )
+        self._formats.append(format)
 
     def search_read_format(self, uri):
         """
@@ -297,9 +278,9 @@ class FormatManager:
             if f.can_write(uri):
                 return f
 
-    def get_format_names(self) -> Tuple[str]:
-        return tuple(f.name for f in self)
+    def get_format_names(self) -> List[str]:
+        return [f.name for f in self]
 
     def show(self):
         """Show formatted list of available formats."""
-        raise NotImplementedError
+        print(self)

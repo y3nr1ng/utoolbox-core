@@ -6,10 +6,10 @@ range of image data.
 """
 # flake8: noqa
 
-from .dataset import DatasetFormatManager
+from .format import FormatManager
 
 # instantiate format manager as singleton
-formats = DatasetFormatManager()
+formats = FormatManager()
 
 # load the functions
 # TODO
@@ -18,4 +18,4 @@ formats = DatasetFormatManager()
 from . import datasets
 
 # namespace cleanup
-del DatasetFormatManager
+del FormatManager
