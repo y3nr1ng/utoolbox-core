@@ -1,4 +1,9 @@
-from utoolbox.io.dastaset_xr import open_dataset
+from utoolbox.io.dataset_xr import formats
+print(formats)
 
-path = "data/20200704_kidney_demo-2_CamA"
+from utoolbox.io.dataset_xr import open_dataset
+
+path = "utoolbox-core/workspace/data/20200704_kidney_demo-2_CamA"
 dataset = open_dataset(path, "r")
+
+raise RuntimeError('DEBUG')

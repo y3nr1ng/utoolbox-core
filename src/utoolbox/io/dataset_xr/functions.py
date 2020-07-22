@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 
+from . import formats
 from .dataset import Dataset
-from ... import formats
 
 
 @contextmanager
@@ -16,8 +16,18 @@ def open_dataset(uri, mode="r", format=None, **kwargs):
     """
     dataset = Dataset(uri, mode, **kwargs)
 
-    # get format
     if format is not None:
+        # we know the format
         format = formats[format]
+        get_reader, get_writer = format.get_reader, format.get_writer
     else:
-        format = format.search_
+        # search the format
+        get_reader, get_writer = formats.search_read_format, formats.search_write_format
+
+    # TODO use instance attribute to attach reader/writer/indexers
+    if "r" in mode:
+        dataset.reader = get_reader(dataset, **kwargs)
+    if "w" in mode or "a" in mode:
+        dataset.writer = get_writer(dataset, **kwargs)
+
+    return dataset

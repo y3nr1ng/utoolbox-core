@@ -1,13 +1,14 @@
-from ..format import Format
 from .. import formats
+from ..dataset import Dataset
+from ..format import Format
 
 
 class Zarr(Format):
-    def can_read(self, uri):
-        pass
+    def can_read(self, dataset: Dataset):
+        return True
 
-    def can_write(self, uri):
-        pass
+    def can_write(self, dataset: Dataset):
+        return True
 
     class Reader(Format.Reader):
         def __len__(self):
@@ -18,7 +19,12 @@ class Zarr(Format):
         def open(self, **kwargs):
             pass
 
-        def close(self):
+        def _close(self):
+            pass
+
+        ##
+
+        def set_index(self, **index):
             pass
 
         ##
@@ -26,17 +32,28 @@ class Zarr(Format):
         def get_data(self, **index):
             pass
 
-        def get_next_data(self):
-            pass
-
         def get_metadata(self, **index):
             pass
+
+    class Writer(Format.Writer):
+        def open(self, **kwargs):
+            pass
+
+        def _close(self):
+            pass
+
+        ##
 
         def set_index(self, **index):
             pass
 
-    class Writer(Format.Writer):
-        pass
+        ##
+
+        def set_data(self):
+            pass
+
+        def set_metadata(self):
+            pass
 
 
 # register

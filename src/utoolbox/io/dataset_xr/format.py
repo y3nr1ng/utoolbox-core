@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from .dataset import Dataset
 
@@ -233,6 +233,9 @@ class FormatManager:
         return len(self._formats)
 
     def __str__(self):
+        if not self:
+            return "*empty*"
+
         ss = []
         for format in self:
             s = f"{format.name} - {format.description}"
@@ -241,7 +244,7 @@ class FormatManager:
 
     ##
 
-    def add_format(self, format, overwrite=False):
+    def add_format(self, format: Format, overwrite: bool = False):
         if not isinstance(format, Format):
             raise TypeError("add_format needs argument to be a Format object")
         elif format in self._formats:
@@ -256,27 +259,31 @@ class FormatManager:
                 )
         self._formats.append(format)
 
-    def search_read_format(self, uri):
+    def search_read_format(self, dataset: Dataset) -> Optional[Format]:
         """
         Search a format that can read the uri.
 
         Args:
-            uri (Path): path to the dataset
+            dataset (Dataset): TBD
         """
         for f in self._formats:
-            if f.can_read(uri):
+            if f.can_read(dataset):
                 return f
+        else:
+            return None
 
-    def search_write_format(self, uri):
+    def search_write_format(self, dataset: Dataset) -> Optional[Format]:
         """
         Search a format that can write the uri.
 
         Args:
-            uri (Path): path to the dataset
+            dataset (Dataset): path to the dataset
         """
         for f in self._formats:
-            if f.can_write(uri):
+            if f.can_write(dataset):
                 return f
+        else:
+            return None
 
     def get_format_names(self) -> List[str]:
         return [f.name for f in self]

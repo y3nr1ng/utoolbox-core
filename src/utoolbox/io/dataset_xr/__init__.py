@@ -10,12 +10,11 @@ from .format import FormatManager
 
 # instantiate format manager as singleton
 formats = FormatManager()
-
-# load the functions
-# TODO
-
 # load all the concrete dataset reader/writer implementations
 from . import datasets
 
 # namespace cleanup
 del FormatManager
+
+# load the functions
+from .functions import open_dataset

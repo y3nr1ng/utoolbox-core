@@ -1,12 +1,14 @@
-from typing import Union
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict, Union
+
 import xarray as xr
 
 
 class Dataset:
     """
-    Dataset represents a unified interface for reading or writing a dataset. This objects wraps information to access a dataset and acts as an interface for the plugins to various resources.
+    Dataset represents a unified interface for reading or writing a dataset. This 
+    objects wraps information to access a dataset and acts as an interface for the 
+    plugins to various resources.
 
     Args:
         uri (str or Path): the resource to load the dataset from
@@ -29,6 +31,8 @@ class Dataset:
 
         # the actual dataset instance
         self._data = None
+        self._reader = None
+        self._writer = None
 
         # mode string type check
         if not isinstance(mode, str):
@@ -37,7 +41,7 @@ class Dataset:
             raise ValueError(
                 "mode should start with r (read), w (write), or a (append)"
             )
-        elif mode not in "rwa+":
+        elif any(c not in "rwa+" for c in mode):
             raise ValueError("mode string contains invalid characters")
         # simplify mode string
         if mode == "r+":
@@ -80,19 +84,41 @@ class Dataset:
         """Additional keyword arguments supplied by the user."""
         return self._kwargs
 
+    @property
+    def reader(self):
+        if self._reader is None:
+            raise RuntimeError("dataset is not readable")
+        return self._reader
+
+    @reader.setter
+    def reader(self, reader):
+        self._reader = reader
+
+    @property
+    def writer(self):
+        if self._writer is None:
+            raise RuntimeError("dataset is not writable")
+        return self._writer
+
+    @writer.setter
+    def writer(self, writer):
+        self._writer = writer
+
     ##
 
     def get_xarray(self) -> xr.Dataset:
         """
-        Get the xarray object that is associated with this dataset. If this is a 
-        reading request, the file is in read mode, otherwise, in write mode.
+        Get the underlying xarray object that is associated with this dataset. If this 
+        is a reading request, the file is in read mode, otherwise, in write mode.
 
         Args:
             TBD
         """
-        # we already has a representation
+        # we already have a representation
         if self._data is not None:
             return self._data
+
+        # TODO
 
     ##
 
@@ -104,4 +130,3 @@ class Dataset:
 
         # parse extension
         self._extension = "".join(self._filename.suffixes)
-
