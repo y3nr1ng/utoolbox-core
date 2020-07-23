@@ -1,5 +1,8 @@
 from typing import Optional
 
+import xarray as xr
+
+from . import indexer  # noqa
 from .format import Format
 
 
@@ -9,6 +12,10 @@ class Dataset:
     ):
         self._reader = reader
         self._writer = writer
+
+        self._obj = None
+
+        # TODO build dataset
 
     ##
 
@@ -23,3 +30,12 @@ class Dataset:
         if self._writer is None:
             raise RuntimeError("dataset is not writable")
         return self._writer
+
+    @property
+    def obj(self) -> xr.Dataset:
+        return self._obj
+
+    ##
+
+    def get_xarray(self) -> xr.Dataset:
+        pass

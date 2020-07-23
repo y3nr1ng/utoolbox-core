@@ -2,12 +2,12 @@ from abc import ABC, abstractmethod
 from collections.abc import MutableMapping
 from typing import Tuple
 
-from .dataset import Dataset
+import xarray as xr
 
 
 class Indexer(MutableMapping, ABC):
-    def __init__(self, dataset: Dataset):
-        self._dataset = dataset
+    def __init__(self, xarray_obj: xr.Dataset):
+        self._obj = xarray_obj
         self._validate_requirements()
 
     def __getitem__(self, key):
@@ -28,9 +28,9 @@ class Indexer(MutableMapping, ABC):
     ##
 
     @property
-    def dataset(self) -> Dataset:
-        """Parent dataset this indexer points to."""
-        return self._dataset
+    def obj(self) -> xr.Dataset:
+        """The xr.Dataset object to operate on."""
+        return self._obj
 
     @property
     @classmethod
@@ -47,6 +47,7 @@ class Indexer(MutableMapping, ABC):
     ##
 
     def sel(self, **kwargs):
+        # TODO
         pass
 
     ##
@@ -101,12 +102,14 @@ class GroupedIndexer(Indexer):
                 )
 
 
+@xr.register_dataset_accessor("grid")
 class GridIndexer(GroupedIndexer):
     coords = ("grid",)
     coord_suffixes = ("x", "y", "z")
     allow_partial = True
 
 
+@xr.register_dataset_accessor("coordinate")
 class CoordinateIndexer(GroupedIndexer):
     coords = ("coord",)
     coord_suffixes = ("x", "y", "z")
@@ -114,13 +117,16 @@ class CoordinateIndexer(GroupedIndexer):
     attrs = ("coord_unit",)
 
 
+@xr.register_dataset_accessor("view")
 class ViewIndexer(Indexer):
     coords = ("view",)
 
 
+@xr.register_dataset_accessor("time")
 class TimeIndexer(Indexer):
     coords = ("time",)
 
 
+@xr.register_dataset_accessor("channel")
 class ChannelIndexer(Indexer):
     coords = ("channel",)

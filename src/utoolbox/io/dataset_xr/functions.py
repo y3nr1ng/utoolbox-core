@@ -38,4 +38,4 @@ def open_dataset(uri, mode="r", format=None, **kwargs):
 
     # create dataset instance
     with reader, writer:
-        yield Dataset(reader, writer)
+        yield Dataset(reader, writer).get_xarray()
