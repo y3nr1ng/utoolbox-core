@@ -46,7 +46,7 @@ class Indexer(MutableMapping, ABC):
 
     ##
 
-    def loc(self, **kwargs):
+    def sel(self, **kwargs):
         pass
 
     ##

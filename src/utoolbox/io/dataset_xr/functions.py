@@ -1,6 +1,7 @@
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 
 from . import formats
+from .request import Request
 from .dataset import Dataset
 
 
@@ -14,20 +15,27 @@ def open_dataset(uri, mode="r", format=None, **kwargs):
         mode (str) : TBD
         **kwargs : TBD
     """
-    dataset = Dataset(uri, mode, **kwargs)
+    request = Request(uri, mode, **kwargs)
 
+    # determine access format
     if format is not None:
         # we know the format
         format = formats[format]
-        get_reader, get_writer = format.get_reader, format.get_writer
+        r_format, w_format = format, format
     else:
-        # search the format
-        get_reader, get_writer = formats.search_read_format, formats.search_write_format
+        r_format = formats.search_read_format(request) if request.readable else None
+        w_format = formats.search_write_format(request) if request.writable else None
 
-    # TODO use instance attribute to attach reader/writer/indexers
-    if "r" in mode:
-        dataset.reader = get_reader(dataset, **kwargs)
-    if "w" in mode or "a" in mode:
-        dataset.writer = get_writer(dataset, **kwargs)
+    # get reader/writer
+    try:
+        reader = r_format.get_reader(request, **kwargs)
+    except AttributeError:
+        reader = nullcontext()
+    try:
+        writer = w_format.get_writer(request, **kwargs)
+    except AttributeError:
+        writer = nullcontext()
 
-    return dataset
+    # create dataset instance
+    with reader, writer:
+        yield Dataset(reader, writer)

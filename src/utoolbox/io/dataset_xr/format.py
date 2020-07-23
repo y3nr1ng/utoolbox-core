@@ -4,7 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple
 
-from .dataset import Dataset
+from .request import Request
 
 logger = logging.getLogger("utoolbox.io.dataset.format")
 
@@ -18,7 +18,7 @@ class Format(ABC):
         description (str): one-line description of the format
     """
 
-    def __init__(self, name, description):
+    def __init__(self, name: str, description: str):
         self._name = name
         self._description = description
 
@@ -29,41 +29,37 @@ class Format(ABC):
     ##
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._name
 
     @property
-    def description(self):
+    def description(self) -> str:
         return self._description
-
-    @property
-    def modes(self) -> Tuple[str]:
-        return self._modes
 
     ##
 
-    def get_reader(self, dataset: Dataset, **kwargs):
-        return self.Reader(self, dataset, **kwargs)
+    def get_reader(self, request: Request, **kwargs):
+        return self.Reader(self, request, **kwargs)
 
-    def get_writer(self, dataset: Dataset, **kwargs):
-        return self.Writer(self, dataset, **kwargs)
+    def get_writer(self, request: Request, **kwargs):
+        return self.Writer(self, request, **kwargs)
 
     @abstractmethod
-    def can_read(self, dataset: Dataset) -> bool:
+    def can_read(self, request: Request) -> bool:
         """
         Whether this dataset can read data from the specified dataset object.
 
         Args:
-            dataset (Dataset): dataset of interest
+            request (Request): TBD
         """
 
     @abstractmethod
-    def can_write(self, dataset: Dataset) -> bool:
+    def can_write(self, request: Request) -> bool:
         """
         Whether this dataset can write data to the specified dataset object.
 
         Args:
-            dataset (Dataset): dataset of interest
+            request (Request): TBD
         """
 
     ##
@@ -74,9 +70,9 @@ class Format(ABC):
         functions.
         """
 
-        def __init__(self, format: Format, dataset: Dataset, **kwargs):
+        def __init__(self, format: Format, request: Request, **kwargs):
             self._format = format
-            self._dataset = dataset
+            self._request = request
 
             # is this reader/writer op already terminated?
             self._closed = False
@@ -104,9 +100,9 @@ class Format(ABC):
             return self._format
 
         @property
-        def dataset(self) -> Dataset:
+        def request(self) -> Request:
             """The uri to dataset corresponding to current read/write operation."""
-            return self._dataset
+            return self._request
 
         ##
 
@@ -182,15 +178,6 @@ class Format(ABC):
             """
 
         @abstractmethod
-        def get_next_data(self):
-            """
-            Return the next data from the series.
-
-            TODO how to specify dimensional order?
-            """
-            pass
-
-        @abstractmethod
         def get_metadata(self, **index):
             """
             Read metadata of the data at provided index. If the index is None, this returns the global metadata.
@@ -208,10 +195,6 @@ class Format(ABC):
 
         @abstractmethod
         def set_data(self, data, **index):
-            pass
-
-        @abstractmethod
-        def append_data(self, data):
             pass
 
         @abstractmethod
@@ -259,28 +242,28 @@ class FormatManager:
                 )
         self._formats.append(format)
 
-    def search_read_format(self, dataset: Dataset) -> Optional[Format]:
+    def search_read_format(self, request: Request) -> Optional[Format]:
         """
         Search a format that can read the uri.
 
         Args:
-            dataset (Dataset): TBD
+            request (Request): TBD
         """
         for f in self._formats:
-            if f.can_read(dataset):
+            if f.can_read(request):
                 return f
         else:
             return None
 
-    def search_write_format(self, dataset: Dataset) -> Optional[Format]:
+    def search_write_format(self, request: Request) -> Optional[Format]:
         """
         Search a format that can write the uri.
 
         Args:
-            dataset (Dataset): path to the dataset
+            request (Request): TBD
         """
         for f in self._formats:
-            if f.can_write(dataset):
+            if f.can_write(request):
                 return f
         else:
             return None

@@ -1,13 +1,13 @@
 from .. import formats
-from ..dataset import Dataset
+from ..request import Request
 from ..format import Format
 
 
 class Zarr(Format):
-    def can_read(self, dataset: Dataset):
+    def can_read(self, request: Request):
         return True
 
-    def can_write(self, dataset: Dataset):
+    def can_write(self, request: Request):
         return True
 
     class Reader(Format.Reader):
@@ -17,7 +17,7 @@ class Zarr(Format):
         ##
 
         def open(self, **kwargs):
-            pass
+            print("reader open")
 
         def _close(self):
             pass
@@ -37,7 +37,7 @@ class Zarr(Format):
 
     class Writer(Format.Writer):
         def open(self, **kwargs):
-            pass
+            print("writer open")
 
         def _close(self):
             pass
