@@ -8,7 +8,16 @@ import xarray as xr
 class Indexer(MutableMapping, ABC):
     def __init__(self, xarray_obj: xr.Dataset):
         self._obj = xarray_obj
-        self._validate_requirements()
+
+        self._index = None
+        try:
+            self._populate_index()
+        except ValueError:
+            # indexer has nothing to do with this object
+            self._index = []
+        else:
+            # populate available index
+            pass
 
     def __getitem__(self, key):
         pass
@@ -20,12 +29,19 @@ class Indexer(MutableMapping, ABC):
         pass
 
     def __iter__(self):
-        pass
+        for index in self._index:
+            yield index
 
     def __len__(self):
-        pass
+        return len(self._index)
 
     ##
+
+    @property
+    @classmethod
+    def allow_partial(self) -> bool:
+        """Allow some of the suffixes combination missing."""
+        return False
 
     @property
     def obj(self) -> xr.Dataset:
@@ -52,69 +68,30 @@ class Indexer(MutableMapping, ABC):
 
     ##
 
-    def _validate_requirements(self):
-        self._validate_coords()
-        self._validate_attrs()
-
-    def _validate_coords(self):
+    def _populate_index(self):
+        coords = []
         for coord in self.coords:
             if coord not in self.dataset.coords:
-                raise ValueError(f'missing coordinate "{coord}"')
-
-    def _validate_attrs(self):
-        for attr in self.attrs:
-            if attr not in self.dataset.attrs:
-                raise ValueError(f'missing attribute "{attr}"')
-
-
-class GroupedIndexer(Indexer):
-    """
-    Indexer that iterate through a group of coordinates at once.
-    """
-
-    @property
-    @classmethod
-    @abstractmethod
-    def coord_suffixes(self) -> Tuple[str]:
-        """Coordinate name suffixes require by this indexer."""
-
-    @property
-    @classmethod
-    def allow_partial(self) -> bool:
-        """Allow some of the suffixes combination missing."""
-        return False
-
-    ##
-
-    def _validate_coords(self):
-        for coord in self.coords:
-            for suffix in self.coord_suffixes:
-                coord = f"{coord}_{suffix}"
-                if coord in self.dataset.coords:
-                    if self.allow_partial:
-                        break
-                else:
-                    if not self.allow_partial:
-                        raise ValueError(f'missing coordinate "{coord}"')
+                if not self.allow_partial:
+                    raise ValueError(f'missing coordinate "{coord}"')
             else:
-                raise ValueError(
-                    f'coordinate "{coord}" does not have any suffix match"'
-                )
+                coords.append(coord)
+
+        # save coordinate names that we can iterate over with
+        self._iter_coords = coords
+
 
 
 @xr.register_dataset_accessor("grid")
-class GridIndexer(GroupedIndexer):
-    coords = ("grid",)
-    coord_suffixes = ("x", "y", "z")
+class GridIndexer(Indexer):
+    coords = ("grid_x", "grid_y", "grid_z")
     allow_partial = True
 
 
 @xr.register_dataset_accessor("coordinate")
-class CoordinateIndexer(GroupedIndexer):
-    coords = ("coord",)
-    coord_suffixes = ("x", "y", "z")
+class CoordinateIndexer(Indexer):
+    coords = ("coord_x", "coord_y", "coord_z")
     allow_partial = True
-    attrs = ("coord_unit",)
 
 
 @xr.register_dataset_accessor("view")
